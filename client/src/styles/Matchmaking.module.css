@@ -1,0 +1,259 @@
+/* ============================================
+   MATCHMAKING PAGE STYLES
+   ============================================ */
+
+.matchPage {
+    padding: 90px 20px 40px;
+    min-height: 100vh;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 28px;
+    animation: fadeInUp 0.5s ease;
+}
+
+.tabs {
+    display: flex;
+    gap: 4px;
+    background: var(--bg-glass);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-full);
+    padding: 4px;
+    margin-bottom: 24px;
+    animation: fadeInUp 0.5s ease 0.1s both;
+    width: fit-content;
+}
+
+.tab {
+    padding: 10px 20px;
+    background: none;
+    border: none;
+    border-radius: var(--radius-full);
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.tab:hover {
+    color: var(--text-primary);
+}
+
+.tab.active {
+    background: var(--gradient-primary);
+    color: #000;
+    font-weight: 600;
+}
+
+.matchGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    gap: 16px;
+}
+
+/* Create Match Modal */
+.createModal {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.modalOverlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+}
+
+.modalContent {
+    position: relative;
+    width: 100%;
+    max-width: 520px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-xl);
+    padding: 32px;
+    animation: fadeInUp 0.3s ease;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.modalHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.modalTitle {
+    font-size: 1.25rem;
+    font-weight: 700;
+}
+
+.modalClose {
+    background: var(--bg-glass);
+    border: 1px solid var(--border-glass);
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+    transition: all var(--transition-fast);
+}
+
+.modalClose:hover {
+    background: var(--bg-glass-hover);
+    color: var(--text-primary);
+}
+
+.modalForm {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.playerCount {
+    display: flex;
+    gap: 10px;
+}
+
+.playerBtn {
+    flex: 1;
+    padding: 14px;
+    background: var(--bg-glass);
+    border: 2px solid var(--border-glass);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    text-align: center;
+}
+
+.playerBtn:hover {
+    border-color: var(--border-glass-hover);
+}
+
+.playerBtn.selected {
+    border-color: var(--accent-green);
+    background: var(--accent-green-dim);
+    color: var(--accent-green);
+}
+
+/* Match Detail Page */
+.matchDetailPage {
+    padding: 90px 20px 40px;
+    min-height: 100vh;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.matchDetailCard {
+    background: var(--bg-card);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+}
+
+.matchDetailHeader {
+    padding: 24px;
+    background: linear-gradient(135deg, rgba(0, 230, 118, 0.08), rgba(59, 130, 246, 0.04));
+    border-bottom: 1px solid var(--border-glass);
+}
+
+.matchDetailBody {
+    padding: 24px;
+}
+
+.playersList {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.playerItem {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: var(--bg-glass);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-glass);
+}
+
+.playerInfo {
+    flex: 1;
+}
+
+.playerName {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.playerStatus {
+    font-size: 0.75rem;
+}
+
+.emptySlot {
+    border-style: dashed;
+    border-color: rgba(255, 255, 255, 0.15);
+    justify-content: center;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+.costBreakdown {
+    background: var(--bg-glass);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    margin-top: 20px;
+}
+
+.costRow {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.costTotal {
+    border-top: 1px solid var(--border-glass);
+    margin-top: 8px;
+    padding-top: 10px;
+    font-weight: 700;
+    color: var(--accent-green);
+    font-size: 1rem;
+}
+
+@media (max-width: 768px) {
+    .matchPage {
+        padding: 80px 16px 32px;
+    }
+
+    .matchGrid {
+        grid-template-columns: 1fr;
+    }
+
+    .header {
+        flex-direction: column;
+        gap: 12px;
+        align-items: flex-start;
+    }
+}

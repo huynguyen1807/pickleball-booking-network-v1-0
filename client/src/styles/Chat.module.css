@@ -1,0 +1,245 @@
+/* ============================================
+   CHAT PAGE STYLES
+   ============================================ */
+
+.chatPage {
+    padding: 70px 0 0;
+    height: 100vh;
+    display: flex;
+}
+
+.chatSidebar {
+    width: 320px;
+    border-right: 1px solid var(--border-glass);
+    background: var(--bg-secondary);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+}
+
+.chatSidebarHeader {
+    padding: 20px;
+    border-bottom: 1px solid var(--border-glass);
+}
+
+.chatSidebarTitle {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 12px;
+}
+
+.chatSearch {
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--bg-glass);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-full);
+    color: var(--text-primary);
+    font-size: 0.85rem;
+}
+
+.chatSearch::placeholder {
+    color: var(--text-muted);
+}
+
+.chatRoomList {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.chatRoomItem {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 20px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.chatRoomItem:hover {
+    background: var(--bg-glass);
+}
+
+.chatRoomItem.activeRoom {
+    background: var(--accent-green-dim);
+    border-left: 3px solid var(--accent-green);
+}
+
+.chatRoomAvatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--bg-glass);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    flex-shrink: 0;
+}
+
+.chatRoomMeta {
+    flex: 1;
+    min-width: 0;
+}
+
+.chatRoomName {
+    font-weight: 600;
+    font-size: 0.9rem;
+    margin-bottom: 2px;
+}
+
+.chatRoomLastMsg {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.chatRoomTime {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+
+.chatUnread {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--accent-green);
+    color: #000;
+    font-size: 0.65rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Chat Main Area */
+.chatMain {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.chatBox {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 70px);
+}
+
+.chatHeader {
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border-glass);
+    background: var(--bg-secondary);
+}
+
+.chatRoomInfo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.chatOnline {
+    font-size: 0.75rem;
+    color: var(--accent-green);
+}
+
+.chatMessages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.message {
+    display: flex;
+    gap: 8px;
+    max-width: 70%;
+    animation: fadeIn 0.2s ease;
+}
+
+.myMessage {
+    align-self: flex-end;
+    flex-direction: row-reverse;
+}
+
+.messageBubble {
+    background: var(--bg-glass);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-md);
+    padding: 10px 14px;
+}
+
+.myMessage .messageBubble {
+    background: var(--accent-green-dim);
+    border-color: rgba(0, 230, 118, 0.2);
+}
+
+.messageAuthor {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--accent-green);
+    margin-bottom: 4px;
+}
+
+.messageText {
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+.messageTime {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    margin-top: 4px;
+    text-align: right;
+}
+
+.chatInput {
+    padding: 16px 24px;
+    border-top: 1px solid var(--border-glass);
+    background: var(--bg-secondary);
+    display: flex;
+    gap: 12px;
+}
+
+.chatInput input {
+    flex: 1;
+}
+
+.chatEmpty {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+}
+
+.chatEmptyIcon {
+    font-size: 4rem;
+    margin-bottom: 16px;
+    opacity: 0.3;
+}
+
+@media (max-width: 768px) {
+    .chatSidebar {
+        width: 100%;
+    }
+
+    .chatMain {
+        display: none;
+    }
+
+    .chatPage.chatOpen .chatSidebar {
+        display: none;
+    }
+
+    .chatPage.chatOpen .chatMain {
+        display: flex;
+    }
+}

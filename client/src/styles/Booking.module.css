@@ -1,0 +1,361 @@
+/* ============================================
+   BOOKING & COURT DETAIL STYLES
+   ============================================ */
+
+.detailPage {
+    padding: 70px 0 40px;
+    min-height: 100vh;
+}
+
+.detailContainer {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* Court Hero */
+.courtHero {
+    height: 320px;
+    background: linear-gradient(135deg, #1a2332, #0d1117);
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.courtHeroPlaceholder {
+    font-size: 5rem;
+    opacity: 0.2;
+}
+
+.courtHeroOverlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(10, 14, 23, 0.95), transparent);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 20px 24px;
+}
+
+.backBtn {
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-full);
+    padding: 8px 16px;
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    cursor: pointer;
+    align-self: flex-start;
+    transition: all var(--transition-fast);
+}
+
+.backBtn:hover {
+    background: rgba(0, 0, 0, 0.6);
+}
+
+.courtHeroInfo {
+    margin-top: auto;
+}
+
+.courtName {
+    font-size: 1.8rem;
+    font-weight: 800;
+    margin-bottom: 6px;
+}
+
+.courtAddress {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+}
+
+/* Detail Grid */
+.detailGrid {
+    display: grid;
+    grid-template-columns: 1fr 400px;
+    gap: 24px;
+    padding: 24px;
+}
+
+.detailLeft {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.detailRight {
+    position: sticky;
+    top: 90px;
+    align-self: start;
+}
+
+/* Stats */
+.statsRow {
+    display: flex;
+    justify-content: space-around;
+    text-align: center;
+}
+
+.stat {
+    padding: 8px 0;
+}
+
+.statValue {
+    font-size: 1.2rem;
+    font-weight: 800;
+    color: var(--accent-green);
+}
+
+.statLabel {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+/* Sections */
+.sectionTitle {
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 14px;
+}
+
+.description {
+    color: var(--text-secondary);
+    line-height: 1.7;
+    font-size: 0.9rem;
+}
+
+.amenities {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.amenity {
+    padding: 6px 14px;
+    background: var(--bg-glass);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-full);
+    font-size: 0.825rem;
+    color: var(--text-secondary);
+}
+
+/* Reviews */
+.review {
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border-glass);
+}
+
+.review:last-child {
+    border-bottom: none;
+}
+
+.reviewHeader {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.reviewUser {
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+.reviewDate {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.reviewRating {
+    margin-left: auto;
+    font-size: 0.75rem;
+}
+
+.reviewText {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    line-height: 1.5;
+}
+
+/* Booking Card */
+.bookingCard {
+    animation: glow 3s infinite;
+}
+
+.slotsGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.slotBtn {
+    padding: 10px;
+    background: var(--bg-glass);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-size: 0.825rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    text-align: center;
+}
+
+.slotBtn:hover:not(:disabled) {
+    border-color: var(--accent-green);
+    background: var(--accent-green-dim);
+}
+
+.slotSelected {
+    border-color: var(--accent-green) !important;
+    background: var(--accent-green-dim) !important;
+    color: var(--accent-green) !important;
+    box-shadow: 0 0 10px var(--accent-green-glow);
+}
+
+.slotUnavailable {
+    opacity: 0.35;
+    cursor: not-allowed !important;
+    text-decoration: line-through;
+}
+
+/* Booking Summary */
+.bookingSummary {
+    background: var(--bg-glass);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.summaryRow {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.summaryTotal {
+    border-top: 1px solid var(--border-glass);
+    margin-top: 8px;
+    padding-top: 10px;
+    font-weight: 700;
+    color: var(--accent-green);
+    font-size: 1rem;
+}
+
+/* Owner Info */
+.ownerInfo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-glass);
+}
+
+/* ---- Booking Confirm Page ---- */
+.bookingPage {
+    padding: 90px 20px 40px;
+    min-height: 100vh;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.bookingSteps {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 32px;
+}
+
+.step {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.step.activeStep {
+    color: var(--accent-green);
+}
+
+.stepNumber {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--bg-glass);
+    border: 1px solid var(--border-glass);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.8rem;
+}
+
+.activeStep .stepNumber {
+    background: var(--gradient-primary);
+    color: #000;
+    border: none;
+}
+
+.paymentMethods {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.paymentOption {
+    padding: 16px;
+    background: var(--bg-glass);
+    border: 2px solid var(--border-glass);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.paymentOption:hover {
+    border-color: var(--border-glass-hover);
+}
+
+.paymentOption.selectedPayment {
+    border-color: var(--accent-green);
+    background: var(--accent-green-dim);
+}
+
+.paymentIcon {
+    font-size: 1.5rem;
+}
+
+.paymentName {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.paymentDesc {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+@media (max-width: 768px) {
+    .detailGrid {
+        grid-template-columns: 1fr;
+        padding: 16px;
+    }
+
+    .detailRight {
+        position: static;
+    }
+
+    .courtHero {
+        height: 240px;
+    }
+
+    .courtName {
+        font-size: 1.3rem;
+    }
+}

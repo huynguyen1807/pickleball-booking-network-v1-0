@@ -1,0 +1,252 @@
+/* ============================================
+   REGISTER PAGE STYLES
+   ============================================ */
+
+.registerPage {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-primary);
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+}
+
+.registerPage::before {
+    content: '';
+    position: absolute;
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(circle, rgba(0, 230, 118, 0.08), transparent 70%);
+    top: -100px;
+    left: -100px;
+    pointer-events: none;
+}
+
+.registerContainer {
+    width: 100%;
+    max-width: 500px;
+    animation: fadeInUp 0.6s ease;
+    position: relative;
+    z-index: 1;
+}
+
+.header {
+    text-align: center;
+    margin-bottom: 32px;
+}
+
+.logo {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.logoIcon {
+    width: 48px;
+    height: 48px;
+    background: var(--gradient-primary);
+    border-radius: var(--radius-lg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    box-shadow: var(--shadow-glow);
+}
+
+.logoText {
+    font-size: 1.6rem;
+    font-weight: 800;
+}
+
+.logoText span {
+    color: var(--accent-green);
+}
+
+.title {
+    font-size: 1.4rem;
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+
+.subtitle {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.card {
+    background: var(--bg-card);
+    backdrop-filter: blur(30px);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-xl);
+    padding: 36px;
+}
+
+.form {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.formRow {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+
+.form label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+    display: block;
+}
+
+.form input,
+.form select {
+    width: 100%;
+    padding: 14px 16px;
+    background: var(--bg-glass);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    transition: all var(--transition-fast);
+}
+
+.form input:focus,
+.form select:focus {
+    border-color: var(--accent-green);
+    box-shadow: 0 0 0 3px var(--accent-green-dim);
+}
+
+.form input::placeholder {
+    color: var(--text-muted);
+}
+
+.form select {
+    cursor: pointer;
+    appearance: none;
+}
+
+.form select option {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+.roleSelector {
+    display: flex;
+    gap: 12px;
+}
+
+.roleOption {
+    flex: 1;
+    padding: 16px;
+    background: var(--bg-glass);
+    border: 2px solid var(--border-glass);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    text-align: center;
+    transition: all var(--transition-fast);
+}
+
+.roleOption:hover {
+    border-color: var(--border-glass-hover);
+}
+
+.roleOption.active {
+    border-color: var(--accent-green);
+    background: var(--accent-green-dim);
+}
+
+.roleIcon {
+    font-size: 1.8rem;
+    margin-bottom: 8px;
+    display: block;
+}
+
+.roleName {
+    font-weight: 600;
+    font-size: 0.9rem;
+    display: block;
+}
+
+.roleDesc {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 4px;
+    display: block;
+}
+
+.ownerNote {
+    background: var(--accent-yellow-dim);
+    color: var(--accent-yellow);
+    padding: 12px 16px;
+    border-radius: var(--radius-md);
+    font-size: 0.825rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.submitBtn {
+    padding: 14px;
+    background: var(--gradient-primary);
+    color: #000;
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all var(--transition-normal);
+    box-shadow: var(--shadow-glow);
+}
+
+.submitBtn:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-glow-strong);
+}
+
+.submitBtn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.footer {
+    text-align: center;
+    margin-top: 24px;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.footer a {
+    color: var(--accent-green);
+    font-weight: 600;
+}
+
+.errorMsg {
+    background: var(--accent-red-dim);
+    color: var(--accent-red);
+    padding: 12px 16px;
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    text-align: center;
+}
+
+.successMsg {
+    background: var(--accent-green-dim);
+    color: var(--accent-green);
+    padding: 12px 16px;
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    text-align: center;
+}
+
+@media (max-width: 480px) {
+    .formRow {
+        grid-template-columns: 1fr;
+    }
+}

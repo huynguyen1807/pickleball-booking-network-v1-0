@@ -1,0 +1,212 @@
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
+import api from '../api/axios'
+import PostCard from '../components/PostCard'
+import styles from '../styles/Home.module.css'
+
+export default function Home() {
+    const { user } = useAuth()
+    const navigate = useNavigate()
+    const [filter, setFilter] = useState('latest')
+    const [posts, setPosts] = useState([])
+    const [matches, setMatches] = useState([])
+    const [courts, setCourts] = useState([])
+    const [stats, setStats] = useState({ total_users: 0, total_courts: 0, today_matches: 0 })
+    const [loading, setLoading] = useState(true)
+    const [postContent, setPostContent] = useState('')
+    const [postType, setPostType] = useState('share')
+    const [posting, setPosting] = useState(false)
+
+    useEffect(() => {
+        loadData()
+    }, [])
+
+    const loadData = async () => {
+        try {
+            const [postsRes, matchesRes, courtsRes] = await Promise.all([
+                api.get('/posts'),
+                api.get('/matches?status=waiting').catch(() => ({ data: [] })),
+                api.get('/courts')
+            ])
+            setPosts(postsRes.data)
+            setMatches(matchesRes.data?.slice(0, 3) || [])
+            setCourts(courtsRes.data?.slice(0, 3) || [])
+
+            // Try to get stats (may fail if not admin, that's ok)
+            try {
+                const statsRes = await api.get('/stats/admin')
+                setStats(statsRes.data)
+            } catch {
+                // Fallback: count from loaded data
+                setStats({
+                    total_users: '-',
+                    total_courts: courtsRes.data?.length || 0,
+                    today_matches: matchesRes.data?.length || 0
+                })
+            }
+        } catch (err) {
+            console.error('Load data error:', err)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const handleCreatePost = async () => {
+        if (!postContent.trim()) return
+        setPosting(true)
+        try {
+            await api.post('/posts', { content: postContent, post_type: postType })
+            setPostContent('')
+            setPostType('share')
+            loadData()
+        } catch (err) {
+            alert(err.response?.data?.message || 'Lỗi khi đăng bài')
+        } finally {
+            setPosting(false)
+        }
+    }
+
+    const filteredPosts = filter === 'find_player'
+        ? posts.filter(p => p.post_type === 'find_player')
+        : filter === 'event'
+            ? posts.filter(p => p.post_type === 'event')
+            : posts
+
+    const filters = [
+        { key: 'latest', label: '🕐 Mới nhất' },
+        { key: 'popular', label: '🔥 Phổ biến' },
+        { key: 'find_player', label: '🎯 Tìm người chơi' },
+        { key: 'event', label: '🎉 Sự kiện' }
+    ]
+
+    const formatPrice = (p) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(p)
+
+    if (loading) return <div className={styles.homePage} style={{ textAlign: 'center', padding: '60px 20px' }}>⏳ Đang tải...</div>
+
+    return (
+        <div className={styles.homePage}>
+            {/* Hero */}
+            <div className={styles.hero}>
+                <div className={styles.heroContent}>
+                    <h1 className={styles.heroTitle}>
+                        Chào {user?.full_name}! 🏓
+                    </h1>
+                    <p className={styles.heroSubtitle}>
+                        Khám phá cộng đồng Pickleball sôi động nhất Đà Nẵng
+                    </p>
+                    <div className={styles.heroStats}>
+                        <div className={styles.heroStat}>
+                            <div className={styles.heroStatValue}>{stats.total_users}</div>
+                            <div className={styles.heroStatLabel}>Người chơi</div>
+                        </div>
+                        <div className={styles.heroStat}>
+                            <div className={styles.heroStatValue}>{stats.total_courts}</div>
+                            <div className={styles.heroStatLabel}>Sân chơi</div>
+                        </div>
+                        <div className={styles.heroStat}>
+                            <div className={styles.heroStatValue}>{stats.today_matches}</div>
+                            <div className={styles.heroStatLabel}>Trận hôm nay</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Create Post */}
+            <div className={styles.createPost}>
+                <div className="avatar">{user?.full_name?.charAt(0) || '?'}</div>
+                <div style={{ flex: 1 }}>
+                    <textarea
+                        className={styles.createPostInput}
+                        placeholder="Bạn đang nghĩ gì? Chia sẻ với cộng đồng..."
+                        value={postContent}
+                        onChange={e => setPostContent(e.target.value)}
+                        rows={2}
+                        style={{ width: '100%', resize: 'vertical', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '10px 14px', color: 'var(--text-primary)', fontSize: '0.875rem' }}
+                    />
+                    <div className={styles.createPostActions}>
+                        <select value={postType} onChange={e => setPostType(e.target.value)}
+                            style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', padding: '4px 8px', color: 'var(--text-primary)', fontSize: '0.8rem' }}>
+                            <option value="share">📸 Chia sẻ</option>
+                            <option value="find_player">🎯 Tìm bạn chơi</option>
+                            <option value="event">🎉 Sự kiện</option>
+                        </select>
+                        <button className="btn btn-primary btn-sm" onClick={handleCreatePost} disabled={posting || !postContent.trim()}>
+                            {posting ? '⏳...' : '📤 Đăng'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Filters */}
+            <div className={styles.filters}>
+                {filters.map(f => (
+                    <button
+                        key={f.key}
+                        className={`${styles.filterBtn} ${filter === f.key ? styles.active : ''}`}
+                        onClick={() => setFilter(f.key)}
+                    >
+                        {f.label}
+                    </button>
+                ))}
+            </div>
+
+            {/* Main Layout */}
+            <div className={styles.mainLayout}>
+                {/* Feed */}
+                <div className={styles.feed}>
+                    {filteredPosts.length > 0 ? filteredPosts.map(post => (
+                        <PostCard key={post.id} post={post} />
+                    )) : (
+                        <div className="glass-card" style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-secondary)' }}>
+                            📝 Chưa có bài viết nào. Hãy là người đầu tiên chia sẻ!
+                        </div>
+                    )}
+                </div>
+
+                {/* Sidebar */}
+                <div className={styles.sidebar}>
+                    {/* Matches */}
+                    <div className={styles.sidebarCard}>
+                        <h3 className={styles.sidebarTitle}>🎯 Trận đang chờ ghép</h3>
+                        {matches.length > 0 ? matches.map((m) => (
+                            <div key={m.id} className={styles.matchItem} onClick={() => navigate(`/matches/${m.id}`)} style={{ cursor: 'pointer' }}>
+                                <div className={styles.matchItemInfo}>
+                                    <div className={styles.matchItemName}>{m.court_name}</div>
+                                    <div className={styles.matchItemTime}>{m.match_date?.split('T')[0]} {m.start_time}</div>
+                                </div>
+                                <div className={styles.matchItemSpots}>{m.max_players - m.current_players} chỗ trống</div>
+                            </div>
+                        )) : (
+                            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', padding: '8px 0' }}>
+                                Chưa có trận nào đang chờ
+                            </div>
+                        )}
+                        <button className="btn btn-primary btn-sm" style={{ width: '100%', marginTop: '12px' }}
+                            onClick={() => navigate('/matchmaking')}>
+                            Xem tất cả
+                        </button>
+                    </div>
+
+                    {/* Courts */}
+                    <div className={styles.sidebarCard}>
+                        <h3 className={styles.sidebarTitle}>🏟️ Sân phổ biến</h3>
+                        {courts.length > 0 ? courts.map((c) => (
+                            <div key={c.id} className={styles.courtItem} onClick={() => navigate(`/courts/${c.id}`)} style={{ cursor: 'pointer' }}>
+                                <div className={styles.courtItemIcon}>🏟️</div>
+                                <div className={styles.courtItemInfo}>
+                                    <div className={styles.courtItemName}>{c.name}</div>
+                                    <div className={styles.courtItemPrice}>{formatPrice(c.price_per_hour)}/h</div>
+                                </div>
+                            </div>
+                        )) : (
+                            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', padding: '8px 0' }}>
+                                Chưa có sân nào
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+}

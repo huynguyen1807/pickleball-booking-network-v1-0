@@ -1,0 +1,253 @@
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const nodemailer = require('nodemailer');
+const { sql, poolPromise } = require('../config/db');
+require('dotenv').config();
+
+// In-memory OTP store
+const otpStore = new Map();
+
+// Email transporter — Gmail with App Password
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+    }
+});
+
+// Generate 6-digit code
+const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
+
+// Register
+exports.register = async (req, res) => {
+    try {
+        const { email, password, full_name, phone, role } = req.body;
+        if (!email || !password || !full_name) {
+            return res.status(400).json({ message: 'Vui lòng điền đầy đủ thông tin' });
+        }
+
+        const pool = await poolPromise;
+        const existing = await pool.request()
+            .input('email', sql.NVarChar, email)
+            .query('SELECT id FROM users WHERE email = @email');
+        if (existing.recordset.length > 0) {
+            return res.status(400).json({ message: 'Email đã tồn tại' });
+        }
+
+        const hash = await bcrypt.hash(password, 10);
+        const userRole = role === 'owner' ? 'owner' : 'user';
+        const status = role === 'owner' ? 'pending' : 'active';
+
+        const result = await pool.request()
+            .input('email', sql.NVarChar, email)
+            .input('password', sql.NVarChar, hash)
+            .input('full_name', sql.NVarChar, full_name)
+            .input('phone', sql.NVarChar, phone || null)
+            .input('role', sql.NVarChar, userRole)
+            .input('status', sql.NVarChar, status)
+            .query(`INSERT INTO users (email, password, full_name, phone, role, status)
+              OUTPUT INSERTED.id
+              VALUES (@email, @password, @full_name, @phone, @role, @status)`);
+
+        res.status(201).json({
+            message: status === 'pending' ? 'Đăng ký thành công! Vui lòng chờ Admin duyệt.' : 'Đăng ký thành công!',
+            userId: result.recordset[0].id
+        });
+    } catch (err) {
+        console.error('Register error:', err);
+        res.status(500).json({ message: 'Lỗi server' });
+    }
+};
+
+// Login
+exports.login = async (req, res) => {
+    try {
+        const { email, password } = req.body;
+        if (!email || !password) {
+            return res.status(400).json({ message: 'Vui lòng nhập email và mật khẩu' });
+        }
+
+        const pool = await poolPromise;
+        const result = await pool.request()
+            .input('email', sql.NVarChar, email)
+            .query('SELECT * FROM users WHERE email = @email');
+
+        if (result.recordset.length === 0) {
+            return res.status(401).json({ message: 'Email hoặc mật khẩu không đúng' });
+        }
+
+        const user = result.recordset[0];
+        if (user.status === 'pending') {
+            return res.status(403).json({ message: 'Tài khoản đang chờ Admin duyệt' });
+        }
+        if (user.status === 'rejected') {
+            return res.status(403).json({ message: 'Tài khoản đã bị từ chối' });
+        }
+
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+            return res.status(401).json({ message: 'Email hoặc mật khẩu không đúng' });
+        }
+
+        const token = jwt.sign(
+            { id: user.id, email: user.email, role: user.role, full_name: user.full_name },
+            process.env.JWT_SECRET,
+            { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+        );
+
+        const { password: _, ...userData } = user;
+        res.json({ message: 'Đăng nhập thành công', token, user: userData });
+    } catch (err) {
+        console.error('Login error:', err);
+        res.status(500).json({ message: 'Lỗi server' });
+    }
+};
+
+// Get profile
+exports.getProfile = async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request()
+            .input('id', sql.Int, req.user.id)
+            .query('SELECT id, email, full_name, phone, avatar, role, status, latitude, longitude, created_at FROM users WHERE id = @id');
+        if (result.recordset.length === 0) return res.status(404).json({ message: 'Không tìm thấy user' });
+        res.json(result.recordset[0]);
+    } catch (err) {
+        res.status(500).json({ message: 'Lỗi server' });
+    }
+};
+
+// Change password
+exports.changePassword = async (req, res) => {
+    try {
+        const { current_password, new_password } = req.body;
+        const pool = await poolPromise;
+        const result = await pool.request()
+            .input('id', sql.Int, req.user.id)
+            .query('SELECT password FROM users WHERE id = @id');
+
+        const isMatch = await bcrypt.compare(current_password, result.recordset[0].password);
+        if (!isMatch) return res.status(400).json({ message: 'Mật khẩu hiện tại không đúng' });
+
+        const hash = await bcrypt.hash(new_password, 10);
+        await pool.request()
+            .input('password', sql.NVarChar, hash)
+            .input('id', sql.Int, req.user.id)
+            .query('UPDATE users SET password = @password WHERE id = @id');
+        res.json({ message: 'Đổi mật khẩu thành công' });
+    } catch (err) {
+        res.status(500).json({ message: 'Lỗi server' });
+    }
+};
+
+// Forgot Password — send 6-digit OTP to email
+exports.forgotPassword = async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email) return res.status(400).json({ message: 'Vui lòng nhập email' });
+
+        const pool = await poolPromise;
+        const result = await pool.request()
+            .input('email', sql.NVarChar, email)
+            .query('SELECT id, full_name FROM users WHERE email = @email');
+
+        if (result.recordset.length === 0) {
+            return res.status(404).json({ message: 'Email không tồn tại trong hệ thống' });
+        }
+
+        const otp = generateOTP();
+        const expiresAt = Date.now() + 5 * 60 * 1000;
+        otpStore.set(email, { otp, expiresAt, verified: false });
+
+        // Send OTP email
+        await transporter.sendMail({
+            from: process.env.SMTP_FROM,
+            to: email,
+            subject: '🏓 Mã xác nhận đặt lại mật khẩu — PickleBall- Đà Nẵng',
+            html: `
+                <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 480px; margin: 0 auto; background: #0d1117; color: #e6edf3; border-radius: 16px; padding: 40px 32px; border: 1px solid #30363d;">
+                    <div style="text-align: center; margin-bottom: 24px;">
+                        <div style="font-size: 40px;">🏓</div>
+                        <h1 style="font-size: 20px; font-weight: 700; margin: 8px 0 4px;">PickleBall- Đà Nẵng</h1>
+                        <p style="color: #8b949e; font-size: 14px; margin: 0;">Đặt lại mật khẩu</p>
+                    </div>
+                    <p style="font-size: 14px; color: #8b949e; margin-bottom: 24px;">
+                        Xin chào <strong style="color: #e6edf3;">${result.recordset[0].full_name}</strong>,<br>
+                        Mã xác nhận của bạn là:
+                    </p>
+                    <div style="text-align: center; margin: 24px 0;">
+                        <div style="display: inline-block; background: linear-gradient(135deg, #00E676, #00C853); color: #000; font-size: 32px; font-weight: 800; letter-spacing: 8px; padding: 16px 32px; border-radius: 12px;">
+                            ${otp}
+                        </div>
+                    </div>
+                    <p style="font-size: 13px; color: #8b949e; text-align: center;">
+                        ⏰ Mã này có hiệu lực trong <strong style="color: #e6edf3;">5 phút</strong>.<br>
+                        Nếu bạn không yêu cầu đặt lại mật khẩu, hãy bỏ qua email này.
+                    </p>
+                </div>
+            `
+        });
+
+        console.log(`[EMAIL] ✅ OTP sent to ${email}`);
+        res.json({ message: 'Mã xác nhận đã được gửi đến email của bạn' });
+    } catch (err) {
+        console.error('[EMAIL] ❌ Error:', err.message);
+        res.status(500).json({ message: 'Không thể gửi email. Vui lòng thử lại sau.' });
+    }
+};
+
+// Verify OTP code
+exports.verifyCode = async (req, res) => {
+    try {
+        const { email, code } = req.body;
+        if (!email || !code) return res.status(400).json({ message: 'Vui lòng nhập email và mã xác nhận' });
+
+        const stored = otpStore.get(email);
+        if (!stored) {
+            return res.status(400).json({ message: 'Mã xác nhận không hợp lệ hoặc đã hết hạn' });
+        }
+
+        if (Date.now() > stored.expiresAt) {
+            otpStore.delete(email);
+            return res.status(400).json({ message: 'Mã xác nhận đã hết hạn. Vui lòng gửi lại.' });
+        }
+
+        if (stored.otp !== code.toString()) {
+            return res.status(400).json({ message: 'Mã xác nhận không đúng' });
+        }
+
+        otpStore.set(email, { ...stored, verified: true });
+        res.json({ message: 'Xác nhận thành công' });
+    } catch (err) {
+        console.error('Verify code error:', err);
+        res.status(500).json({ message: 'Lỗi server' });
+    }
+};
+
+// Reset Password
+exports.resetPassword = async (req, res) => {
+    try {
+        const { email, new_password } = req.body;
+        if (!email || !new_password) return res.status(400).json({ message: 'Vui lòng nhập đầy đủ thông tin' });
+        if (new_password.length < 6) return res.status(400).json({ message: 'Mật khẩu phải có ít nhất 6 ký tự' });
+
+        const stored = otpStore.get(email);
+        if (!stored || !stored.verified) {
+            return res.status(400).json({ message: 'Vui lòng xác nhận mã OTP trước' });
+        }
+
+        const pool = await poolPromise;
+        const hash = await bcrypt.hash(new_password, 10);
+        await pool.request()
+            .input('email', sql.NVarChar, email)
+            .input('password', sql.NVarChar, hash)
+            .query('UPDATE users SET password = @password WHERE email = @email');
+
+        otpStore.delete(email);
+        res.json({ message: 'Đặt lại mật khẩu thành công!' });
+    } catch (err) {
+        console.error('Reset password error:', err);
+        res.status(500).json({ message: 'Lỗi server' });
+    }
+};

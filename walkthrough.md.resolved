@@ -1,0 +1,45 @@
+# Pickleball Social Platform — Frontend Walkthrough
+
+## Tổng quan
+
+Đã xây dựng toàn bộ giao diện frontend cho nền tảng Pickleball Social Platform + Booking tại Đà Nẵng gồm **14 trang** và **6 component tái sử dụng**, mỗi trang/component có **CSS module riêng**.
+
+## Screenshots
+
+````carousel
+![Trang đăng nhập - Dark theme, glassmorphism, demo login buttons](C:\Users\ThangTran\.gemini\antigravity\brain\7fcf17d5-0c12-465a-b7ca-f32b69a80734\login_page_1771948513605.png)
+<!-- slide -->
+![Trang chủ - Hero stats, create post, feed, sidebar](C:\Users\ThangTran\.gemini\antigravity\brain\7fcf17d5-0c12-465a-b7ca-f32b69a80734\home_page_1771948523557.png)
+````
+
+![Demo flow đăng nhập → trang chủ](C:\Users\ThangTran\.gemini\antigravity\brain\7fcf17d5-0c12-465a-b7ca-f32b69a80734\login_and_home_1771948503340.webp)
+
+## Cấu trúc đã tạo
+
+
+## Tính năng đã triển khai
+
+- ✅ **3 demo login** (User / Owner / Admin) — test ngay không cần backend
+- ✅ **Role-based routing** — mỗi role thấy menu & dashboard khác nhau
+- ✅ **Home feed** — bài post + filter + sidebar trận chờ ghép
+- ✅ **Courts listing** — tìm kiếm, sort (gần nhất/giá thấp/phổ biến/rating)
+- ✅ **Court detail** — chọn khung giờ, tính phí + hoa hồng, đặt sân
+- ✅ **Booking flow** — 3 bước (xác nhận → thanh toán → hoàn tất)
+- ✅ **Matchmaking** — tạo trận, chọn sân/giờ/số người, xem trận đang chờ
+- ✅ **Match detail** — danh sách người chơi, chia cost, payment status
+- ✅ **Chat** — sidebar room list, message bubbles, unread badges
+- ✅ **Settings** — sửa profile, nâng cấp User → Owner, đổi mật khẩu
+- ✅ **Admin dashboard** — duyệt/từ chối Owner, thống kê nền tảng
+
+## Cách chạy
+
+```bash
+cd client
+npm install
+npm run dev
+# Mở http://localhost:5173
+```
+
+## Bước tiếp theo
+
+Backend (Node.js + MySQL) chưa được code. Khi bạn sẵn sàng, mình sẽ triển khai API để kết nối frontend với database.
