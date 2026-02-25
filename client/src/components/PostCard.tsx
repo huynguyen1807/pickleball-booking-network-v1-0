@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
+import api from '../api/axios'
 import styles from '../styles/Cards.module.css'
 
 export default function PostCard({ post }) {
@@ -24,6 +25,28 @@ export default function PostCard({ post }) {
     const [commentsList, setCommentsList] = useState([])
     const [commentText, setCommentText] = useState('')
     const [commentCount, setCommentCount] = useState(data.comments || 0)
+    const [shareCount, setShareCount] = useState(data.shares || 0)
+
+    useEffect(() => {
+        // initialize counts if props changed
+        setLikeCount(data.likes || 0)
+        setCommentCount(data.comments || 0)
+        setShareCount(data.shares || 0)
+    }, [data.likes, data.comments])
+
+    useEffect(() => {
+        if (showComments) {
+            // load comments from server
+            (async () => {
+                try {
+                    const res = await api.get(`/posts/${data.id}/comments`)
+                    setCommentsList(res.data)
+                } catch (err) {
+                    console.error('Load comments error', err)
+                }
+            })()
+        }
+    }, [showComments, data.id])
 
     const getInitials = (name) => name ? name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '?'
     const timeAgo = (date) => {
@@ -44,9 +67,22 @@ export default function PostCard({ post }) {
 
     const typeInfo = typeLabels[data.post_type] || typeLabels.share
 
-    const handleLike = () => {
-        setLiked(prev => !prev)
-        setLikeCount(prev => liked ? prev - 1 : prev + 1)
+    const handleLike = async () => {
+        if (!user) return alert('Vui lòng đăng nhập để tương tác')
+        try {
+            if (!liked) {
+                const res = await api.post(`/posts/${data.id}/like`)
+                setLikeCount(res.data.likes ?? (likeCount + 1))
+                setLiked(true)
+            } else {
+                const res = await api.delete(`/posts/${data.id}/like`)
+                setLikeCount(res.data.likes ?? Math.max(0, likeCount - 1))
+                setLiked(false)
+            }
+        } catch (err) {
+            console.error('Like error', err)
+            alert(err.response?.data?.message || 'Lỗi khi tương tác')
+        }
     }
 
     const shareUrl = encodeURIComponent(window.location.origin + `/post/${data.id}`)
@@ -55,30 +91,37 @@ export default function PostCard({ post }) {
     const handleShareFacebook = () => {
         window.open(`https://www.facebook.com/sharer/sharer.php?u=${shareUrl}&quote=${shareText}`, '_blank', 'width=600,height=400')
         setShowShare(false)
+        // record share (only if logged in)
+        if (user) api.post(`/posts/${data.id}/share`).then(r => setShareCount(r.data.shares)).catch(() => {})
     }
 
     const handleShareMessenger = () => {
         window.open(`https://www.facebook.com/dialog/send?link=${shareUrl}&app_id=0&redirect_uri=${encodeURIComponent(window.location.href)}`, '_blank', 'width=600,height=400')
         setShowShare(false)
+        if (user) api.post(`/posts/${data.id}/share`).then(r => setShareCount(r.data.shares)).catch(() => {})
     }
 
     const handleCopyLink = () => {
         navigator.clipboard.writeText(window.location.origin + `/post/${data.id}`)
         setShowShare(false)
         alert('Đã sao chép link!')
+        if (user) api.post(`/posts/${data.id}/share`).then(r => setShareCount(r.data.shares)).catch(() => {})
     }
 
-    const handleAddComment = (e) => {
+    const handleAddComment = async (e) => {
         e.preventDefault()
+        if (!user) return alert('Vui lòng đăng nhập để bình luận')
         if (!commentText.trim()) return
-        setCommentsList(prev => [...prev, {
-            id: Date.now(),
-            user_name: user?.full_name || 'Bạn',
-            content: commentText,
-            created_at: new Date().toISOString()
-        }])
-        setCommentCount(prev => prev + 1)
-        setCommentText('')
+        try {
+            const res = await api.post(`/posts/${data.id}/comments`, { content: commentText })
+            // server returns created comment
+            setCommentsList(prev => [res.data.comment, ...prev])
+            setCommentCount(res.data.comments || (commentCount + 1))
+            setCommentText('')
+        } catch (err) {
+            console.error('Comment error', err)
+            alert(err.response?.data?.message || 'Lỗi khi gửi bình luận')
+        }
     }
 
     return (

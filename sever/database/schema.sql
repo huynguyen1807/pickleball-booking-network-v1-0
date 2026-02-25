@@ -82,6 +82,42 @@ CREATE TABLE posts (
 );
 GO
 
+-- POST LIKES
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='post_likes' AND xtype='U')
+CREATE TABLE post_likes (
+  id INT IDENTITY(1,1) PRIMARY KEY,
+  post_id INT NOT NULL FOREIGN KEY REFERENCES posts(id) ON DELETE CASCADE,
+  user_id INT NOT NULL FOREIGN KEY REFERENCES users(id) ON DELETE NO ACTION,
+  created_at DATETIME DEFAULT GETDATE()
+);
+GO
+
+-- Ensure a user can like a post only once
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'UQ_post_likes_post_user')
+CREATE UNIQUE INDEX UQ_post_likes_post_user ON post_likes(post_id, user_id);
+GO
+
+-- COMMENTS
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='comments' AND xtype='U')
+CREATE TABLE comments (
+  id INT IDENTITY(1,1) PRIMARY KEY,
+  post_id INT NOT NULL FOREIGN KEY REFERENCES posts(id) ON DELETE CASCADE,
+  user_id INT NOT NULL FOREIGN KEY REFERENCES users(id) ON DELETE NO ACTION,
+  content NVARCHAR(MAX) NOT NULL,
+  created_at DATETIME DEFAULT GETDATE()
+);
+GO
+
+-- POST SHARES
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='post_shares' AND xtype='U')
+CREATE TABLE post_shares (
+  id INT IDENTITY(1,1) PRIMARY KEY,
+  post_id INT NOT NULL FOREIGN KEY REFERENCES posts(id) ON DELETE CASCADE,
+  user_id INT NULL FOREIGN KEY REFERENCES users(id) ON DELETE NO ACTION,
+  created_at DATETIME DEFAULT GETDATE()
+);
+GO
+
 -- BOOKINGS
 IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='bookings' AND xtype='U')
 CREATE TABLE bookings (
