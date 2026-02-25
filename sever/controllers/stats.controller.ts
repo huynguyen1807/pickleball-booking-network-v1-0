@@ -1,6 +1,6 @@
-const { sql, poolPromise } = require('../config/db');
+import { sql, poolPromise } from '../config/db';
 
-exports.getUserStats = async (req, res) => {
+export const getUserStats = async (req, res) => {
     try {
         const pool = await poolPromise;
         const uid = req.user.id;
@@ -18,7 +18,7 @@ exports.getUserStats = async (req, res) => {
     } catch (err) { res.status(500).json({ message: 'Lỗi server' }); }
 };
 
-exports.getOwnerStats = async (req, res) => {
+export const getOwnerStats = async (req, res) => {
     try {
         const pool = await poolPromise;
         const uid = req.user.id;
@@ -34,7 +34,7 @@ exports.getOwnerStats = async (req, res) => {
     } catch (err) { res.status(500).json({ message: 'Lỗi server' }); }
 };
 
-exports.getAdminStats = async (req, res) => {
+export const getAdminStats = async (req, res) => {
     try {
         const pool = await poolPromise;
         const r1 = await pool.request().query('SELECT COUNT(*) AS total_users FROM users');
@@ -54,3 +54,4 @@ exports.getAdminStats = async (req, res) => {
         });
     } catch (err) { res.status(500).json({ message: 'Lỗi server' }); }
 };
+

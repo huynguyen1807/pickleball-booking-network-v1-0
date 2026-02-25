@@ -1,4 +1,6 @@
-module.exports = (io) => {
+import { Server } from 'socket.io';
+
+const initSocket = (io: Server) => {
     io.on('connection', (socket) => {
         console.log('🔌 User connected:', socket.id);
 
@@ -43,3 +45,5 @@ module.exports = (io) => {
         });
     });
 };
+
+export default initSocket;

@@ -1,6 +1,6 @@
-const { sql, poolPromise } = require('../config/db');
+import { sql, poolPromise } from '../config/db';
 
-exports.getNotifications = async (req, res) => {
+export const getNotifications = async (req, res) => {
     try {
         const pool = await poolPromise;
         const result = await pool.request().input('user_id', sql.Int, req.user.id)
@@ -9,7 +9,7 @@ exports.getNotifications = async (req, res) => {
     } catch (err) { res.status(500).json({ message: 'Lỗi server' }); }
 };
 
-exports.markRead = async (req, res) => {
+export const markRead = async (req, res) => {
     try {
         const pool = await poolPromise;
         await pool.request().input('id', sql.Int, req.params.id).input('user_id', sql.Int, req.user.id)
@@ -18,7 +18,7 @@ exports.markRead = async (req, res) => {
     } catch (err) { res.status(500).json({ message: 'Lỗi server' }); }
 };
 
-exports.markAllRead = async (req, res) => {
+export const markAllRead = async (req, res) => {
     try {
         const pool = await poolPromise;
         await pool.request().input('user_id', sql.Int, req.user.id)
@@ -27,7 +27,7 @@ exports.markAllRead = async (req, res) => {
     } catch (err) { res.status(500).json({ message: 'Lỗi server' }); }
 };
 
-exports.createNotification = async (userId, title, message, type, referenceId) => {
+export const createNotification = async (userId, title, message, type, referenceId) => {
     try {
         const pool = await poolPromise;
         await pool.request()
@@ -37,3 +37,4 @@ exports.createNotification = async (userId, title, message, type, referenceId) =
             .query('INSERT INTO notifications (user_id, title, message, type, reference_id) VALUES (@user_id, @title, @message, @type, @reference_id)');
     } catch (err) { console.error('Notification error:', err); }
 };
+

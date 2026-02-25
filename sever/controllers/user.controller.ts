@@ -1,7 +1,7 @@
-const { sql, poolPromise } = require('../config/db');
+import { sql, poolPromise } from '../config/db';
 
 // Update profile
-exports.updateProfile = async (req, res) => {
+export const updateProfile = async (req, res) => {
     try {
         const { full_name, phone, latitude, longitude } = req.body;
         const pool = await poolPromise;
@@ -19,7 +19,7 @@ exports.updateProfile = async (req, res) => {
 };
 
 // Request upgrade to Owner
-exports.requestUpgrade = async (req, res) => {
+export const requestUpgrade = async (req, res) => {
     try {
         const { reason } = req.body;
         const pool = await poolPromise;
@@ -40,7 +40,7 @@ exports.requestUpgrade = async (req, res) => {
 };
 
 // Get all users (admin)
-exports.getAllUsers = async (req, res) => {
+export const getAllUsers = async (req, res) => {
     try {
         const pool = await poolPromise;
         const result = await pool.request()
@@ -50,3 +50,4 @@ exports.getAllUsers = async (req, res) => {
         res.status(500).json({ message: 'Lỗi server' });
     }
 };
+

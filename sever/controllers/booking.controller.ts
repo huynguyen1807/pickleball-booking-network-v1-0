@@ -1,9 +1,10 @@
-const { sql, poolPromise } = require('../config/db');
-require('dotenv').config();
+import { sql, poolPromise } from '../config/db';
+import dotenv from 'dotenv';
+dotenv.config();
 const COMMISSION = parseFloat(process.env.COMMISSION_RATE) || 0.05;
 
 // Create booking
-exports.createBooking = async (req, res) => {
+export const createBooking = async (req, res) => {
     try {
         const { court_id, booking_date, start_time, end_time, payment_method } = req.body;
         const pool = await poolPromise;
@@ -41,7 +42,7 @@ exports.createBooking = async (req, res) => {
 };
 
 // Get user bookings
-exports.getMyBookings = async (req, res) => {
+export const getMyBookings = async (req, res) => {
     try {
         const pool = await poolPromise;
         const result = await pool.request().input('user_id', sql.Int, req.user.id)
@@ -53,7 +54,7 @@ exports.getMyBookings = async (req, res) => {
 };
 
 // Get bookings for owner courts
-exports.getOwnerBookings = async (req, res) => {
+export const getOwnerBookings = async (req, res) => {
     try {
         const pool = await poolPromise;
         const result = await pool.request().input('owner_id', sql.Int, req.user.id)
@@ -65,7 +66,7 @@ exports.getOwnerBookings = async (req, res) => {
 };
 
 // Cancel booking
-exports.cancelBooking = async (req, res) => {
+export const cancelBooking = async (req, res) => {
     try {
         const pool = await poolPromise;
         const booking = await pool.request().input('id', sql.Int, req.params.id).query('SELECT user_id, status FROM bookings WHERE id = @id');
@@ -80,3 +81,4 @@ exports.cancelBooking = async (req, res) => {
         res.status(500).json({ message: 'Lỗi server' });
     }
 };
+

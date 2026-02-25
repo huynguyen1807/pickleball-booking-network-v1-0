@@ -1,6 +1,6 @@
-const { sql, poolPromise } = require('../config/db');
+import { sql, poolPromise } from '../config/db';
 
-exports.getPaymentHistory = async (req, res) => {
+export const getPaymentHistory = async (req, res) => {
     try {
         const pool = await poolPromise;
         const result = await pool.request().input('user_id', sql.Int, req.user.id).query(`
@@ -15,7 +15,7 @@ exports.getPaymentHistory = async (req, res) => {
     } catch (err) { res.status(500).json({ message: 'Lỗi server' }); }
 };
 
-exports.processPayment = async (req, res) => {
+export const processPayment = async (req, res) => {
     try {
         const { booking_id, match_id, amount, payment_method } = req.body;
         const commission = amount * 0.05;
@@ -37,3 +37,4 @@ exports.processPayment = async (req, res) => {
         res.json({ message: 'Thanh toán thành công', paymentId: result.recordset[0].id });
     } catch (err) { res.status(500).json({ message: 'Lỗi server' }); }
 };
+

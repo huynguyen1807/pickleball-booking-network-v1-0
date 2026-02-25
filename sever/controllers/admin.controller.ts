@@ -1,6 +1,6 @@
-const { sql, poolPromise } = require('../config/db');
+import { sql, poolPromise } from '../config/db';
 
-exports.getUpgradeRequests = async (req, res) => {
+export const getUpgradeRequests = async (req, res) => {
     try {
         const { status } = req.query;
         const pool = await poolPromise;
@@ -13,7 +13,7 @@ exports.getUpgradeRequests = async (req, res) => {
     } catch (err) { res.status(500).json({ message: 'Lỗi server' }); }
 };
 
-exports.approveUpgrade = async (req, res) => {
+export const approveUpgrade = async (req, res) => {
     try {
         const pool = await poolPromise;
         const request_data = await pool.request().input('id', sql.Int, req.params.id)
@@ -28,7 +28,7 @@ exports.approveUpgrade = async (req, res) => {
     } catch (err) { res.status(500).json({ message: 'Lỗi server' }); }
 };
 
-exports.rejectUpgrade = async (req, res) => {
+export const rejectUpgrade = async (req, res) => {
     try {
         const { admin_note } = req.body;
         const pool = await poolPromise;
@@ -38,7 +38,7 @@ exports.rejectUpgrade = async (req, res) => {
     } catch (err) { res.status(500).json({ message: 'Lỗi server' }); }
 };
 
-exports.getAllUsers = async (req, res) => {
+export const getAllUsers = async (req, res) => {
     try {
         const pool = await poolPromise;
         const result = await pool.request().query('SELECT id, email, full_name, phone, role, status, created_at FROM users ORDER BY created_at DESC');
@@ -46,7 +46,7 @@ exports.getAllUsers = async (req, res) => {
     } catch (err) { res.status(500).json({ message: 'Lỗi server' }); }
 };
 
-exports.toggleUserStatus = async (req, res) => {
+export const toggleUserStatus = async (req, res) => {
     try {
         const { status } = req.body;
         const pool = await poolPromise;
@@ -55,3 +55,4 @@ exports.toggleUserStatus = async (req, res) => {
         res.json({ message: 'Đã cập nhật trạng thái user' });
     } catch (err) { res.status(500).json({ message: 'Lỗi server' }); }
 };
+

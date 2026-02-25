@@ -1,7 +1,7 @@
-const { sql, poolPromise } = require('../config/db');
+import { sql, poolPromise } from '../config/db';
 
 // Create court (owner)
-exports.createCourt = async (req, res) => {
+export const createCourt = async (req, res) => {
     try {
         const { name, address, description, image, price_per_hour, latitude, longitude } = req.body;
         const pool = await poolPromise;
@@ -24,7 +24,7 @@ exports.createCourt = async (req, res) => {
 };
 
 // Get all courts (public)
-exports.getAllCourts = async (req, res) => {
+export const getAllCourts = async (req, res) => {
     try {
         const pool = await poolPromise;
         const result = await pool.request().query(`
@@ -41,7 +41,7 @@ exports.getAllCourts = async (req, res) => {
 };
 
 // Get court by ID
-exports.getCourtById = async (req, res) => {
+export const getCourtById = async (req, res) => {
     try {
         const pool = await poolPromise;
         const result = await pool.request()
@@ -65,7 +65,7 @@ exports.getCourtById = async (req, res) => {
 };
 
 // Update court (owner)
-exports.updateCourt = async (req, res) => {
+export const updateCourt = async (req, res) => {
     try {
         const { name, address, description, image, price_per_hour, latitude, longitude, is_active } = req.body;
         const pool = await poolPromise;
@@ -87,7 +87,7 @@ exports.updateCourt = async (req, res) => {
 };
 
 // Delete court (owner)
-exports.deleteCourt = async (req, res) => {
+export const deleteCourt = async (req, res) => {
     try {
         const pool = await poolPromise;
         const court = await pool.request().input('id', sql.Int, req.params.id).query('SELECT owner_id FROM courts WHERE id = @id');
@@ -101,7 +101,7 @@ exports.deleteCourt = async (req, res) => {
 };
 
 // Get my courts (owner)
-exports.getMyCourts = async (req, res) => {
+export const getMyCourts = async (req, res) => {
     try {
         const pool = await poolPromise;
         const result = await pool.request()
@@ -116,7 +116,7 @@ exports.getMyCourts = async (req, res) => {
 };
 
 // Add review
-exports.addReview = async (req, res) => {
+export const addReview = async (req, res) => {
     try {
         const { rating, comment } = req.body;
         const pool = await poolPromise;
@@ -131,3 +131,4 @@ exports.addReview = async (req, res) => {
         res.status(500).json({ message: 'Lỗi server' });
     }
 };
+

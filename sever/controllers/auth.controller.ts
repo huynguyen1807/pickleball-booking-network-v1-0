@@ -1,8 +1,9 @@
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const nodemailer = require('nodemailer');
-const { sql, poolPromise } = require('../config/db');
-require('dotenv').config();
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import nodemailer from 'nodemailer';
+import { sql, poolPromise } from '../config/db';
+import dotenv from 'dotenv';
+dotenv.config();
 
 // In-memory OTP store
 const otpStore = new Map();
@@ -20,7 +21,7 @@ const transporter = nodemailer.createTransport({
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
 
 // Register
-exports.register = async (req, res) => {
+export const register = async (req, res) => {
     try {
         const { email, password, full_name, phone, role } = req.body;
         if (!email || !password || !full_name) {
@@ -61,7 +62,7 @@ exports.register = async (req, res) => {
 };
 
 // Login
-exports.login = async (req, res) => {
+export const login = async (req, res) => {
     try {
         const { email, password } = req.body;
         if (!email || !password) {
@@ -105,7 +106,7 @@ exports.login = async (req, res) => {
 };
 
 // Get profile
-exports.getProfile = async (req, res) => {
+export const getProfile = async (req, res) => {
     try {
         const pool = await poolPromise;
         const result = await pool.request()
@@ -119,7 +120,7 @@ exports.getProfile = async (req, res) => {
 };
 
 // Change password
-exports.changePassword = async (req, res) => {
+export const changePassword = async (req, res) => {
     try {
         const { current_password, new_password } = req.body;
         const pool = await poolPromise;
@@ -142,7 +143,7 @@ exports.changePassword = async (req, res) => {
 };
 
 // Forgot Password — send 6-digit OTP to email
-exports.forgotPassword = async (req, res) => {
+export const forgotPassword = async (req, res) => {
     try {
         const { email } = req.body;
         if (!email) return res.status(400).json({ message: 'Vui lòng nhập email' });
@@ -198,7 +199,7 @@ exports.forgotPassword = async (req, res) => {
 };
 
 // Verify OTP code
-exports.verifyCode = async (req, res) => {
+export const verifyCode = async (req, res) => {
     try {
         const { email, code } = req.body;
         if (!email || !code) return res.status(400).json({ message: 'Vui lòng nhập email và mã xác nhận' });
@@ -226,7 +227,7 @@ exports.verifyCode = async (req, res) => {
 };
 
 // Reset Password
-exports.resetPassword = async (req, res) => {
+export const resetPassword = async (req, res) => {
     try {
         const { email, new_password } = req.body;
         if (!email || !new_password) return res.status(400).json({ message: 'Vui lòng nhập đầy đủ thông tin' });
@@ -251,3 +252,4 @@ exports.resetPassword = async (req, res) => {
         res.status(500).json({ message: 'Lỗi server' });
     }
 };
+

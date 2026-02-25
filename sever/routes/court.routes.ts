@@ -1,7 +1,8 @@
-const router = require('express').Router();
-const auth = require('../middleware/auth');
-const role = require('../middleware/role');
-const { createCourt, getAllCourts, getCourtById, updateCourt, deleteCourt, getMyCourts, addReview } = require('../controllers/court.controller');
+import { Router } from 'express';
+const router = Router();
+import auth from '../middleware/auth';
+import role from '../middleware/role';
+import { createCourt, getAllCourts, getCourtById, updateCourt, deleteCourt, getMyCourts, addReview } from '../controllers/court.controller';
 
 router.get('/', getAllCourts);
 router.get('/my', auth, role('owner'), getMyCourts);
@@ -11,4 +12,5 @@ router.put('/:id', auth, role('owner'), updateCourt);
 router.delete('/:id', auth, role('owner'), deleteCourt);
 router.post('/:id/review', auth, addReview);
 
-module.exports = router;
+export default router;
+

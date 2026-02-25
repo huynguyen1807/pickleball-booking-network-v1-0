@@ -1,6 +1,6 @@
-const { sql, poolPromise } = require('../config/db');
+import { sql, poolPromise } from '../config/db';
 
-exports.getChatRooms = async (req, res) => {
+export const getChatRooms = async (req, res) => {
     try {
         const pool = await poolPromise;
         const result = await pool.request().input('user_id', sql.Int, req.user.id).query(`
@@ -15,7 +15,7 @@ exports.getChatRooms = async (req, res) => {
     } catch (err) { res.status(500).json({ message: 'Lỗi server' }); }
 };
 
-exports.getMessages = async (req, res) => {
+export const getMessages = async (req, res) => {
     try {
         const pool = await poolPromise;
         const member = await pool.request()
@@ -29,7 +29,7 @@ exports.getMessages = async (req, res) => {
     } catch (err) { res.status(500).json({ message: 'Lỗi server' }); }
 };
 
-exports.sendMessage = async (req, res) => {
+export const sendMessage = async (req, res) => {
     try {
         const { content } = req.body;
         const pool = await poolPromise;
@@ -45,3 +45,4 @@ exports.sendMessage = async (req, res) => {
         res.status(201).json({ message: 'Đã gửi', messageId: result.recordset[0].id });
     } catch (err) { res.status(500).json({ message: 'Lỗi server' }); }
 };
+

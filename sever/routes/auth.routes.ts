@@ -1,6 +1,7 @@
-const router = require('express').Router();
-const auth = require('../middleware/auth');
-const { register, login, getProfile, changePassword, forgotPassword, verifyCode, resetPassword } = require('../controllers/auth.controller');
+import { Router } from 'express';
+const router = Router();
+import auth from '../middleware/auth';
+import { register, login, getProfile, changePassword, forgotPassword, verifyCode, resetPassword } from '../controllers/auth.controller';
 
 router.post('/register', register);
 router.post('/login', login);
@@ -10,4 +11,5 @@ router.post('/forgot-password', forgotPassword);
 router.post('/verify-code', verifyCode);
 router.post('/reset-password', resetPassword);
 
-module.exports = router;
+export default router;
+

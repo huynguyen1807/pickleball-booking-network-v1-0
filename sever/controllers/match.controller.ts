@@ -1,9 +1,10 @@
-const { sql, poolPromise } = require('../config/db');
-require('dotenv').config();
+import { sql, poolPromise } from '../config/db';
+import dotenv from 'dotenv';
+dotenv.config();
 const COMMISSION = parseFloat(process.env.COMMISSION_RATE) || 0.05;
 
 // Create match
-exports.createMatch = async (req, res) => {
+export const createMatch = async (req, res) => {
     try {
         const { court_id, match_date, start_time, end_time, max_players } = req.body;
         const pool = await poolPromise;
@@ -49,7 +50,7 @@ exports.createMatch = async (req, res) => {
 };
 
 // Get all matches
-exports.getAllMatches = async (req, res) => {
+export const getAllMatches = async (req, res) => {
     try {
         const { status } = req.query;
         const pool = await poolPromise;
@@ -65,7 +66,7 @@ exports.getAllMatches = async (req, res) => {
 };
 
 // Get match by ID
-exports.getMatchById = async (req, res) => {
+export const getMatchById = async (req, res) => {
     try {
         const pool = await poolPromise;
         const result = await pool.request().input('id', sql.Int, req.params.id)
@@ -82,7 +83,7 @@ exports.getMatchById = async (req, res) => {
 };
 
 // Join match
-exports.joinMatch = async (req, res) => {
+export const joinMatch = async (req, res) => {
     try {
         const pool = await poolPromise;
         const match = await pool.request().input('id', sql.Int, req.params.id).query('SELECT * FROM matches WHERE id = @id');
@@ -119,7 +120,7 @@ exports.joinMatch = async (req, res) => {
 };
 
 // Leave match
-exports.leaveMatch = async (req, res) => {
+export const leaveMatch = async (req, res) => {
     try {
         const pool = await poolPromise;
         const match = await pool.request().input('id', sql.Int, req.params.id).query('SELECT creator_id FROM matches WHERE id = @id');
@@ -135,3 +136,4 @@ exports.leaveMatch = async (req, res) => {
         res.status(500).json({ message: 'Lỗi server' });
     }
 };
+

@@ -1,7 +1,9 @@
-const sql = require('mssql');
-const fs = require('fs');
-const path = require('path');
-require('dotenv').config();
+import sql from 'mssql';
+import fs from 'fs';
+import path from 'path';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const DB_NAME = process.env.DB_NAME || 'pickleball_danang';
 
@@ -10,7 +12,7 @@ const masterConfig = {
     server: process.env.DB_SERVER || 'localhost',
     port: parseInt(process.env.DB_PORT) || 1433,
     user: process.env.DB_USER || 'sa',
-    password: process.env.DB_PASSWORD || '12345',
+    password: process.env.DB_PASSWORD || '123456',
     database: 'master',
     options: {
         encrypt: false,
@@ -78,4 +80,4 @@ async function initDatabase() {
 
 const poolPromise = initDatabase();
 
-module.exports = { sql, poolPromise };
+export { sql, poolPromise };

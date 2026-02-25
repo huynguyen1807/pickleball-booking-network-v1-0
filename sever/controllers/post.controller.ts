@@ -1,7 +1,7 @@
-const { sql, poolPromise } = require('../config/db');
+import { sql, poolPromise } from '../config/db';
 
 // Create post
-exports.createPost = async (req, res) => {
+export const createPost = async (req, res) => {
     try {
         const { content, image, post_type } = req.body;
         const pool = await poolPromise;
@@ -18,7 +18,7 @@ exports.createPost = async (req, res) => {
 };
 
 // Get all posts
-exports.getAllPosts = async (req, res) => {
+export const getAllPosts = async (req, res) => {
     try {
         const { type, sort } = req.query;
         const pool = await poolPromise;
@@ -37,7 +37,7 @@ exports.getAllPosts = async (req, res) => {
 };
 
 // Delete post
-exports.deletePost = async (req, res) => {
+export const deletePost = async (req, res) => {
     try {
         const pool = await poolPromise;
         const post = await pool.request().input('id', sql.Int, req.params.id).query('SELECT user_id FROM posts WHERE id = @id');
@@ -51,3 +51,4 @@ exports.deletePost = async (req, res) => {
         res.status(500).json({ message: 'Lỗi server' });
     }
 };
+
