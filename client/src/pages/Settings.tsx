@@ -5,7 +5,7 @@ import styles from '../styles/Dashboard.module.css'
 
 export default function Settings() {
     const { user, updateUser } = useAuth()
-    const [form, setForm] = useState({
+    const [form, setForm] = useState<any>({
         full_name: user?.full_name || '',
         email: user?.email || '',
         phone: user?.phone || '',
@@ -139,7 +139,7 @@ export default function Settings() {
                             <>
                                 <div className="input-group" style={{ marginBottom: '14px' }}>
                                     <label>Lý do muốn trở thành Owner</label>
-                                    <textarea className="input-field" rows="3"
+                                    <textarea className="input-field" rows={3}
                                         placeholder="VD: Tôi có 2 sân pickleball tại Hòa Xuân và muốn cho thuê qua nền tảng..."
                                         value={upgradeReason}
                                         onChange={e => setUpgradeReason(e.target.value)}
