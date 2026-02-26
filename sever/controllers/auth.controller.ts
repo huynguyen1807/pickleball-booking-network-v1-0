@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import nodemailer from 'nodemailer';
 import { sql, poolPromise } from '../config/db';
 import dotenv from 'dotenv';
+import type { StringValue } from 'ms';
 dotenv.config();
 
 // In-memory OTP store
@@ -93,8 +94,8 @@ export const login = async (req, res) => {
 
         const token = jwt.sign(
             { id: user.id, email: user.email, role: user.role, full_name: user.full_name },
-            process.env.JWT_SECRET,
-            { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+            process.env.JWT_SECRET as string,
+            { expiresIn: (process.env.JWT_EXPIRES_IN || '7d') as StringValue }
         );
 
         const { password: _, ...userData } = user;
