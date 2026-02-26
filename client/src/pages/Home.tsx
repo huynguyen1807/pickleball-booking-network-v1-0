@@ -10,6 +10,9 @@ export default function Home() {
     const navigate = useNavigate()
     const [filter, setFilter] = useState('latest')
     const [posts, setPosts] = useState([])
+    const [hiddenPosts, setHiddenPosts] = useState(() => {
+        try { return JSON.parse(localStorage.getItem('hiddenPosts') || '[]') } catch { return [] }
+    })
     const [matches, setMatches] = useState([])
     const [courts, setCourts] = useState([])
     const [stats, setStats] = useState({ total_users: 0, total_courts: 0, today_matches: 0 })
@@ -67,22 +70,42 @@ export default function Home() {
         }
     }
 
-    const filteredPosts = filter === 'find_player'
-        ? posts.filter(p => p.post_type === 'find_player')
-        : filter === 'event'
-            ? posts.filter(p => p.post_type === 'event')
-            : posts
+    // filter out hidden posts and optionally by type
+    // include hidden posts but mark them so we can render a placeholder
+    const postsWithFlag = posts.map(p => ({ ...p, isHidden: hiddenPosts.includes(p.id) }))
+    const filteredPosts = postsWithFlag
+        .filter(p => ['share','find_player','ad','event'].includes(filter) ? p.post_type === filter : true)
 
     const filters = [
         { key: 'latest', label: '🕐 Mới nhất' },
         { key: 'popular', label: '🔥 Phổ biến' },
+        { key: 'share', label: '📸 Chia sẻ' },
         { key: 'find_player', label: '🎯 Tìm người chơi' },
-        { key: 'event', label: '🎉 Sự kiện' }
+        { key: 'event', label: '🎉 Sự kiện' },
+        { key: 'ad', label: '📢 Quảng cáo' }
     ]
 
     const formatPrice = (p) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(p)
 
     if (loading) return <div className={styles.homePage} style={{ textAlign: 'center', padding: '60px 20px' }}>⏳ Đang tải...</div>
+
+    const handleHide = (id) => {
+        setHiddenPosts(prev => {
+            let updated
+            if (prev.includes(id)) {
+                // unhide
+                updated = prev.filter(x => x !== id)
+            } else {
+                updated = [...prev, id]
+            }
+            localStorage.setItem('hiddenPosts', JSON.stringify(updated))
+            return updated
+        })
+    }
+
+    const handleDelete = (id) => {
+        setPosts(prev => prev.filter(p => p.id !== id))
+    }
 
     return (
         <div className={styles.homePage}>
@@ -125,11 +148,11 @@ export default function Home() {
                         style={{ width: '100%', resize: 'vertical', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '10px 14px', color: 'var(--text-primary)', fontSize: '0.875rem' }}
                     />
                     <div className={styles.createPostActions}>
-                        <select value={postType} onChange={e => setPostType(e.target.value)}
-                            style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', padding: '4px 8px', color: 'var(--text-primary)', fontSize: '0.8rem' }}>
+                        <select value={postType} onChange={e => setPostType(e.target.value)} className={styles.postTypeSelect}>
                             <option value="share">📸 Chia sẻ</option>
                             <option value="find_player">🎯 Tìm bạn chơi</option>
                             <option value="event">🎉 Sự kiện</option>
+                            <option value="ad">📢 Quảng cáo</option>
                         </select>
                         <button className="btn btn-primary btn-sm" onClick={handleCreatePost} disabled={posting || !postContent.trim()}>
                             {posting ? '⏳...' : '📤 Đăng'}
@@ -156,7 +179,7 @@ export default function Home() {
                 {/* Feed */}
                 <div className={styles.feed}>
                     {filteredPosts.length > 0 ? filteredPosts.map(post => (
-                        <PostCard key={post.id} post={post} />
+                        <PostCard key={post.id} post={post} isHidden={post.isHidden} onHide={handleHide} onDeleted={handleDelete} />
                     )) : (
                         <div className="glass-card" style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-secondary)' }}>
                             📝 Chưa có bài viết nào. Hãy là người đầu tiên chia sẻ!

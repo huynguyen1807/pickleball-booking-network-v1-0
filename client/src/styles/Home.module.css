@@ -135,13 +135,13 @@
 }
 
 .filterBtn {
-    padding: 8px 18px;
+    padding: 10px 20px;
     background: var(--bg-glass);
     border: 1px solid var(--border-glass);
     border-radius: var(--radius-full);
     color: var(--text-secondary);
-    font-size: 0.85rem;
-    font-weight: 500;
+    font-size: 0.95rem;
+    font-weight: 600;
     cursor: pointer;
     transition: all var(--transition-fast);
 }
@@ -155,6 +155,32 @@
     background: var(--accent-green-dim);
     border-color: var(--accent-green);
     color: var(--accent-green);
+}
+
+/* Post type dropdown styling */
+.postTypeSelect {
+    background: var(--bg-card);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-sm);
+    padding: 6px 10px;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: border-color var(--transition-fast), background var(--transition-fast);
+    appearance: none;
+}
+.postTypeSelect:hover {
+    border-color: var(--border-glass-hover);
+}
+.postTypeSelect option {
+    background: var(--bg-card);
+    color: var(--text-primary);
+}
+.postTypeSelect:focus {
+    outline: none;
+    border-color: var(--accent-green);
+    background: var(--bg-tertiary);
 }
 
 /* Main Layout */

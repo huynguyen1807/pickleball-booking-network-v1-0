@@ -23,7 +23,8 @@ export const getAllPosts = async (req, res) => {
         const { type, sort } = req.query;
         const pool = await poolPromise;
         const request = pool.request();
-        let sql_query = `SELECT TOP 50 p.*, u.full_name, u.avatar, u.role AS user_role,
+        // alias full_name to user_name so frontend can display author correctly
+        let sql_query = `SELECT TOP 50 p.*, u.full_name AS user_name, u.avatar, u.role AS user_role,
             (SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = p.id) AS likes,
             (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id) AS comments,
             (SELECT COUNT(*) FROM post_shares ps WHERE ps.post_id = p.id) AS shares
@@ -105,7 +106,7 @@ export const getComments = async (req, res) => {
         const pool = await poolPromise;
         const result = await pool.request()
             .input('post_id', sql.Int, postId)
-            .query(`SELECT c.id, c.content, c.created_at, u.id AS user_id, u.full_name, u.avatar
+            .query(`SELECT c.id, c.content, c.created_at, u.id AS user_id, u.full_name AS user_name, u.avatar
                 FROM comments c JOIN users u ON c.user_id = u.id
                 WHERE c.post_id = @post_id ORDER BY c.created_at DESC`);
         const rows = result.recordset.map(r => ({ ...r, created_at: r.created_at ? new Date(r.created_at).toISOString() : null }));

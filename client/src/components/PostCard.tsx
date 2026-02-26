@@ -1,11 +1,23 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect, FormEvent } from 'react'
 import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
 import styles from '../styles/Cards.module.css'
 
-export default function PostCard({ post }) {
+type PostType = any
+type CommentType = any
+
+interface PostCardProps {
+    post?: PostType
+    isHidden?: boolean
+    onDeleted?: (id: number) => void
+    onHide?: (id: number) => void
+}
+
+export default function PostCard({ post, isHidden = false, onDeleted, onHide }: PostCardProps) {
     const { user } = useAuth()
-    const data = post || {
+    // normalize post object: prefer `user_name`, fallback to `full_name`
+    const normalizedPost = post ? { ...post, user_name: post.user_name || post.full_name } : null
+    const data = normalizedPost || {
         id: 1,
         user_name: 'Nguyễn Văn A',
         user_role: 'user',
@@ -22,7 +34,7 @@ export default function PostCard({ post }) {
     const [likeCount, setLikeCount] = useState(data.likes || 0)
     const [showShare, setShowShare] = useState(false)
     const [showComments, setShowComments] = useState(false)
-    const [commentsList, setCommentsList] = useState([])
+    const [commentsList, setCommentsList] = useState<CommentType[]>([])
     const [commentText, setCommentText] = useState('')
     const [commentCount, setCommentCount] = useState(data.comments || 0)
     const [shareCount, setShareCount] = useState(data.shares || 0)
@@ -48,8 +60,8 @@ export default function PostCard({ post }) {
         }
     }, [showComments, data.id])
 
-    const getInitials = (name) => name ? name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '?'
-    const timeAgo = (date) => {
+    const getInitials = (name?: string | null) => name ? name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) : '?'
+    const timeAgo = (date?: string | Date | null) => {
         const diff = Date.now() - new Date(date).getTime()
         const mins = Math.floor(diff / 60000)
         if (mins < 60) return `${mins} phút trước`
@@ -58,14 +70,13 @@ export default function PostCard({ post }) {
         return `${Math.floor(hours / 24)} ngày trước`
     }
 
-    const typeLabels = {
+    const typeLabels: Record<string, { text: string; class: string }> = {
         find_player: { text: '🎯 Tìm người chơi', class: 'green' },
         share: { text: '📸 Chia sẻ', class: 'blue' },
         ad: { text: '📢 Quảng cáo', class: 'yellow' },
         event: { text: '🎉 Sự kiện', class: 'purple' }
     }
-
-    const typeInfo = typeLabels[data.post_type] || typeLabels.share
+    const typeInfo = (typeLabels[(data.post_type as string) || 'share'] || typeLabels.share)
 
     const handleLike = async () => {
         if (!user) return alert('Vui lòng đăng nhập để tương tác')
@@ -79,9 +90,9 @@ export default function PostCard({ post }) {
                 setLikeCount(res.data.likes ?? Math.max(0, likeCount - 1))
                 setLiked(false)
             }
-        } catch (err) {
+        } catch (err: any) {
             console.error('Like error', err)
-            alert(err.response?.data?.message || 'Lỗi khi tương tác')
+            alert(err?.response?.data?.message || 'Lỗi khi tương tác')
         }
     }
 
@@ -108,7 +119,7 @@ export default function PostCard({ post }) {
         if (user) api.post(`/posts/${data.id}/share`).then(r => setShareCount(r.data.shares)).catch(() => {})
     }
 
-    const handleAddComment = async (e) => {
+    const handleAddComment = async (e: FormEvent) => {
         e.preventDefault()
         if (!user) return alert('Vui lòng đăng nhập để bình luận')
         if (!commentText.trim()) return
@@ -119,14 +130,75 @@ export default function PostCard({ post }) {
             setCommentCount(res.data.comments || (commentCount + 1))
             setCommentText('')
         } catch (err) {
-            console.error('Comment error', err)
-            alert(err.response?.data?.message || 'Lỗi khi gửi bình luận')
+            const eErr: any = err
+            console.error('Comment error', eErr)
+            alert(eErr?.response?.data?.message || 'Lỗi khi gửi bình luận')
         }
+    }
+
+    const canDelete = user && (user.id === data.user_id || user.role === 'admin')
+    const [showMenu, setShowMenu] = useState(false)
+
+    const toggleMenu = () => setShowMenu(prev => !prev)
+
+    const handleActionHide = () => {
+        onHide && onHide(data.id)
+        setShowMenu(false)
+    }
+
+    const handleActionDelete = async () => {
+        if (!window.confirm('Bạn có chắc muốn xóa bài viết này?')) return
+        try {
+            await api.delete(`/posts/${data.id}`)
+            onDeleted && onDeleted(data.id)
+        } catch (err) {
+            console.error('Delete error', err)
+            alert(err.response?.data?.message || 'Lỗi khi xóa bài viết')
+        }
+        setShowMenu(false)
+    }
+
+    // show minimal card when hidden
+    if (isHidden) {
+        return (
+            <div className={`${styles.postCard} ${data.is_promoted ? styles.promoted : ''}`}>                
+                {/* still render menu so user can unhide or delete */}
+                <div style={{ position: 'absolute', top: 8, right: 8 }}>
+                    <button className={styles.menuBtn} onClick={toggleMenu} title="Tùy chọn">
+                        ⋮
+                    </button>
+                    {showMenu && (
+                        <div className={styles.menuDropdown} onMouseLeave={() => setShowMenu(false)}>
+                            <button className={styles.menuItem} onClick={handleActionHide}>Bỏ ẩn bài viết</button>
+                            {canDelete && <button className={styles.menuItem} onClick={handleActionDelete}>Xóa bài viết</button>}
+                        </div>
+                    )}
+                </div>
+                <div className={styles.hiddenNotice}>Bài viết đã bị ẩn</div>
+            </div>
+        )
     }
 
     return (
         <div className={`${styles.postCard} ${data.is_promoted ? styles.promoted : ''}`}>
             {data.is_promoted && <div className={styles.promotedBadge}>⚡ Được tài trợ</div>}
+            {/* overflow menu */}
+            <div style={{ position: 'absolute', top: 8, right: 8 }}>
+                <button className={styles.menuBtn} onClick={toggleMenu} title="Tùy chọn">
+                    ⋯
+                </button>
+                {showMenu && (
+                    <div className={styles.menuDropdown} onMouseLeave={() => setShowMenu(false)}>
+                        {!isHidden && (
+                            <button className={styles.menuItem} onClick={handleActionHide}>Ẩn bài viết</button>
+                        )}
+                        {isHidden && (
+                            <button className={styles.menuItem} onClick={handleActionHide}>Bỏ ẩn bài viết</button>
+                        )}
+                        {canDelete && <button className={styles.menuItem} onClick={handleActionDelete}>Xóa bài viết</button>}
+                    </div>
+                )}
+            </div>
 
             <div className={styles.postHeader}>
                 <div className="avatar">{getInitials(data.user_name)}</div>
@@ -218,16 +290,19 @@ export default function PostCard({ post }) {
                     {/* Comment list */}
                     {commentsList.length > 0 && (
                         <div className={styles.commentsList}>
-                            {commentsList.map(c => (
-                                <div key={c.id} className={styles.commentItem}>
-                                    <div className={`avatar avatar-sm ${styles.commentAvatar}`}>{getInitials(c.user_name)}</div>
-                                    <div className={styles.commentBubble}>
-                                        <span className={styles.commentUser}>{c.user_name}</span>
-                                        <span className={styles.commentText}>{c.content}</span>
-                                        <span className={styles.commentTime}>{timeAgo(c.created_at)}</span>
+                            {commentsList.map((c: any) => {
+                                const commenterName = c.user_name || c.full_name || 'Người dùng'
+                                return (
+                                    <div key={c.id} className={styles.commentItem}>
+                                        <div className={`avatar avatar-sm ${styles.commentAvatar}`}>{getInitials(commenterName)}</div>
+                                        <div className={styles.commentBubble}>
+                                            <span className={styles.commentUser}>{commenterName}</span>
+                                            <span className={styles.commentText}>{c.content}</span>
+                                            <span className={styles.commentTime}>{timeAgo(c.created_at)}</span>
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
+                                )
+                            })}
                         </div>
                     )}
 
