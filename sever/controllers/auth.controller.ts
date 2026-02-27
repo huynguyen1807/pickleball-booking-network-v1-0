@@ -21,25 +21,111 @@ const transporter = nodemailer.createTransport({
 // Generate 6-digit code
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
 
-// Register
-export const register = async (req, res) => {
-    try {
-        const { email, password, full_name, phone, role } = req.body;
-        if (!email || !password || !full_name) {
-            return res.status(400).json({ message: 'Vui lòng điền đầy đủ thông tin' });
-        }
+// Validate strong password
+const validatePassword = (pwd: string): string | null => {
+    if (pwd.length < 8) return 'Mật khẩu phải có ít nhất 8 ký tự';
+    if (!/[A-Z]/.test(pwd)) return 'Mật khẩu phải có ít nhất 1 chữ in hoa';
+    if (!/[a-z]/.test(pwd)) return 'Mật khẩu phải có ít nhất 1 chữ thường';
+    if (!/[0-9]/.test(pwd)) return 'Mật khẩu phải có ít nhất 1 chữ số';
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pwd)) return 'Mật khẩu phải có ít nhất 1 ký tự đặc biệt';
+    return null;
+};
 
-        const pool = await poolPromise;
+// Register
+export const sendRegisterOTP = async (req, res) => {
+    try {
+        const { email } = req.body
+        if (!email)
+            return res.status(400).json({ message: 'Vui lòng nhập email' })
+
+        const pool = await poolPromise
+
         const existing = await pool.request()
             .input('email', sql.NVarChar, email)
-            .query('SELECT id FROM users WHERE email = @email');
+            .query('SELECT id FROM users WHERE email = @email')
+
         if (existing.recordset.length > 0) {
-            return res.status(400).json({ message: 'Email đã tồn tại' });
+            return res.status(400).json({ message: 'Email đã tồn tại' })
         }
 
-        const hash = await bcrypt.hash(password, 10);
-        const userRole = role === 'owner' ? 'owner' : 'user';
-        const status = role === 'owner' ? 'pending' : 'active';
+        const otp = generateOTP()
+
+        otpStore.set(email, {
+            otp,
+            expiresAt: Date.now() + 5 * 60 * 1000,
+            type: 'register'
+        })
+
+        await transporter.sendMail({
+            from: process.env.SMTP_FROM,
+            to: email,
+            subject: '🏓 Mã xác nhận đăng ký — PickleBall- Đà Nẵng',
+            html: `
+                <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 480px; margin: 0 auto; background: #0d1117; color: #e6edf3; border-radius: 16px; padding: 40px 32px; border: 1px solid #30363d;">
+                    <div style="text-align: center; margin-bottom: 24px;">
+                        <div style="font-size: 40px;">🏓</div>
+                        <h1 style="font-size: 20px; font-weight: 700; margin: 8px 0 4px;">PickleBall- Đà Nẵng</h1>
+                        <p style="color: #8b949e; font-size: 14px; margin: 0;">Xác nhận đăng ký tài khoản</p>
+                    </div>
+                    <p style="font-size: 14px; color: #8b949e; margin-bottom: 24px;">
+                        Xin chào,<br>
+                        Mã xác nhận đăng ký tài khoản của bạn là:
+                    </p>
+                    <div style="text-align: center; margin: 24px 0;">
+                        <div style="display: inline-block; background: linear-gradient(135deg, #00E676, #00C853); color: #000; font-size: 32px; font-weight: 800; letter-spacing: 8px; padding: 16px 32px; border-radius: 12px;">
+                            ${otp}
+                        </div>
+                    </div>
+                    <p style="font-size: 13px; color: #8b949e; text-align: center;">
+                        ⏰ Mã này có hiệu lực trong <strong style="color: #e6edf3;">5 phút</strong>.<br>
+                        Nếu bạn không yêu cầu đăng ký, hãy bỏ qua email này.
+                    </p>
+                </div>
+            `
+        })
+
+        res.json({ message: 'OTP đã gửi về email' })
+
+    } catch (err) {
+        console.error(err)
+        res.status(500).json({ message: 'Không thể gửi OTP' })
+    }
+}
+
+/* ================================
+   REGISTER (VERIFY OTP + CREATE)
+================================ */
+export const register = async (req, res) => {
+    try {
+        const { email, password, full_name, phone, role, code } = req.body
+
+        if (!email || !password || !full_name || !code) {
+            return res.status(400).json({ message: 'Thiếu thông tin hoặc OTP' })
+        }
+
+        const pwdError = validatePassword(password)
+        if (pwdError) return res.status(400).json({ message: pwdError })
+
+        const stored = otpStore.get(email)
+
+        if (!stored || stored.type !== 'register') {
+            return res.status(400).json({ message: 'Vui lòng yêu cầu OTP trước' })
+        }
+
+        if (Date.now() > stored.expiresAt) {
+            otpStore.delete(email)
+            return res.status(400).json({ message: 'OTP đã hết hạn' })
+        }
+
+        if (stored.otp !== code.toString()) {
+            return res.status(400).json({ message: 'OTP không đúng' })
+        }
+
+        const pool = await poolPromise
+
+        const hash = await bcrypt.hash(password, 10)
+        const userRole = role === 'owner' ? 'owner' : 'user'
+        const status = role === 'owner' ? 'pending' : 'active'
 
         const result = await pool.request()
             .input('email', sql.NVarChar, email)
@@ -48,20 +134,26 @@ export const register = async (req, res) => {
             .input('phone', sql.NVarChar, phone || null)
             .input('role', sql.NVarChar, userRole)
             .input('status', sql.NVarChar, status)
-            .query(`INSERT INTO users (email, password, full_name, phone, role, status)
-              OUTPUT INSERTED.id
-              VALUES (@email, @password, @full_name, @phone, @role, @status)`);
+            .query(`
+                INSERT INTO users (email, password, full_name, phone, role, status)
+                OUTPUT INSERTED.id
+                VALUES (@email, @password, @full_name, @phone, @role, @status)
+            `)
+
+        otpStore.delete(email)
 
         res.status(201).json({
-            message: status === 'pending' ? 'Đăng ký thành công! Vui lòng chờ Admin duyệt.' : 'Đăng ký thành công!',
+            message: status === 'pending'
+                ? 'Đăng ký thành công! Chờ admin duyệt.'
+                : 'Đăng ký thành công!',
             userId: result.recordset[0].id
-        });
-    } catch (err) {
-        console.error('Register error:', err);
-        res.status(500).json({ message: 'Lỗi server' });
-    }
-};
+        })
 
+    } catch (err) {
+        console.error('Register error:', err)
+        res.status(500).json({ message: 'Lỗi server' })
+    }
+}
 // Login
 export const login = async (req, res) => {
     try {
@@ -232,7 +324,8 @@ export const resetPassword = async (req, res) => {
     try {
         const { email, new_password } = req.body;
         if (!email || !new_password) return res.status(400).json({ message: 'Vui lòng nhập đầy đủ thông tin' });
-        if (new_password.length < 6) return res.status(400).json({ message: 'Mật khẩu phải có ít nhất 6 ký tự' });
+        const pwdError = validatePassword(new_password);
+        if (pwdError) return res.status(400).json({ message: pwdError });
 
         const stored = otpStore.get(email);
         if (!stored || !stored.verified) {
