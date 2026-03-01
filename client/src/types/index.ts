@@ -6,6 +6,8 @@ export interface User {
   role: 'user' | 'owner' | 'admin';
   skill_level?: string;
   status: 'active' | 'inactive' | 'pending';
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface Court {

@@ -12,7 +12,7 @@ export default function Home() {
     const [posts, setPosts] = useState([])
     const [matches, setMatches] = useState([])
     const [courts, setCourts] = useState([])
-    const [stats, setStats] = useState({ total_users: 0, total_courts: 0, today_matches: 0 })
+    const [stats, setStats] = useState<any>({ total_users: 0, total_courts: 0, today_matches: 0 })
     const [loading, setLoading] = useState(true)
     const [postContent, setPostContent] = useState('')
     const [postType, setPostType] = useState('share')

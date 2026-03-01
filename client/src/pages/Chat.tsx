@@ -28,7 +28,7 @@ export default function Chat() {
         if (!dateStr) return ''
         const date = new Date(dateStr)
         const now = new Date()
-        const diffMs = now - date
+        const diffMs = now.getTime() - date.getTime()
         const diffHours = diffMs / (1000 * 60 * 60)
         if (diffHours < 24) return date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
         if (diffHours < 48) return 'Hôm qua'

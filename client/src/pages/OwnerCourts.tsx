@@ -118,7 +118,7 @@ export default function OwnerCourts() {
                         </div>
                         <div className="input-group">
                             <label>Mô tả</label>
-                            <textarea className="input-field" rows="3" placeholder="Mô tả sân, tiện ích..." style={{ resize: 'vertical' }}
+                            <textarea className="input-field" rows={3} placeholder="Mô tả sân, tiện ích..." style={{ resize: 'vertical' }}
                                 value={createForm.description} onChange={e => setCreateForm(p => ({ ...p, description: e.target.value }))} />
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>

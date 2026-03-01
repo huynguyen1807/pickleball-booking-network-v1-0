@@ -204,7 +204,7 @@ CREATE TABLE reviews (
 );
 GO
 
--- SEED ADMIN (password: admin123 - bcrypt hash)
+-- SEED ADMIN (password: password - bcrypt hash)
 IF NOT EXISTS (SELECT id FROM users WHERE email = 'admin@pickleball.vn')
 INSERT INTO users (email, password, full_name, phone, role, status)
 VALUES ('admin@pickleball.vn', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Admin System', '0900000000', 'admin', 'active');

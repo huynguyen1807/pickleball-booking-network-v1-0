@@ -34,7 +34,7 @@ export default function ChatBox({ roomId, roomName }) {
             if (data.chat_room_id === roomId) {
                 setMessages(prev => {
                     // Avoid duplicates
-                    if (prev.some(m => m.content === data.content && m.user_id === data.user_id && Math.abs(new Date(m.created_at) - new Date(data.created_at)) < 2000)) {
+                    if (prev.some(m => m.content === data.content && m.user_id === data.user_id && Math.abs(new Date(m.created_at).getTime() - new Date(data.created_at).getTime()) < 2000)) {
                         return prev
                     }
                     return [...prev, data]
