@@ -19,6 +19,8 @@ import UserDashboard from './pages/UserDashboard'
 import OwnerDashboard from './pages/OwnerDashboard'
 import OwnerCourts from './pages/OwnerCourts'
 import AdminDashboard from './pages/AdminDashboard'
+import OwnerCourtDetail from './pages/OwnerCourtDetail'
+
 
 export default function App() {
     const { user } = useAuth()
@@ -67,6 +69,9 @@ export default function App() {
                 } />
                 <Route path="/owner/courts" element={
                     <ProtectedRoute roles={['owner']}><OwnerCourts /></ProtectedRoute>
+                } />
+                <Route path="/owner/courtDetail/:id" element={
+                    <ProtectedRoute roles={['owner']}><OwnerCourtDetail /></ProtectedRoute>
                 } />
 
                 {/* Admin routes */}

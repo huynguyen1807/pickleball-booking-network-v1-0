@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../api/axios'
 import styles from '../styles/Dashboard.module.css'
+import { useNavigate } from 'react-router-dom'
 
 export default function OwnerCourts() {
     const [courts, setCourts] = useState([])
@@ -8,9 +9,9 @@ export default function OwnerCourts() {
     const [showCreate, setShowCreate] = useState(false)
     const [creating, setCreating] = useState(false)
     const [createForm, setCreateForm] = useState({
-        name: '', address: '', description: '', price_per_hour: '', latitude: '', longitude: '', image: ''
+        name: '', address: '', description: '', number_of_small_court: '', latitude: '', longitude: '', image: ''
     })
-
+    const navigate = useNavigate()
     useEffect(() => {
         loadCourts()
     }, [])
@@ -27,7 +28,7 @@ export default function OwnerCourts() {
     }
 
     const handleCreateCourt = async () => {
-        if (!createForm.name || !createForm.address || !createForm.price_per_hour) {
+        if (!createForm.name || !createForm.address || !createForm.number_of_small_court) {
             alert('Vui lòng điền tên sân, địa chỉ và giá')
             return
         }
@@ -38,12 +39,12 @@ export default function OwnerCourts() {
                 address: createForm.address,
                 description: createForm.description,
                 image: createForm.image || null,
-                price_per_hour: parseFloat(createForm.price_per_hour),
+                number_of_small_court: parseFloat(createForm.number_of_small_court),
                 latitude: createForm.latitude ? parseFloat(createForm.latitude) : null,
                 longitude: createForm.longitude ? parseFloat(createForm.longitude) : null
             })
             setShowCreate(false)
-            setCreateForm({ name: '', address: '', description: '', price_per_hour: '', latitude: '', longitude: '', image: '' })
+            setCreateForm({ name: '', address: '', description: '', number_of_small_court: '', latitude: '', longitude: '', image: '' })
             loadCourts()
         } catch (err) {
             alert(err.response?.data?.message || 'Lỗi tạo sân')
@@ -59,7 +60,7 @@ export default function OwnerCourts() {
                 address: court.address,
                 description: court.description,
                 image: court.image,
-                price_per_hour: court.price_per_hour,
+                number_of_small_court: court.number_of_small_court,
                 latitude: court.latitude,
                 longitude: court.longitude,
                 is_active: !court.is_active
@@ -80,7 +81,7 @@ export default function OwnerCourts() {
         }
     }
 
-    const formatPrice = (p) => new Intl.NumberFormat('vi-VN').format(p) + 'đ'
+    const formatPrice = (p) => new Intl.NumberFormat('vi-VN').format(p) + ' '
 
     if (loading) return <div className={styles.dashboardPage} style={{ textAlign: 'center', padding: '60px 20px' }}>⏳ Đang tải...</div>
 
@@ -106,9 +107,9 @@ export default function OwnerCourts() {
                                     value={createForm.name} onChange={e => setCreateForm(p => ({ ...p, name: e.target.value }))} />
                             </div>
                             <div className="input-group">
-                                <label>Giá / giờ (VNĐ)</label>
-                                <input className="input-field" type="number" placeholder="150000"
-                                    value={createForm.price_per_hour} onChange={e => setCreateForm(p => ({ ...p, price_per_hour: e.target.value }))} />
+                                <label>Số lượng sân nhỏ</label>
+                                <input className="input-field" type="number" placeholder="5"
+                                    value={createForm.number_of_small_court} onChange={e => setCreateForm(p => ({ ...p, number_of_small_court: e.target.value }))} />
                             </div>
                         </div>
                         <div className="input-group">
@@ -151,7 +152,7 @@ export default function OwnerCourts() {
                         <div className={styles.courtManageName}>{court.name}</div>
                         <div className={styles.courtManageAddress}>{court.address}</div>
                         <div className={styles.courtManageStats}>
-                            <span className={styles.courtManageStat}>💰 {formatPrice(court.price_per_hour)}/h</span>
+                            <span className={styles.courtManageStat}>🏟️ {formatPrice(court.number_of_small_court)}sân</span>
                             <span className={styles.courtManageStat}>📋 {court.booking_count || 0} booking</span>
                             <span className={styles.courtManageStat}>⭐ {court.avg_rating ? parseFloat(court.avg_rating).toFixed(1) : 'N/A'}</span>
                         </div>
@@ -163,8 +164,10 @@ export default function OwnerCourts() {
                         <button className="btn btn-secondary btn-sm" onClick={() => handleToggleActive(court)}>
                             {court.is_active ? '⏸ Tạm ngưng' : '▶ Kích hoạt'}
                         </button>
-                        <button className="btn btn-danger btn-sm" onClick={() => handleDelete(court.id)}>
-                            🗑️ Xóa
+                        <button
+                            className="btn btn-primary btn-sm"
+                                 onClick={() => navigate(`/owner/courtDetail/${court.id}`)}>
+                                    📄 Chi tiết
                         </button>
                     </div>
                 </div>

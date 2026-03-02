@@ -15,7 +15,7 @@ export interface Court {
   name: string;
   description?: string;
   location: string;
-  price_per_hour: number;
+  number_of_small_court: number;
   owner_id: number;
   status: 'active' | 'inactive';
   images?: string;
@@ -68,3 +68,4 @@ export interface ChatMessage {
   created_at: string;
   full_name?: string;
 }
+

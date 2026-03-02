@@ -23,7 +23,7 @@ export default function CourtCard({ court }) {
         <div className={styles.courtCard} onClick={() => navigate(`/courts/${data.id}`)}>
             <div className={styles.courtImage}>
                 <div className={styles.courtImagePlaceholder}>🏟️</div>
-                <div className={styles.courtPrice}>{formatPrice(data.price_per_hour)}/h</div>
+                <div className={styles.courtPrice}>{formatPrice(data.number_of_small_court)} sân</div>
                 {data.distance && <div className={styles.courtDistance}>📍 {data.distance} km</div>}
             </div>
 

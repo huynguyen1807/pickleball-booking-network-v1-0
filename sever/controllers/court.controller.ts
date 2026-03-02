@@ -3,7 +3,7 @@ import { sql, poolPromise } from '../config/db';
 // Create court (owner)
 export const createCourt = async (req, res) => {
     try {
-        const { name, address, description, image, price_per_hour, latitude, longitude } = req.body;
+        const { name, address, description, image, number_of_small_court, latitude, longitude } = req.body;
         const pool = await poolPromise;
         const result = await pool.request()
             .input('owner_id', sql.Int, req.user.id)
@@ -11,12 +11,12 @@ export const createCourt = async (req, res) => {
             .input('address', sql.NVarChar, address)
             .input('description', sql.NVarChar, description)
             .input('image', sql.NVarChar, image)
-            .input('price_per_hour', sql.Decimal(12, 2), price_per_hour)
+            .input('number_of_small_court', sql.Decimal(12, 2), number_of_small_court)
             .input('latitude', sql.Decimal(10, 7), latitude || null)
             .input('longitude', sql.Decimal(10, 7), longitude || null)
-            .query(`INSERT INTO courts (owner_id, name, address, description, image, price_per_hour, latitude, longitude)
+            .query(`INSERT INTO courts (owner_id, name, address, description, image, number_of_small_court, latitude, longitude)
               OUTPUT INSERTED.id
-              VALUES (@owner_id, @name, @address, @description, @image, @price_per_hour, @latitude, @longitude)`);
+              VALUES (@owner_id, @name, @address, @description, @image, @number_of_small_court, @latitude, @longitude)`);
         res.status(201).json({ message: 'Đã thêm sân', courtId: result.recordset[0].id });
     } catch (err) {
         res.status(500).json({ message: 'Lỗi server' });
@@ -67,7 +67,7 @@ export const getCourtById = async (req, res) => {
 // Update court (owner)
 export const updateCourt = async (req, res) => {
     try {
-        const { name, address, description, image, price_per_hour, latitude, longitude, is_active } = req.body;
+        const { name, address, description, image, number_of_small_court, latitude, longitude, is_active } = req.body;
         const pool = await poolPromise;
         const court = await pool.request().input('id', sql.Int, req.params.id).query('SELECT owner_id FROM courts WHERE id = @id');
         if (court.recordset.length === 0) return res.status(404).json({ message: 'Không tìm thấy sân' });
@@ -76,10 +76,10 @@ export const updateCourt = async (req, res) => {
         await pool.request()
             .input('name', sql.NVarChar, name).input('address', sql.NVarChar, address)
             .input('description', sql.NVarChar, description).input('image', sql.NVarChar, image)
-            .input('price_per_hour', sql.Decimal(12, 2), price_per_hour)
+            .input('number_of_small_court', sql.Decimal(12, 2), number_of_small_court)
             .input('latitude', sql.Decimal(10, 7), latitude).input('longitude', sql.Decimal(10, 7), longitude)
             .input('is_active', sql.Bit, is_active).input('id', sql.Int, req.params.id)
-            .query('UPDATE courts SET name=@name, address=@address, description=@description, image=@image, price_per_hour=@price_per_hour, latitude=@latitude, longitude=@longitude, is_active=@is_active WHERE id=@id');
+            .query('UPDATE courts SET name=@name, address=@address, description=@description, image=@image, number_of_small_court=@number_of_small_court, latitude=@latitude, longitude=@longitude, is_active=@is_active WHERE id=@id');
         res.json({ message: 'Cập nhật sân thành công' });
     } catch (err) {
         res.status(500).json({ message: 'Lỗi server' });
@@ -132,3 +132,125 @@ export const addReview = async (req, res) => {
     }
 };
 
+export const getSubCourtsByCourtId = async (req, res) => {
+  try {
+    const pool = await poolPromise
+    const result = await pool.request()
+      .input('court_id', sql.Int, req.params.courtId)
+      .query(`
+        SELECT *
+        FROM sub_courts
+        ORDER BY id ASC
+      `)
+
+    res.json(result.recordset)
+  } catch (err) {
+    res.status(500).json({ message: 'Lỗi server' })
+  }
+}
+
+export const getSubCourtById = async (req, res) => {
+  try {
+    const pool = await poolPromise
+    const result = await pool.request()
+      .input('id', sql.Int, req.params.id)
+      .query(`SELECT * FROM sub_courts WHERE id = @id`)
+
+    if (result.recordset.length === 0) {
+      return res.status(404).json({ message: 'Không tìm thấy sân con' })
+    }
+
+    res.json(result.recordset[0])
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ message: 'Lỗi server' })
+  }
+}
+
+export const createSubCourt = async (req, res) => {
+  try {
+    const { name, court_type, surface_type, status } = req.body
+    const courtId = Number(req.params.courtId)
+
+    if (!name || !court_type || !surface_type) {
+      return res.status(400).json({ message: 'Thiếu thông tin sân con' })
+    }
+
+    const pool = await poolPromise
+
+    // check sân cha
+    const parent = await pool.request()
+      .input('id', sql.Int, courtId)
+      .query('SELECT id FROM courts WHERE id = @id')
+
+    if (parent.recordset.length === 0) {
+      return res.status(404).json({ message: 'Không tìm thấy sân cha' })
+    }
+
+    const result = await pool.request()
+      .input('court_id', sql.Int, courtId)
+      .input('name', sql.NVarChar, name)
+      .input('court_type', sql.VarChar, court_type)
+      .input('surface_type', sql.VarChar, surface_type)
+      .input('status', sql.VarChar, status || 'active')
+      .query(`
+        INSERT INTO sub_courts
+          (court_id, name, court_type, surface_type, status)
+        OUTPUT INSERTED.*
+        VALUES
+          (@court_id, @name, @court_type, @surface_type, @status)
+      `)
+
+    res.status(201).json(result.recordset[0])
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ message: 'Lỗi server' })
+  }
+}
+
+export const updateSubCourt = async (req, res) => {
+  try {
+    const { name, court_type, surface_type, status } = req.body
+    const pool = await poolPromise
+
+    const result = await pool.request()
+      .input('id', sql.Int, req.params.id)
+      .input('name', sql.NVarChar, name)
+      .input('court_type', sql.VarChar, court_type)
+      .input('surface_type', sql.VarChar, surface_type)
+      .input('status', sql.VarChar, status)
+      .query(`
+        UPDATE sub_courts
+        SET
+          name = @name,
+          court_type = @court_type,
+          surface_type = @surface_type,
+          status = @status,
+          updated_at = GETDATE()
+        OUTPUT INSERTED.*
+        WHERE id = @id
+      `)
+
+    if (result.recordset.length === 0) {
+      return res.status(404).json({ message: 'Không tìm thấy sân con' })
+    }
+
+    res.json(result.recordset[0])
+  } catch (err) {
+    res.status(500).json({ message: 'Lỗi server' })
+  }
+}
+
+export const updateSubCourtStatus = async (req, res) => {
+  const pool = await poolPromise
+  await pool.request()
+    .input('id', sql.Int, req.params.id)
+    .input('status', sql.VarChar, req.body.status)
+    .query(`
+      UPDATE sub_courts
+      SET status = @status
+      WHERE id = @id
+    `)
+
+  res.json({ message: 'Cập nhật trạng thái thành công' })
+}
