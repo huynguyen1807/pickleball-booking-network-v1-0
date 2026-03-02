@@ -143,6 +143,7 @@ CREATE TABLE payments (
   amount DECIMAL(12,2) NOT NULL,
   commission DECIMAL(12,2) DEFAULT 0,
   payment_method NVARCHAR(50) DEFAULT 'mock',
+  transaction_id NVARCHAR(100) UNIQUE,
   status NVARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending','completed','failed','refunded')),
   created_at DATETIME DEFAULT GETDATE()
 );

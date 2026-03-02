@@ -8,6 +8,7 @@ export const createBooking = async (req, res) => {
     try {
         const { court_id, booking_date, start_time, end_time, payment_method } = req.body;
         const pool = await poolPromise;
+        const isPayOS = payment_method === 'payos';
 
         const court = await pool.request().input('id', sql.Int, court_id)
             .query('SELECT price_per_hour FROM courts WHERE id = @id AND is_active = 1');
@@ -25,14 +26,17 @@ export const createBooking = async (req, res) => {
             .input('end_time', sql.NVarChar, end_time).input('total_price', sql.Decimal(12, 2), total + commission)
             .input('commission_rate', sql.Decimal(4, 2), COMMISSION).input('commission_amount', sql.Decimal(12, 2), commission)
             .input('payment_method', sql.NVarChar, payment_method || 'mock')
+                        .input('status', sql.NVarChar, isPayOS ? 'pending' : 'confirmed')
             .query(`INSERT INTO bookings (user_id, court_id, booking_date, start_time, end_time, total_price, commission_rate, commission_amount, payment_method, status)
-              OUTPUT INSERTED.id VALUES (@user_id, @court_id, @booking_date, @start_time, @end_time, @total_price, @commission_rate, @commission_amount, @payment_method, 'confirmed')`);
+                            OUTPUT INSERTED.id VALUES (@user_id, @court_id, @booking_date, @start_time, @end_time, @total_price, @commission_rate, @commission_amount, @payment_method, @status)`);
 
-        await pool.request()
-            .input('user_id', sql.Int, req.user.id).input('booking_id', sql.Int, result.recordset[0].id)
-            .input('amount', sql.Decimal(12, 2), total + commission).input('commission', sql.Decimal(12, 2), commission)
-            .input('payment_method', sql.NVarChar, payment_method || 'mock')
-            .query("INSERT INTO payments (user_id, booking_id, amount, commission, payment_method, status) VALUES (@user_id, @booking_id, @amount, @commission, @payment_method, 'completed')");
+                if (!isPayOS) {
+                        await pool.request()
+                                .input('user_id', sql.Int, req.user.id).input('booking_id', sql.Int, result.recordset[0].id)
+                                .input('amount', sql.Decimal(12, 2), total + commission).input('commission', sql.Decimal(12, 2), commission)
+                                .input('payment_method', sql.NVarChar, payment_method || 'mock')
+                                .query("INSERT INTO payments (user_id, booking_id, amount, commission, payment_method, status) VALUES (@user_id, @booking_id, @amount, @commission, @payment_method, 'completed')");
+                }
 
         res.status(201).json({ message: 'Đặt sân thành công', bookingId: result.recordset[0].id, total: total + commission });
     } catch (err) {
