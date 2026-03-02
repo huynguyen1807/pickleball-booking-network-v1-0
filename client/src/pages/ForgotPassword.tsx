@@ -40,7 +40,7 @@ export default function ForgotPassword() {
         }
     }
 
-    const handleVerifyOTP = async (e, codeOverride) => {
+    const handleVerifyOTP = async (e?, codeOverride?) => {
         e?.preventDefault()
         const code = codeOverride || otp.join('')
         if (code.length < 6) return setError('Vui lòng nhập đủ 6 số')
@@ -61,7 +61,11 @@ export default function ForgotPassword() {
 
     const handleResetPassword = async (e) => {
         e.preventDefault()
-        if (newPassword.length < 6) return setError('Mật khẩu phải có ít nhất 6 ký tự')
+        if (newPassword.length < 8) return setError('Mật khẩu phải có ít nhất 8 ký tự')
+        if (!/[A-Z]/.test(newPassword)) return setError('Mật khẩu phải có ít nhất 1 chữ in hoa')
+        if (!/[a-z]/.test(newPassword)) return setError('Mật khẩu phải có ít nhất 1 chữ thường')
+        if (!/[0-9]/.test(newPassword)) return setError('Mật khẩu phải có ít nhất 1 chữ số')
+        if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(newPassword)) return setError('Mật khẩu phải có ít nhất 1 ký tự đặc biệt (!@#$%...)')
         if (newPassword !== confirmPassword) return setError('Mật khẩu xác nhận không khớp')
         setError('')
         setLoading(true)
@@ -178,7 +182,7 @@ export default function ForgotPassword() {
                     )}
 
                     {step === 2 && (
-                        <form className={styles.loginForm} onSubmit={handleVerifyOTP}>
+                        <form className={styles.loginForm} onSubmit={(e) => handleVerifyOTP(e)}>
                             <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
                                 {otp.map((digit, idx) => (
                                     <input key={idx} ref={el => inputRefs.current[idx] = el}
