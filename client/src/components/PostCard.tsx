@@ -34,6 +34,7 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
     }
 
     const [liked, setLiked] = useState(false)
+    const [, setTick] = useState(0)
     const [likeCount, setLikeCount] = useState(data.likes || 0)
     const [showShare, setShowShare] = useState(false)
     const [showComments, setShowComments] = useState(false)
@@ -48,6 +49,12 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
         setCommentCount(data.comments || 0)
         setShareCount(data.shares || 0)
     }, [post?.id])
+
+    // Auto-refresh time display every 30 seconds
+    useEffect(() => {
+        const timer = setInterval(() => setTick(t => t + 1), 30000)
+        return () => clearInterval(timer)
+    }, [])
 
     // Real-time socket updates for this post
     useEffect(() => {
@@ -82,12 +89,17 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
 
     const getInitials = (name?: string | null) => name ? name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) : '?'
     const timeAgo = (date?: string | Date | null) => {
-        const diff = Date.now() - new Date(date).getTime()
+        if (!date) return ''
+        const d = new Date(date)
+        const diff = Date.now() - d.getTime()
+        if (diff < 0) return 'Vừa xong'
         const mins = Math.floor(diff / 60000)
+        if (mins < 1) return 'Vừa xong'
         if (mins < 60) return `${mins} phút trước`
         const hours = Math.floor(mins / 60)
         if (hours < 24) return `${hours} giờ trước`
-        return `${Math.floor(hours / 24)} ngày trước`
+        if (hours < 48) return `Hôm qua lúc ${d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`
+        return d.toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
     }
 
     const typeLabels: Record<string, { text: string; class: string }> = {

@@ -128,13 +128,16 @@ export default function ImageLightbox({ imageUrl, post, onClose }: LightboxProps
     }
     const timeAgo = (date?: string | null) => {
         if (!date) return ''
-        const diff = Date.now() - new Date(date).getTime()
+        const d = new Date(date)
+        const diff = Date.now() - d.getTime()
+        if (diff < 0) return 'Vừa xong'
         const mins = Math.floor(diff / 60000)
         if (mins < 1) return 'Vừa xong'
         if (mins < 60) return `${mins} phút trước`
         const hours = Math.floor(mins / 60)
         if (hours < 24) return `${hours} giờ trước`
-        return `${Math.floor(hours / 24)} ngày trước`
+        if (hours < 48) return `Hôm qua lúc ${d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`
+        return d.toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
     }
 
     return (

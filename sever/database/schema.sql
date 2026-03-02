@@ -22,8 +22,8 @@ CREATE TABLE users (
   status NVARCHAR(20) DEFAULT 'active' CHECK (status IN ('active','pending','rejected')),
   latitude DECIMAL(10,7),
   longitude DECIMAL(10,7),
-  created_at DATETIME DEFAULT GETDATE(),
-  updated_at DATETIME DEFAULT GETDATE()
+  created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET(),
+  updated_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
 );
 GO
 
@@ -35,8 +35,8 @@ CREATE TABLE upgrade_requests (
   reason NVARCHAR(MAX),
   status NVARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected')),
   admin_note NVARCHAR(MAX),
-  created_at DATETIME DEFAULT GETDATE(),
-  updated_at DATETIME DEFAULT GETDATE()
+  created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET(),
+  updated_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
 );
 GO
 
@@ -53,7 +53,7 @@ CREATE TABLE courts (
   latitude DECIMAL(10,7),
   longitude DECIMAL(10,7),
   is_active BIT DEFAULT 1,
-  created_at DATETIME DEFAULT GETDATE()
+  created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
 );
 GO
 
@@ -78,7 +78,7 @@ CREATE TABLE posts (
   image NVARCHAR(MAX),
   post_type NVARCHAR(20) DEFAULT 'share' CHECK (post_type IN ('find_player','share','ad','event')),
   is_promoted BIT DEFAULT 0,
-  created_at DATETIME DEFAULT GETDATE()
+  created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
 );
 GO
 
@@ -88,7 +88,7 @@ CREATE TABLE post_likes (
   id INT IDENTITY(1,1) PRIMARY KEY,
   post_id INT NOT NULL FOREIGN KEY REFERENCES posts(id) ON DELETE CASCADE,
   user_id INT NOT NULL FOREIGN KEY REFERENCES users(id) ON DELETE NO ACTION,
-  created_at DATETIME DEFAULT GETDATE()
+  created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
 );
 GO
 
@@ -104,7 +104,7 @@ CREATE TABLE comments (
   post_id INT NOT NULL FOREIGN KEY REFERENCES posts(id) ON DELETE CASCADE,
   user_id INT NOT NULL FOREIGN KEY REFERENCES users(id) ON DELETE NO ACTION,
   content NVARCHAR(MAX) NOT NULL,
-  created_at DATETIME DEFAULT GETDATE()
+  created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
 );
 GO
 
@@ -114,7 +114,7 @@ CREATE TABLE post_shares (
   id INT IDENTITY(1,1) PRIMARY KEY,
   post_id INT NOT NULL FOREIGN KEY REFERENCES posts(id) ON DELETE CASCADE,
   user_id INT NULL FOREIGN KEY REFERENCES users(id) ON DELETE NO ACTION,
-  created_at DATETIME DEFAULT GETDATE()
+  created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
 );
 GO
 
@@ -133,7 +133,7 @@ CREATE TABLE bookings (
   commission_amount DECIMAL(12,2),
   status NVARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending','confirmed','cancelled','completed')),
   payment_method NVARCHAR(50),
-  created_at DATETIME DEFAULT GETDATE()
+  created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
 );
 GO
 
@@ -152,7 +152,7 @@ CREATE TABLE matches (
   total_cost DECIMAL(12,2) NOT NULL,
   commission_rate DECIMAL(4,2) DEFAULT 0.05,
   status NVARCHAR(20) DEFAULT 'waiting' CHECK (status IN ('waiting','confirmed','completed','cancelled')),
-  created_at DATETIME DEFAULT GETDATE()
+  created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
 );
 GO
 
@@ -165,7 +165,7 @@ CREATE TABLE match_players (
   status NVARCHAR(20) DEFAULT 'joined' CHECK (status IN ('joined','left')),
   payment_status NVARCHAR(20) DEFAULT 'pending' CHECK (payment_status IN ('pending','paid')),
   amount_due DECIMAL(12,2),
-  created_at DATETIME DEFAULT GETDATE()
+  created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
 );
 GO
 
@@ -180,7 +180,7 @@ CREATE TABLE payments (
   commission DECIMAL(12,2) DEFAULT 0,
   payment_method NVARCHAR(50) DEFAULT 'mock',
   status NVARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending','completed','failed','refunded')),
-  created_at DATETIME DEFAULT GETDATE()
+  created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
 );
 GO
 
@@ -194,7 +194,7 @@ CREATE TABLE notifications (
   type NVARCHAR(50),
   reference_id INT,
   is_read BIT DEFAULT 0,
-  created_at DATETIME DEFAULT GETDATE()
+  created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
 );
 GO
 
@@ -204,7 +204,7 @@ CREATE TABLE chat_rooms (
   id INT IDENTITY(1,1) PRIMARY KEY,
   match_id INT FOREIGN KEY REFERENCES matches(id),
   name NVARCHAR(200),
-  created_at DATETIME DEFAULT GETDATE()
+  created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
 );
 GO
 
@@ -224,7 +224,7 @@ CREATE TABLE messages (
   chat_room_id INT NOT NULL FOREIGN KEY REFERENCES chat_rooms(id) ON DELETE CASCADE,
   user_id INT NOT NULL FOREIGN KEY REFERENCES users(id),
   content NVARCHAR(MAX) NOT NULL,
-  created_at DATETIME DEFAULT GETDATE()
+  created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
 );
 GO
 
@@ -236,7 +236,7 @@ CREATE TABLE reviews (
   court_id INT NOT NULL FOREIGN KEY REFERENCES courts(id),
   rating INT NOT NULL CHECK (rating >= 1 AND rating <= 5),
   comment NVARCHAR(MAX),
-  created_at DATETIME DEFAULT GETDATE()
+  created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
 );
 GO
 
