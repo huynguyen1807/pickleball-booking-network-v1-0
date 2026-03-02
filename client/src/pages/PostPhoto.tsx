@@ -123,13 +123,16 @@ export default function PostPhoto() {
     }
     const timeAgo = (date?: string | null) => {
         if (!date) return ''
-        const diff = Date.now() - new Date(date).getTime()
+        const d = new Date(date)
+        const diff = Date.now() - d.getTime()
+        if (diff < 0) return 'Vừa xong'
         const m = Math.floor(diff / 60000)
         if (m < 1) return 'Vừa xong'
         if (m < 60) return `${m} phút trước`
         const h = Math.floor(m / 60)
         if (h < 24) return `${h} giờ trước`
-        return `${Math.floor(h / 24)} ngày trước`
+        if (h < 48) return `Hôm qua lúc ${d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`
+        return d.toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
     }
 
     if (loading) return (
