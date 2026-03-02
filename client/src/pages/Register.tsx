@@ -6,7 +6,7 @@ import styles from '../styles/Register.module.css'
 export default function Register() {
     const navigate = useNavigate()
     const [form, setForm] = useState({
-        full_name: '', email: '', phone: '', password: '', confirmPassword: '', role: 'user'
+        full_name: '', email: '', phone: '', password: '', confirmPassword: '', role: 'user', reason: ''
     })
     const [error, setError] = useState('')
     const [step, setStep] = useState(1) // 1: form đăng ký, 2: xác nhận OTP
@@ -14,6 +14,7 @@ export default function Register() {
     const [loading, setLoading] = useState(false)
     const [otp, setOtp] = useState(['', '', '', '', '', ''])
     const [countdown, setCountdown] = useState(0)
+    const [isSubmitting, setIsSubmitting] = useState(false)
     const inputRefs = useRef<(HTMLInputElement | null)[]>([])
 
     useEffect(() => {
@@ -41,6 +42,14 @@ export default function Register() {
         setError('')
         setSuccess('')
 
+        // Normalize email
+        const normalizedEmail = form.email.trim().toLowerCase()
+
+        // Validate reason for owner
+        if (form.role === 'owner' && !form.reason?.trim()) {
+            return setError('Vui lòng nhập lý do muốn trở thành chủ sân')
+        }
+
         if (form.password !== form.confirmPassword) {
             return setError('Mật khẩu xác nhận không khớp!')
         }
@@ -49,11 +58,17 @@ export default function Register() {
 
         setLoading(true)
         try {
-            await api.post('/auth/send-register-otp', { email: form.email })
+            const response = await api.post('/auth/send-register-otp', { email: normalizedEmail })
+            console.log('OTP sent successfully:', response.data)
+
+            // Update form with normalized email
+            setForm(prev => ({ ...prev, email: normalizedEmail }))
 
             setStep(2)
             setCountdown(60)
+            setSuccess('Mã xác nhận đã được gửi đến email của bạn!')
         } catch (err: any) {
+            console.error('Send OTP error:', err)
             setError(err.response?.data?.message || 'Không thể gửi mã xác nhận')
         } finally {
             setLoading(false)
@@ -63,30 +78,51 @@ export default function Register() {
     // Step 2: Nhập OTP → xác nhận → đăng ký luôn
     const handleVerifyAndRegister = async (e?: any, codeOverride?: string) => {
         e?.preventDefault()
+        
+        // Prevent double submission
+        if (isSubmitting) {
+            console.log('Already submitting, skipping...')
+            return
+        }
+        
         const code = codeOverride || otp.join('')
         if (code.length < 6) return setError('Vui lòng nhập đủ 6 số')
         setError('')
+        setIsSubmitting(true)
         setLoading(true)
+        
+        const registerData = {
+            full_name: form.full_name,
+            email: form.email,
+            phone: form.phone,
+            password: form.password,
+            role: form.role,
+            reason: form.reason || '',
+            code: code
+        }
+        
+        console.log('Registering with data:', { ...registerData, password: '***' })
+        
         try {
-            await api.post('/auth/register', {
-                full_name: form.full_name,
-                email: form.email,
-                phone: form.phone,
-                password: form.password,
-                role: form.role,
-                code: code
-            })
+            const response = await api.post('/auth/register', registerData)
+            console.log('Registration response:', response.data)
+
+            // Clear OTP to prevent re-submission
+            setOtp(['', '', '', '', '', ''])
 
             if (form.role === 'owner') {
-                setSuccess('Đăng ký thành công! Tài khoản Owner đang chờ Admin duyệt.')
+                setSuccess('✅ Đăng ký thành công! Tài khoản Owner đang chờ Admin duyệt. Đang chuyển đến trang đăng nhập...')
+                setTimeout(() => navigate('/login'), 3000)
             } else {
                 setSuccess('🎉 Đăng ký thành công! Đang chuyển đến trang đăng nhập...')
                 setTimeout(() => navigate('/login'), 2000)
             }
         } catch (err: any) {
+            console.error('Registration error:', err.response?.data || err)
             setError(err.response?.data?.message || 'Mã xác nhận không đúng')
             setOtp(['', '', '', '', '', ''])
             inputRefs.current[0]?.focus()
+            setIsSubmitting(false) // Reset on error to allow retry
         } finally {
             setLoading(false)
         }
@@ -96,6 +132,7 @@ export default function Register() {
         if (countdown > 0) return
         setError('')
         setLoading(true)
+        setIsSubmitting(false) // Reset submitting flag
         try {
             await api.post('/auth/send-register-otp', { email: form.email })
             setSuccess('Đã gửi lại mã xác nhận đến email!')
@@ -110,22 +147,25 @@ export default function Register() {
     }
 
     const handleOtpChange = (idx: number, value: string) => {
+        if (isSubmitting) return // Prevent changes during submission
         if (!/^\d*$/.test(value)) return
         const next = [...otp]
         next[idx] = value.slice(-1)
         setOtp(next)
         setError('')
         if (value && idx < 5) inputRefs.current[idx + 1]?.focus()
-        if (value && idx === 5 && next.join('').length === 6) {
+        if (value && idx === 5 && next.join('').length === 6 && !isSubmitting) {
             setTimeout(() => handleVerifyAndRegister(null, next.join('')), 200)
         }
     }
 
     const handleOtpKeyDown = (idx: number, e: any) => {
+        if (isSubmitting) return
         if (e.key === 'Backspace' && !otp[idx] && idx > 0) inputRefs.current[idx - 1]?.focus()
     }
 
     const handleOtpPaste = (e: any) => {
+        if (isSubmitting) return // Prevent paste during submission
         e.preventDefault()
         const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
         if (pasted.length > 0) {
@@ -133,7 +173,9 @@ export default function Register() {
             pasted.split('').forEach((ch: string, i: number) => { next[i] = ch })
             setOtp(next)
             inputRefs.current[Math.min(pasted.length, 5)]?.focus()
-            if (pasted.length === 6) setTimeout(() => handleVerifyAndRegister(null, pasted), 200)
+            if (pasted.length === 6 && !isSubmitting) {
+                setTimeout(() => handleVerifyAndRegister(null, pasted), 200)
+            }
         }
     }
 
@@ -191,6 +233,31 @@ export default function Register() {
                             {form.role === 'owner' && (
                                 <div className={styles.ownerNote}>
                                     ⚠️ Tài khoản Owner cần được Admin duyệt trước khi sử dụng
+                                </div>
+                            )}
+
+                            {form.role === 'owner' && (
+                                <div className="input-group">
+                                    <label>Lý do muốn trở thành chủ sân *</label>
+                                    <textarea
+                                        name="reason"
+                                        placeholder="VD: Tôi sở hữu 2 sân pickleball tại Sơn Trà và muốn cho thuê trên nền tảng..."
+                                        value={form.reason}
+                                        onChange={handleChange}
+                                        required
+                                        rows={3}
+                                        style={{
+                                            width: '100%',
+                                            padding: '12px 16px',
+                                            background: 'var(--bg-glass)',
+                                            border: '1px solid var(--border-glass)',
+                                            borderRadius: 'var(--radius-md)',
+                                            color: 'var(--text-primary)',
+                                            fontSize: '0.9rem',
+                                            resize: 'vertical',
+                                            minHeight: '80px'
+                                        }}
+                                    />
                                 </div>
                             )}
 
@@ -284,18 +351,21 @@ export default function Register() {
                                         onKeyDown={e => handleOtpKeyDown(idx, e)}
                                         onPaste={idx === 0 ? handleOtpPaste : undefined}
                                         autoFocus={idx === 0}
+                                        disabled={isSubmitting}
                                         style={{
                                             width: '52px', height: '60px', textAlign: 'center',
                                             fontSize: '1.5rem', fontWeight: 800,
                                             background: 'var(--bg-glass)',
                                             border: digit ? '2px solid var(--accent-green)' : '1px solid var(--border-glass)',
                                             borderRadius: 'var(--radius-md)', color: 'var(--text-primary)',
-                                            transition: 'all 0.2s ease', caretColor: 'var(--accent-green)'
+                                            transition: 'all 0.2s ease', caretColor: 'var(--accent-green)',
+                                            opacity: isSubmitting ? 0.6 : 1,
+                                            cursor: isSubmitting ? 'not-allowed' : 'text'
                                         }}
                                     />
                                 ))}
                             </div>
-                            <button type="submit" className={styles.submitBtn} disabled={loading || otp.join('').length < 6}>
+                            <button type="submit" className={styles.submitBtn} disabled={loading || isSubmitting || otp.join('').length < 6}>
                                 {loading ? '⏳ Đang xác nhận...' : '✅ Xác nhận & Đăng ký'}
                             </button>
                             <div style={{ textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
@@ -308,7 +378,7 @@ export default function Register() {
                                     </button>
                                 )}
                             </div>
-                            <button type="button" onClick={() => { setStep(1); setOtp(['', '', '', '', '', '']); setError(''); setSuccess('') }}
+                            <button type="button" onClick={() => { setStep(1); setOtp(['', '', '', '', '', '']); setError(''); setSuccess(''); setIsSubmitting(false) }}
                                 style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'center' }}>
                                 ← Quay lại sửa thông tin
                             </button>

@@ -38,10 +38,13 @@ export const sendRegisterOTP = async (req, res) => {
         if (!email)
             return res.status(400).json({ message: 'Vui lòng nhập email' })
 
+        // Normalize email: trim and lowercase
+        const trimmedEmail = email.trim().toLowerCase()
+
         const pool = await poolPromise
 
         const existing = await pool.request()
-            .input('email', sql.NVarChar, email)
+            .input('email', sql.NVarChar, trimmedEmail)
             .query('SELECT id FROM users WHERE email = @email')
 
         if (existing.recordset.length > 0) {
@@ -50,7 +53,8 @@ export const sendRegisterOTP = async (req, res) => {
 
         const otp = generateOTP()
 
-        otpStore.set(email, {
+        console.log(`[SEND_OTP] Storing OTP for email: ${trimmedEmail}, OTP: ${otp}`)
+        otpStore.set(trimmedEmail, {
             otp,
             expiresAt: Date.now() + 5 * 60 * 1000,
             type: 'register'
@@ -58,7 +62,7 @@ export const sendRegisterOTP = async (req, res) => {
 
         await transporter.sendMail({
             from: process.env.SMTP_FROM,
-            to: email,
+            to: trimmedEmail,
             subject: '🏓 Mã xác nhận đăng ký — PickleBall- Đà Nẵng',
             html: `
                 <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 480px; margin: 0 auto; background: #0d1117; color: #e6edf3; border-radius: 16px; padding: 40px 32px; border: 1px solid #30363d;">
@@ -97,28 +101,40 @@ export const sendRegisterOTP = async (req, res) => {
 ================================ */
 export const register = async (req, res) => {
     try {
-        const { email, password, full_name, phone, role, code } = req.body
+        const { email, password, full_name, phone, role, code, reason } = req.body
 
         if (!email || !password || !full_name || !code) {
             return res.status(400).json({ message: 'Thiếu thông tin hoặc OTP' })
         }
 
+        // Trim email to avoid whitespace issues
+        const trimmedEmail = email.trim().toLowerCase()
+
         const pwdError = validatePassword(password)
         if (pwdError) return res.status(400).json({ message: pwdError })
 
-        const stored = otpStore.get(email)
+        console.log(`[REGISTER] Checking OTP for email: ${trimmedEmail}`)
+        const stored = otpStore.get(trimmedEmail)
 
         if (!stored || stored.type !== 'register') {
+            console.log(`[REGISTER] OTP not found for: ${trimmedEmail}, otpStore keys:`, Array.from(otpStore.keys()))
             return res.status(400).json({ message: 'Vui lòng yêu cầu OTP trước' })
         }
 
         if (Date.now() > stored.expiresAt) {
-            otpStore.delete(email)
+            otpStore.delete(trimmedEmail)
+            console.log(`[REGISTER] OTP expired for: ${trimmedEmail}`)
             return res.status(400).json({ message: 'OTP đã hết hạn' })
         }
 
         if (stored.otp !== code.toString()) {
+            console.log(`[REGISTER] OTP mismatch for ${trimmedEmail}: expected ${stored.otp}, got ${code}`)
             return res.status(400).json({ message: 'OTP không đúng' })
+        }
+
+        // Validate reason for owner registration AFTER OTP verification
+        if (role === 'owner' && !reason?.trim()) {
+            return res.status(400).json({ message: 'Vui lòng nhập lý do muốn trở thành chủ sân' })
         }
 
         const pool = await poolPromise
@@ -127,8 +143,9 @@ export const register = async (req, res) => {
         const userRole = role === 'owner' ? 'owner' : 'user'
         const status = role === 'owner' ? 'pending' : 'active'
 
+        console.log(`[REGISTER] Creating user with email: ${trimmedEmail}, role: ${userRole}, status: ${status}`)
         const result = await pool.request()
-            .input('email', sql.NVarChar, email)
+            .input('email', sql.NVarChar, trimmedEmail)
             .input('password', sql.NVarChar, hash)
             .input('full_name', sql.NVarChar, full_name)
             .input('phone', sql.NVarChar, phone || null)
@@ -140,13 +157,28 @@ export const register = async (req, res) => {
                 VALUES (@email, @password, @full_name, @phone, @role, @status)
             `)
 
-        otpStore.delete(email)
+        const userId = result.recordset[0].id
+
+        // If owner, create upgrade request
+        if (role === 'owner') {
+            console.log(`[REGISTER] Creating upgrade request for user ${userId}`)
+            await pool.request()
+                .input('user_id', sql.Int, userId)
+                .input('reason', sql.NVarChar, reason)
+                .query(`
+                    INSERT INTO upgrade_requests (user_id, reason, status)
+                    VALUES (@user_id, @reason, 'pending')
+                `)
+        }
+
+        otpStore.delete(trimmedEmail)
+        console.log(`[REGISTER] Registration successful for: ${trimmedEmail}`)
 
         res.status(201).json({
             message: status === 'pending'
                 ? 'Đăng ký thành công! Chờ admin duyệt.'
                 : 'Đăng ký thành công!',
-            userId: result.recordset[0].id
+            userId: userId
         })
 
     } catch (err) {
