@@ -125,6 +125,78 @@
     color: var(--text-primary);
 }
 
+/* Image upload toolbar */
+.imageTools {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.imageTool {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px;
+    background: var(--bg-glass);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+}
+
+.imageTool:hover {
+    background: var(--bg-glass-hover);
+    border-color: var(--accent-green);
+    color: var(--accent-green);
+}
+
+/* Image preview before posting */
+.imagePreview {
+    position: relative;
+    margin: 10px 0 8px;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    display: inline-block;
+    max-width: 100%;
+}
+
+.previewImg {
+    display: block;
+    max-width: 100%;
+    max-height: 200px;
+    object-fit: contain;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-glass);
+    background: var(--bg-tertiary);
+}
+
+.removeImageBtn {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #fff;
+    font-size: 0.75rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+    line-height: 1;
+}
+
+.removeImageBtn:hover {
+    background: rgba(239, 68, 68, 0.85);
+}
+
 /* Filters */
 .filters {
     display: flex;
@@ -170,13 +242,16 @@
     transition: border-color var(--transition-fast), background var(--transition-fast);
     appearance: none;
 }
+
 .postTypeSelect:hover {
     border-color: var(--border-glass-hover);
 }
+
 .postTypeSelect option {
     background: var(--bg-card);
     color: var(--text-primary);
 }
+
 .postTypeSelect:focus {
     outline: none;
     border-color: var(--accent-green);

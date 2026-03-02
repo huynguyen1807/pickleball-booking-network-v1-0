@@ -1,6 +1,8 @@
 import React, { useState, useEffect, FormEvent } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { useNavigate } from 'react-router-dom'
 import api from '../api/axios'
+import { io as socketIO } from 'socket.io-client'
 import styles from '../styles/Cards.module.css'
 
 type PostType = any
@@ -15,6 +17,7 @@ interface PostCardProps {
 
 export default function PostCard({ post, isHidden = false, onDeleted, onHide }: PostCardProps) {
     const { user } = useAuth()
+    const navigate = useNavigate()
     // normalize post object: prefer `user_name`, fallback to `full_name`
     const normalizedPost = post ? { ...post, user_name: post.user_name || post.full_name } : null
     const data = normalizedPost || {
@@ -44,7 +47,24 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
         setLikeCount(data.likes || 0)
         setCommentCount(data.comments || 0)
         setShareCount(data.shares || 0)
-    }, [data.likes, data.comments])
+    }, [post?.id])
+
+    // Real-time socket updates for this post
+    useEffect(() => {
+        if (!data.id) return
+        const socket = socketIO('http://localhost:5000', { transports: ['websocket'] })
+        socket.emit('join_post', data.id)
+        socket.on('post_liked', (ev: { postId: number; likes: number }) => {
+            if (ev.postId === data.id) setLikeCount(ev.likes)
+        })
+        socket.on('post_commented', (ev: { postId: number; comments: number }) => {
+            if (ev.postId === data.id) setCommentCount(ev.comments)
+        })
+        return () => {
+            socket.emit('leave_post', data.id)
+            socket.disconnect()
+        }
+    }, [data.id])
 
     useEffect(() => {
         if (showComments) {
@@ -103,20 +123,20 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
         window.open(`https://www.facebook.com/sharer/sharer.php?u=${shareUrl}&quote=${shareText}`, '_blank', 'width=600,height=400')
         setShowShare(false)
         // record share (only if logged in)
-        if (user) api.post(`/posts/${data.id}/share`).then(r => setShareCount(r.data.shares)).catch(() => {})
+        if (user) api.post(`/posts/${data.id}/share`).then(r => setShareCount(r.data.shares)).catch(() => { })
     }
 
     const handleShareMessenger = () => {
         window.open(`https://www.facebook.com/dialog/send?link=${shareUrl}&app_id=0&redirect_uri=${encodeURIComponent(window.location.href)}`, '_blank', 'width=600,height=400')
         setShowShare(false)
-        if (user) api.post(`/posts/${data.id}/share`).then(r => setShareCount(r.data.shares)).catch(() => {})
+        if (user) api.post(`/posts/${data.id}/share`).then(r => setShareCount(r.data.shares)).catch(() => { })
     }
 
     const handleCopyLink = () => {
         navigator.clipboard.writeText(window.location.origin + `/post/${data.id}`)
         setShowShare(false)
         alert('Đã sao chép link!')
-        if (user) api.post(`/posts/${data.id}/share`).then(r => setShareCount(r.data.shares)).catch(() => {})
+        if (user) api.post(`/posts/${data.id}/share`).then(r => setShareCount(r.data.shares)).catch(() => { })
     }
 
     const handleAddComment = async (e: FormEvent) => {
@@ -161,7 +181,7 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
     // show minimal card when hidden
     if (isHidden) {
         return (
-            <div className={`${styles.postCard} ${data.is_promoted ? styles.promoted : ''}`}>                
+            <div className={`${styles.postCard} ${data.is_promoted ? styles.promoted : ''}`}>
                 {/* still render menu so user can unhide or delete */}
                 <div style={{ position: 'absolute', top: 8, right: 8 }}>
                     <button className={styles.menuBtn} onClick={toggleMenu} title="Tùy chọn">
@@ -214,7 +234,18 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
 
             <div className={styles.postContent}>{data.content}</div>
 
-            {data.image && <img src={data.image} alt="" className={styles.postImage} />}
+            {data.image && (
+                <>
+                    <button
+                        onClick={() => navigate(`/post/${data.id}/photo`)}
+                        style={{ display: 'block', width: '100%', padding: 0, border: 'none', background: 'none', cursor: 'zoom-in' }}
+                        title="Click để xem ảnh phóng to"
+                    >
+                        <img src={data.image} alt="" className={styles.postImage} style={{ pointerEvents: 'none' }} />
+                    </button>
+                    <div className={styles.imageHint}>🔍 Click ảnh để xem toàn màn hình</div>
+                </>
+            )}
 
             {/* Like / Comment / Share Actions */}
             <div className={styles.postActions}>

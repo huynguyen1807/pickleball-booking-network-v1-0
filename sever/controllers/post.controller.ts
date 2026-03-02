@@ -1,4 +1,26 @@
 import { sql, poolPromise } from '../config/db';
+import { getIO } from '../socket/index';
+
+// Get single post by ID
+export const getPostById = async (req, res) => {
+    try {
+        const postId = parseInt(req.params.id);
+        const pool = await poolPromise;
+        const result = await pool.request()
+            .input('id', sql.Int, postId)
+            .query(`SELECT p.*, u.full_name AS user_name, u.avatar, u.role AS user_role,
+                (SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = p.id) AS likes,
+                (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id) AS comments,
+                (SELECT COUNT(*) FROM post_shares ps WHERE ps.post_id = p.id) AS shares
+                FROM posts p JOIN users u ON p.user_id = u.id WHERE p.id = @id`);
+        if (result.recordset.length === 0) return res.status(404).json({ message: 'Không tìm thấy bài viết' });
+        const post = result.recordset[0];
+        if (post.created_at) post.created_at = new Date(post.created_at).toISOString();
+        res.json(post);
+    } catch (err) {
+        res.status(500).json({ message: 'Lỗi server' });
+    }
+};
 
 // Create post
 export const createPost = async (req, res) => {
@@ -80,7 +102,10 @@ export const likePost = async (req, res) => {
         }
 
         const likesRes = await pool.request().input('post_id', sql.Int, postId).query('SELECT COUNT(*) AS cnt FROM post_likes WHERE post_id = @post_id');
-        res.json({ message: 'Đã thích', likes: likesRes.recordset[0].cnt });
+        const likes = likesRes.recordset[0].cnt;
+        // Broadcast real-time
+        try { getIO()?.to(`post_${postId}`).emit('post_liked', { postId, likes }); } catch { }
+        res.json({ message: 'Đã thích', likes });
     } catch (err) {
         res.status(500).json({ message: 'Lỗi server' });
     }
@@ -93,7 +118,9 @@ export const unlikePost = async (req, res) => {
         const pool = await poolPromise;
         await pool.request().input('post_id', sql.Int, postId).input('user_id', sql.Int, req.user.id).query('DELETE FROM post_likes WHERE post_id = @post_id AND user_id = @user_id');
         const likesRes = await pool.request().input('post_id', sql.Int, postId).query('SELECT COUNT(*) AS cnt FROM post_likes WHERE post_id = @post_id');
-        res.json({ message: 'Bỏ thích', likes: likesRes.recordset[0].cnt });
+        const likes = likesRes.recordset[0].cnt;
+        try { getIO()?.to(`post_${postId}`).emit('post_liked', { postId, likes }); } catch { }
+        res.json({ message: 'Bỏ thích', likes });
     } catch (err) {
         res.status(500).json({ message: 'Lỗi server' });
     }
@@ -135,13 +162,17 @@ export const addComment = async (req, res) => {
         const commentId = insert.recordset[0].id;
         const createdAt = insert.recordset[0].created_at;
 
-        const commentRes = await pool.request().input('id', sql.Int, commentId).query('SELECT c.id, c.content, c.created_at, u.id AS user_id, u.full_name, u.avatar FROM comments c JOIN users u ON c.user_id = u.id WHERE c.id = @id');
+        const commentRes = await pool.request().input('id', sql.Int, commentId)
+            .query('SELECT c.id, c.content, c.created_at, u.id AS user_id, u.full_name AS user_name, u.avatar FROM comments c JOIN users u ON c.user_id = u.id WHERE c.id = @id');
 
         const countRes = await pool.request().input('post_id', sql.Int, postId).query('SELECT COUNT(*) AS cnt FROM comments WHERE post_id = @post_id');
 
         const comment = commentRes.recordset[0];
         if (comment) comment.created_at = comment.created_at ? new Date(comment.created_at).toISOString() : null;
-        res.status(201).json({ comment, comments: countRes.recordset[0].cnt });
+        const comments = countRes.recordset[0].cnt;
+        // Broadcast real-time
+        try { getIO()?.to(`post_${postId}`).emit('post_commented', { postId, comment, comments }); } catch { }
+        res.status(201).json({ comment, comments });
     } catch (err) {
         res.status(500).json({ message: 'Lỗi server' });
     }

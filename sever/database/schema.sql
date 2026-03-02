@@ -75,7 +75,7 @@ CREATE TABLE posts (
   id INT IDENTITY(1,1) PRIMARY KEY,
   user_id INT NOT NULL FOREIGN KEY REFERENCES users(id) ON DELETE CASCADE,
   content NVARCHAR(MAX) NOT NULL,
-  image NVARCHAR(500),
+  image NVARCHAR(MAX),
   post_type NVARCHAR(20) DEFAULT 'share' CHECK (post_type IN ('find_player','share','ad','event')),
   is_promoted BIT DEFAULT 0,
   created_at DATETIME DEFAULT GETDATE()
@@ -244,4 +244,9 @@ GO
 IF NOT EXISTS (SELECT id FROM users WHERE email = 'admin@pickleball.vn')
 INSERT INTO users (email, password, full_name, phone, role, status)
 VALUES ('admin@pickleball.vn', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Admin System', '0900000000', 'admin', 'active');
+GO
+
+-- MIGRATION: Expand posts.image column to hold base64 images (run once automatically by db.ts on startup)
+IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='posts' AND COLUMN_NAME='image' AND DATA_TYPE='nvarchar' AND CHARACTER_MAXIMUM_LENGTH=500)
+    ALTER TABLE posts ALTER COLUMN image NVARCHAR(MAX);
 GO
