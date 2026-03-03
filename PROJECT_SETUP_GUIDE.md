@@ -889,6 +889,13 @@ ngrok http 5000 --domain=your-domain.ngrok-free.app
 # Open: http://localhost:4040
 ```
 
+## Kill Terminal khi Port bị chiếm dụng
+
+netstat -ano | findstr :5000    
+ 
+taskkill /PID [code] /F   
+ 
+
 ---
 
 ## 🚨 Production Deployment Checklist

@@ -53,7 +53,10 @@ export const sortParams = (obj: any): any => {
  */
 export const createQueryString = (obj: any): string => {
     return Object.keys(obj)
-        .map(key => `${key}=${obj[key]}`)
+        .map(key => {
+            const value = obj[key];
+            return `${key}=${value === null || value === undefined ? '' : value}`;
+        })
         .join('&');
 };
 
