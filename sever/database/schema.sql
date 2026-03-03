@@ -49,11 +49,26 @@ CREATE TABLE courts (
   address NVARCHAR(500) NOT NULL,
   description NVARCHAR(MAX),
   image NVARCHAR(500),
-  price_per_hour DECIMAL(12,2) NOT NULL,
+  number_of_small_court DECIMAL(12,2) NOT NULL,
   latitude DECIMAL(10,7),
   longitude DECIMAL(10,7),
   is_active BIT DEFAULT 1,
   created_at DATETIME DEFAULT GETDATE()
+);
+GO
+
+-- SUB COURTS
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='sub_courts' AND xtype='U')
+CREATE TABLE sub_courts (
+  id INT IDENTITY(1,1) PRIMARY KEY,
+  court_id INT NOT NULL FOREIGN KEY REFERENCES courts(id) ON DELETE CASCADE,
+  name NVARCHAR(200) NOT NULL,
+  court_type NVARCHAR(50) NOT NULL,
+  surface_type NVARCHAR(50) NOT NULL,
+  status NVARCHAR(20) DEFAULT 'active' CHECK (status IN ('active','maintenance')),
+  price_per_hour DECIMAL(12,2) DEFAULT 0.00,
+  created_at DATETIME DEFAULT GETDATE(),
+  updated_at DATETIME DEFAULT GETDATE()
 );
 GO
 

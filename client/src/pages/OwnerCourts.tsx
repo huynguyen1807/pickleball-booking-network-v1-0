@@ -152,7 +152,7 @@ export default function OwnerCourts() {
                         <div className={styles.courtManageName}>{court.name}</div>
                         <div className={styles.courtManageAddress}>{court.address}</div>
                         <div className={styles.courtManageStats}>
-                            <span className={styles.courtManageStat}>🏟️ {formatPrice(court.number_of_small_court)}sân</span>
+                            <span className={styles.courtManageStat}>🏟️ {court.sub_courts_count || 0} sân</span>
                             <span className={styles.courtManageStat}>📋 {court.booking_count || 0} booking</span>
                             <span className={styles.courtManageStat}>⭐ {court.avg_rating ? parseFloat(court.avg_rating).toFixed(1) : 'N/A'}</span>
                         </div>

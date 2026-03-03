@@ -2,7 +2,7 @@ import { Router } from 'express';
 const router = Router();
 import auth from '../middleware/auth';
 import role from '../middleware/role';
-import { createCourt, getAllCourts, getCourtById, updateCourt, deleteCourt, getMyCourts, addReview, updateSubCourtStatus, updateSubCourt, createSubCourt, getSubCourtById, getSubCourtsByCourtId } from '../controllers/court.controller';
+import { createCourt, getAllCourts, getCourtById, updateCourt, deleteCourt, getMyCourts, addReview, updateSubCourtStatus, updateSubCourt, createSubCourt, getSubCourtById, getSubCourtsByCourtId, deleteSubCourt } from '../controllers/court.controller';
 
 router.get('/', getAllCourts);
 router.get('/my', auth, role('owner'), getMyCourts);
@@ -14,11 +14,15 @@ router.post('/:id/review', auth, addReview);
 
 // courts.routes.ts
 router.get('/:courtId/sub-courts', getSubCourtsByCourtId)
-router.post('/:courtId/sub-courts', createSubCourt)
+router.post('/:courtId/sub-courts', auth, createSubCourt)
+router.get('/:courtId/sub-courts/:id', getSubCourtById)
+router.put('/:courtId/sub-courts/:id', auth, updateSubCourt)
+router.put('/:courtId/sub-courts/:id/status', auth, updateSubCourtStatus)
+router.delete('/:courtId/sub-courts/:id', auth, deleteSubCourt)
 
-// subCourts.routes.ts
-router.put('/:id', updateSubCourt)
-router.put('/:id/status', updateSubCourtStatus)
+// legacy direct subcourt endpoints (for compatibility?)
+// router.put('/:id', auth, updateSubCourt)
+// router.put('/:id/status', auth, updateSubCourtStatus)
 
 export default router;
 

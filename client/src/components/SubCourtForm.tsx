@@ -1,25 +1,49 @@
 import { useState } from 'react'
 import api from '../api/axios'
 
-export default function SubCourtForm({ courtId, subCourt, onClose, onSuccess }) {
+type Props = {
+  courtId?: string | number | null
+  subCourt?: any
+  onClose: () => void
+  onSuccess: () => any
+}
+
+export default function SubCourtForm({ courtId, subCourt, onClose, onSuccess }: Props) {
   const [form, setForm] = useState({
     name: subCourt?.name || '',
     court_type: subCourt?.court_type || 'indoor',
     surface_type: subCourt?.surface_type || 'hard',
-    status: subCourt?.status || 'active'
+    status: subCourt?.status || 'active',
+    price_per_hour: subCourt?.price_per_hour ?? 0
   })
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
   const submit = async () => {
     if (!form.name) return alert('Nhập tên sân')
+    
+    setLoading(true)
+    setError('')
 
-    if (subCourt) {
-      await api.put(`/sub-courts/${subCourt.id}`, form)
-    } else {
-      await api.post(`/courts/${courtId}/sub-courts`, form)
+    try {
+      const payload = { ...form }
+      if (subCourt) {
+        if (!courtId) throw new Error('courtId required to update')
+        await api.put(`/courts/${courtId}/sub-courts/${subCourt.id}`, payload)
+      } else {
+        if (!courtId) throw new Error('courtId required to create')
+        await api.post(`/courts/${courtId}/sub-courts`, payload)
+      }
+
+      onSuccess()
+      onClose()
+    } catch (err) {
+      const message = err.response?.data?.message || 'Cập nhập thất bại'
+      setError(message)
+      console.error('Error:', err)
+    } finally {
+      setLoading(false)
     }
-
-    onClose()
-    onSuccess()
   }
 
   return (
@@ -49,6 +73,18 @@ export default function SubCourtForm({ courtId, subCourt, onClose, onSuccess }) 
         <option value="carpet">Sân thảm</option>
       </select>
 
+      <div style={{ marginTop: 8 }}>
+        <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Giá (/giờ)</label>
+        <input
+          type="number"
+          step="0.01"
+          min={0}
+          className="input-field"
+          value={form.price_per_hour}
+          onChange={e => setForm(p => ({ ...p, price_per_hour: parseFloat(e.target.value || '0') }))}
+        />
+      </div>
+
       {subCourt && (
         <select
           value={form.status}
@@ -59,9 +95,23 @@ export default function SubCourtForm({ courtId, subCourt, onClose, onSuccess }) 
         </select>
       )}
 
+      {error && <div style={{ color: '#ef4444', marginBottom: 12 }}>⚠️ {error}</div>}
+
       <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
-        <button className="btn btn-primary" onClick={submit}>Lưu</button>
-        <button className="btn btn-secondary" onClick={onClose}>Hủy</button>
+        <button 
+          className="btn btn-primary" 
+          onClick={submit}
+          disabled={loading}
+        >
+          {loading ? 'Đang lưu...' : 'Lưu'}
+        </button>
+        <button 
+          className="btn btn-secondary" 
+          onClick={onClose}
+          disabled={loading}
+        >
+          Hủy
+        </button>
       </div>
     </div>
   )

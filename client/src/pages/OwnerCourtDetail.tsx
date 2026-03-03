@@ -1,10 +1,11 @@
 import { useParams } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import api from '../api/axios'
-import SubCourtForm from '../components/SubcourtForm'
+import SubCourtForm from '../components/SubCourtForm.tsx'
 
 export default function OwnerCourtDetail() {
-  const { id } = useParams()
+  const { id } = useParams<{ id: string }>()
+  if (!id) return <div>Sân không hợp lệ</div>
 
   const [court, setCourt] = useState(null)
   const [subCourts, setSubCourts] = useState([])
@@ -12,6 +13,8 @@ export default function OwnerCourtDetail() {
 
   const [showCreate, setShowCreate] = useState(false)
   const [editingSubCourt, setEditingSubCourt] = useState(null)
+  const [editingCourt, setEditingCourt] = useState(false)
+  const [courtForm, setCourtForm] = useState({ name: '', address: '', description: '', price_per_hour: 0 })
 
   useEffect(() => {
     loadDetail()
@@ -21,6 +24,7 @@ export default function OwnerCourtDetail() {
     try {
       const res = await api.get(`/courts/${id}`)
       setCourt(res.data)
+      setCourtForm({ name: res.data.name, address: res.data.address, description: res.data.description, price_per_hour: res.data.price_per_hour || 0 })
 
       const sub = await api.get(`/courts/${id}/sub-courts`)
       setSubCourts(sub.data)
@@ -32,56 +36,158 @@ export default function OwnerCourtDetail() {
   }
 
   const toggleSubCourtStatus = async (sc) => {
-    await api.put(`/sub-courts/${sc.id}/status`, {
-      status: sc.status === 'active' ? 'maintenance' : 'active'
-    })
-    loadDetail()
+    try {
+      await api.put(`/courts/${id}/sub-courts/${sc.id}/status`, {
+        status: sc.status === 'active' ? 'maintenance' : 'active'
+      })
+      loadDetail()
+    } catch (err) {
+      alert(err.response?.data?.message || 'Lỗi server khi đổi trạng thái')
+    }
+  }
+
+  const deleteSubCourt = async (scId) => {
+    if (!window.confirm('Xóa sân con này?')) return
+    try {
+      await api.delete(`/courts/${id}/sub-courts/${scId}`)
+      setSubCourts(prev => prev.filter(s => s.id !== scId))
+    } catch (err) {
+      alert(err.response?.data?.message || 'Lỗi xóa sân con')
+    }
+  }
+
+  const updateCourt = async () => {
+    try {
+      // include price and maybe other fields if they exist
+      const payload = { ...courtForm }
+      await api.put(`/courts/${id}`, payload)
+      setCourt(prev => ({ ...prev, ...courtForm }))
+      setEditingCourt(false)
+      alert('Cập nhập sân thành công')
+    } catch (err) {
+      alert(err.response?.data?.message || 'Lỗi cập nhập sân')
+    }
+  }
+
+  const deleteCourt = async () => {
+    if (!window.confirm('Xóa sân này? Tất cả sân con sẽ bị xóa!')) return
+    try {
+      await api.delete(`/courts/${id}`)
+      alert('Xóa sân thành công')
+      window.location.href = '/owner-dashboard'
+    } catch (err) {
+      alert(err.response?.data?.message || 'Lỗi xóa sân')
+    }
   }
 
   if (loading) return <div>Đang tải...</div>
 
   return (
-    <div className="dashboardPage">
-      <h1>🏟️ {court.name}</h1>
-      <p>{court.address}</p>
-      <p>{court.description}</p>
+    <div className="dashboardPage" style={{ paddingTop: '80px' }}>
+      {!editingCourt && (
+        <div className="glass-card" style={{ marginBottom: '24px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '16px' }}>
+            <h2>🏟️ {court.name}</h2>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn btn-primary btn-sm" onClick={() => setEditingCourt(true)}>
+                ✏️ Chỉnh sửa sân
+              </button>
+              <button className="btn btn-danger btn-sm" onClick={deleteCourt}>
+                🗑️ Xóa sân
+              </button>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div>
+              <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Địa chỉ</label>
+              <p style={{ fontSize: '0.95rem', marginTop: '4px' }}>📍 {court.address}</p>
+            </div>
+            <div>
+              <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Giá / Giờ</label>
+              <p style={{ fontSize: '0.95rem', marginTop: '4px', fontWeight: 600 }}>
+                {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(court.price_per_hour || 0)}
+              </p>
+            </div>
+          </div>
+
+          <div style={{ marginTop: '16px' }}>
+            <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Mô tả</label>
+            <p style={{ fontSize: '0.95rem', marginTop: '4px', lineHeight: '1.5' }}>
+              {court.description || '(Chưa có mô tả)'}
+            </p>
+          </div>
+
+          <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+              Tổng cộng: <b>{subCourts.length}</b> sân con
+            </p>
+          </div>
+        </div>
+      )}
 
       <hr />
 
-      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-        <h3>🎯 Danh sách sân con</h3>
-        <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <h3>🎯 Danh sách sân con ({subCourts.length})</h3>
+        <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
           ➕ Thêm sân con
         </button>
       </div>
 
-      {subCourts.map(sc => (
-        <div key={sc.id} className="glass-card">
-          <b>{sc.name}</b>
-          <div>
-            🏟️ {sc.court_type} | 🧱 {sc.surface_type}
-          </div>
-          <span>
-            {sc.status === 'active' ? '🟢 Hoạt động' : '🛠️ Bảo trì'}
-          </span>
+      {subCourts && subCourts.length > 0 ? (
+        subCourts.map(sc => (
+          <div key={sc.id} className="glass-card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '12px' }}>
+              <div>
+                <h4 style={{ margin: '0 0 4px 0' }}>{sc.name}</h4>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                  🏟️ {sc.court_type} | 🧱 {sc.surface_type}
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ color: sc.status === 'active' ? '#10b981' : '#f59e0b', fontWeight: 600 }}>
+                  {sc.status === 'active' ? '🟢 Hoạt động' : '🛠️ Bảo trì'}
+                </div>
+              </div>
+            </div>
 
-          <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
-            <button
-              className="btn btn-secondary btn-sm"
-              onClick={() => toggleSubCourtStatus(sc)}
-            >
-              {sc.status === 'active' ? 'Bảo trì' : 'Kích hoạt'}
-            </button>
+            <div style={{ padding: '12px 0', borderBottom: '1px solid var(--border-color)' }}>
+              <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Giá / Giờ</label>
+              <p style={{ margin: '4px 0 0 0', fontWeight: 600, fontSize: '0.95rem' }}>
+                {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(sc.price_per_hour || 0)}
+              </p>
+            </div>
 
-            <button
-              className="btn btn-outline btn-sm"
-              onClick={() => setEditingSubCourt(sc)}
-            >
-              ✏️ Sửa
-            </button>
+            <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => toggleSubCourtStatus(sc)}
+              >
+                {sc.status === 'active' ? '⏸️ Bảo trì' : '▶️ Kích hoạt'}
+              </button>
+
+              <button
+                className="btn btn-outline btn-sm"
+                onClick={() => setEditingSubCourt(sc)}
+              >
+                ✏️ Sửa
+              </button>
+
+              <button
+                className="btn btn-danger btn-sm"
+                onClick={() => deleteSubCourt(sc.id)}
+              >
+                🗑️ Xóa
+              </button>
+            </div>
           </div>
+        ))
+      ) : (
+        <div className="glass-card" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '24px' }}>
+          <p>Chưa có sân con nào. Hãy thêm sân con đầu tiên!</p>
         </div>
-      ))}
+      )}
 
       {showCreate && (
         <SubCourtForm
@@ -93,10 +199,64 @@ export default function OwnerCourtDetail() {
 
       {editingSubCourt && (
         <SubCourtForm
+          courtId={id}
           subCourt={editingSubCourt}
           onClose={() => setEditingSubCourt(null)}
           onSuccess={loadDetail}
         />
+      )}
+
+      {editingCourt && (
+        <div className="glass-card" style={{ marginBottom: '24px', backgroundColor: 'rgba(59, 130, 246, 0.05)', borderLeft: '4px solid var(--primary-color)' }}>
+          <h3 style={{ marginBottom: '16px' }}>✏️ Cập nhập thông tin sân</h3>
+
+          <div className="input-group">
+            <label>Tên sân</label>
+            <input
+              type="text"
+              className="input-field"
+              value={courtForm.name}
+              onChange={e => setCourtForm(p => ({ ...p, name: e.target.value }))}
+            />
+          </div>
+
+          <div className="input-group">
+            <label>Giá / giờ</label>
+            <input
+              type="number"
+              className="input-field"
+              step="0.01"
+              value={courtForm.price_per_hour}
+              onChange={e => setCourtForm(p => ({ ...p, price_per_hour: parseFloat(e.target.value) || 0 }))}
+            />
+          </div>
+
+          <div className="input-group">
+            <label>Địa chỉ</label>
+            <input
+              type="text"
+              className="input-field"
+              value={courtForm.address}
+              onChange={e => setCourtForm(p => ({ ...p, address: e.target.value }))}
+            />
+          </div>
+
+          <div className="input-group">
+            <label>Mô tả</label>
+            <textarea
+              className="input-field"
+              rows={3}
+              value={courtForm.description}
+              onChange={e => setCourtForm(p => ({ ...p, description: e.target.value }))}
+              style={{ resize: 'vertical' }}
+            />
+          </div>
+
+          <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
+            <button className="btn btn-primary" onClick={updateCourt}>💾 Lưu thay đổi</button>
+            <button className="btn btn-secondary" onClick={() => setEditingCourt(false)}>Hủy</button>
+          </div>
+        </div>
       )}
     </div>
   )

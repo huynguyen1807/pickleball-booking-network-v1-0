@@ -5,13 +5,20 @@ import api from '../api/axios'
 import styles from '../styles/Booking.module.css'
 
 const TIME_SLOTS = [
-    { id: 1, start: '06:00', end: '08:00', label: '06:00 - 08:00' },
-    { id: 2, start: '08:00', end: '10:00', label: '08:00 - 10:00' },
-    { id: 3, start: '10:00', end: '12:00', label: '10:00 - 12:00' },
-    { id: 4, start: '14:00', end: '16:00', label: '14:00 - 16:00' },
-    { id: 5, start: '16:00', end: '18:00', label: '16:00 - 18:00' },
-    { id: 6, start: '18:00', end: '20:00', label: '18:00 - 20:00' },
-    { id: 7, start: '20:00', end: '22:00', label: '20:00 - 22:00' }
+    { id: 1, start: '06:00', end: '07:00', label: '06:00 - 07:00' },
+    { id: 2, start: '07:00', end: '8:00', label: '07:00 - 8:00' },
+    { id: 3, start: '8:00', end: '9:00', label: '8:00 - 9:00' },
+    { id: 4, start: '9:00', end: '10:00', label: '9:00 - 10:00' },
+    { id: 5, start: '10:00', end: '11:00', label: '10:00 - 11:00' },
+    { id: 6, start: '14:00', end: '15:00', label: '14:00 - 15:00' },
+    { id: 7, start: '15:00', end: '16:00', label: '15:00 - 16:00' },
+    { id: 8, start: '16:00', end: '17:00', label: '16:00 - 17:00' },
+    { id: 9, start: '17:00', end: '18:00', label: '17:00 - 18:00' },
+    { id: 10, start: '18:00', end: '19:00', label: '18:00 - 19:00' },
+    { id: 11, start: '19:00', end: '20:00', label: '19:00 - 20:00' },
+    { id: 12, start: '20:00', end: '21:00', label: '20:00 - 21:00' },
+    { id: 13, start: '21:00', end: '22:00', label: '21:00 - 22:00' },
+    { id: 14, start: '22:00', end: '23:00', label: '22:00 - 23:00' }
 ]
 
 export default function CourtDetail() {
@@ -19,6 +26,8 @@ export default function CourtDetail() {
     const navigate = useNavigate()
     const { user } = useAuth()
     const [court, setCourt] = useState(null)
+    const [subCourts, setSubCourts] = useState<any[]>([])
+    const [selectedSubCourt, setSelectedSubCourt] = useState<any>(null)
     const [loading, setLoading] = useState(true)
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
     const [selectedSlot, setSelectedSlot] = useState(null)
@@ -33,6 +42,14 @@ export default function CourtDetail() {
         try {
             const res = await api.get(`/courts/${id}`)
             setCourt(res.data)
+            // load sub-courts for this court
+            try {
+                const sub = await api.get(`/courts/${id}/sub-courts`)
+                setSubCourts(sub.data || [])
+                setSelectedSubCourt(sub.data && sub.data.length ? sub.data[0] : null)
+            } catch (e) {
+                console.warn('Không tải được sân con', e)
+            }
         } catch (err) {
             console.error('Failed to load court:', err)
         } finally {
@@ -61,8 +78,9 @@ export default function CourtDetail() {
 
     const selectedSlotData = TIME_SLOTS.find(s => s.id === selectedSlot)
     const hours = selectedSlotData ? parseInt(selectedSlotData.end) - parseInt(selectedSlotData.start) : 0
-    const totalPrice = court.price_per_hour * hours
-    const commission = totalPrice * 0.05
+    const pricePerHour = selectedSubCourt?.price_per_hour ?? court.price_per_hour
+    const totalPrice = pricePerHour * hours
+
 
     return (
         <div className={styles.detailPage}>
@@ -94,8 +112,8 @@ export default function CourtDetail() {
                                     <div className={styles.statLabel}>Lượt đặt</div>
                                 </div>
                                 <div className={styles.stat}>
-                                    <div className={styles.statValue}>{formatPrice(court.price_per_hour)}</div>
-                                    <div className={styles.statLabel}>/ giờ</div>
+                                    <div className={styles.statValue}>{subCourts.length || 0}</div>
+                                    <div className={styles.statLabel}> Sân</div>
                                 </div>
                             </div>
                         </div>
@@ -177,26 +195,38 @@ export default function CourtDetail() {
                                 </div>
                             </div>
 
+                            {subCourts && subCourts.length > 0 && (
+                                <div className="input-group" style={{ marginBottom: '16px' }}>
+                                    <label>Chọn sân con</label>
+                                    <select className="input-field" value={selectedSubCourt?.id || ''} onChange={e => {
+                                        const sc = subCourts.find(s => String(s.id) === String(e.target.value))
+                                        setSelectedSubCourt(sc || null)
+                                    }}>
+                                        <option value="">-- Mặc định (tổng sân) --</option>
+                                        {subCourts.map(sc => (
+                                            <option key={sc.id} value={sc.id}>{sc.name} — {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(sc.price_per_hour || 0)} — {sc.status}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+
                             {selectedSlot && (
                                 <div className={styles.bookingSummary}>
                                     <div className={styles.summaryRow}>
-                                        <span>Giá sân ({hours}h)</span>
+                                        <span>Giá sân ({hours}h) {selectedSubCourt ? `- ${selectedSubCourt.name}` : ''}</span>
                                         <span>{formatPrice(totalPrice)}</span>
                                     </div>
-                                    <div className={styles.summaryRow}>
-                                        <span>Phí dịch vụ (5%)</span>
-                                        <span>{formatPrice(commission)}</span>
-                                    </div>
+                                    
                                     <div className={`${styles.summaryRow} ${styles.summaryTotal}`}>
                                         <span>Tổng cộng</span>
-                                        <span>{formatPrice(totalPrice + commission)}</span>
+                                        <span>{formatPrice(totalPrice)}</span>
                                     </div>
                                 </div>
                             )}
 
                             <button className="btn btn-primary btn-lg" style={{ width: '100%' }}
                                 disabled={!selectedSlot}
-                                onClick={() => navigate(`/booking/${court.id}?slot=${selectedSlot}&date=${selectedDate}&start=${selectedSlotData?.start}&end=${selectedSlotData?.end}`)}>
+                                onClick={() => navigate(`/booking/${court.id}?slot=${selectedSlot}&date=${selectedDate}&start=${selectedSlotData?.start}&end=${selectedSlotData?.end}${selectedSubCourt ? `&subCourt=${selectedSubCourt.id}` : ''}`)}>
                                 {selectedSlot ? '💳 Đặt sân & Thanh toán' : 'Chọn khung giờ'}
                             </button>
 
