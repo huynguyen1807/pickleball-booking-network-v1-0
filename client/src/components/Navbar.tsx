@@ -85,9 +85,9 @@ export default function Navbar() {
                     </NavLink>
                 </li>
                 <li>
-                    <NavLink to="/courts" className={({ isActive }) => `${styles.navLink} ${isActive ? styles.active : ''}`}
+                    <NavLink to="/facilities" className={({ isActive }) => `${styles.navLink} ${isActive ? styles.active : ''}`}
                         onClick={() => setMobileOpen(false)}>
-                        🏟️ Sân chơi
+                        🏟️ Cơ sở
                     </NavLink>
                 </li>
                 <li>
