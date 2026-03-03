@@ -15,7 +15,7 @@ export default function Home() {
         try { return JSON.parse(localStorage.getItem('hiddenPosts') || '[]') } catch { return [] }
     })
     const [matches, setMatches] = useState([])
-    const [facilities, setFacilities] = useState([])
+    const [courts, setCourts] = useState([])
     const [stats, setStats] = useState<any>({ total_users: 0, total_courts: 0, today_matches: 0 })
     const [loading, setLoading] = useState(true)
     const [postContent, setPostContent] = useState('')
@@ -31,14 +31,14 @@ export default function Home() {
 
     const loadData = async () => {
         try {
-            const [postsRes, matchesRes, facilitiesRes] = await Promise.all([
+            const [postsRes, matchesRes, courtsRes] = await Promise.all([
                 api.get('/posts'),
                 api.get('/matches?status=waiting').catch(() => ({ data: [] })),
-                api.get('/facilities')
+                api.get('/courts')
             ])
             setPosts(postsRes.data)
             setMatches(matchesRes.data?.slice(0, 3) || [])
-            setFacilities(facilitiesRes.data?.slice(0, 3) || [])
+            setCourts(courtsRes.data?.slice(0, 3) || [])
 
             // Try to get stats (may fail if not admin, that's ok)
             try {
@@ -48,7 +48,7 @@ export default function Home() {
                 // Fallback: count from loaded data
                 setStats({
                     total_users: '-',
-                    total_facilities: facilitiesRes.data?.length || 0,
+                    total_courts: courtsRes.data?.length || 0,
                     today_matches: matchesRes.data?.length || 0
                 })
             }
@@ -152,8 +152,8 @@ export default function Home() {
                             <div className={styles.heroStatLabel}>Người chơi</div>
                         </div>
                         <div className={styles.heroStat}>
-                            <div className={styles.heroStatValue}>{stats.total_facilities || stats.total_courts}</div>
-                            <div className={styles.heroStatLabel}>Cơ sở</div>
+                            <div className={styles.heroStatValue}>{stats.total_courts}</div>
+                            <div className={styles.heroStatLabel}>Sân chơi</div>
                         </div>
                         <div className={styles.heroStat}>
                             <div className={styles.heroStatValue}>{stats.today_matches}</div>
@@ -285,20 +285,20 @@ export default function Home() {
                         </button>
                     </div>
 
-                    {/* Facilities */}
+                    {/* Courts */}
                     <div className={styles.sidebarCard}>
-                        <h3 className={styles.sidebarTitle}>🏟️ Cơ sở nổi bật</h3>
-                        {facilities.length > 0 ? facilities.map((f: any) => (
-                            <div key={f.id} className={styles.courtItem} onClick={() => navigate(`/facilities/${f.id}`)} style={{ cursor: 'pointer' }}>
+                        <h3 className={styles.sidebarTitle}>🏟️ Sân phổ biến</h3>
+                        {courts.length > 0 ? courts.map((c) => (
+                            <div key={c.id} className={styles.courtItem} onClick={() => navigate(`/courts/${c.id}`)} style={{ cursor: 'pointer' }}>
                                 <div className={styles.courtItemIcon}>🏟️</div>
                                 <div className={styles.courtItemInfo}>
-                                    <div className={styles.courtItemName}>{f.name}</div>
-                                    <div className={styles.courtItemPrice}>Từ {formatPrice(f.min_price)}/h</div>
+                                    <div className={styles.courtItemName}>{c.name}</div>
+                                    <div className={styles.courtItemPrice}>{formatPrice(c.price_per_hour)}/h</div>
                                 </div>
                             </div>
                         )) : (
                             <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', padding: '8px 0' }}>
-                                Chưa có cơ sở nào
+                                Chưa có sân nào
                             </div>
                         )}
                     </div>

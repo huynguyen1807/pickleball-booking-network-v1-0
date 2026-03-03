@@ -26,17 +26,17 @@ export const createBooking = async (req, res) => {
             .input('end_time', sql.NVarChar, end_time).input('total_price', sql.Decimal(12, 2), total + commission)
             .input('commission_rate', sql.Decimal(4, 2), COMMISSION).input('commission_amount', sql.Decimal(12, 2), commission)
             .input('payment_method', sql.NVarChar, payment_method || 'mock')
-            .input('status', sql.NVarChar, isPayOS ? 'pending' : 'confirmed')
+                        .input('status', sql.NVarChar, isPayOS ? 'pending' : 'confirmed')
             .query(`INSERT INTO bookings (user_id, court_id, booking_date, start_time, end_time, total_price, commission_rate, commission_amount, payment_method, status)
                             OUTPUT INSERTED.id VALUES (@user_id, @court_id, @booking_date, @start_time, @end_time, @total_price, @commission_rate, @commission_amount, @payment_method, @status)`);
 
-        if (!isPayOS) {
-            await pool.request()
-                .input('user_id', sql.Int, req.user.id).input('booking_id', sql.Int, result.recordset[0].id)
-                .input('amount', sql.Decimal(12, 2), total + commission).input('commission', sql.Decimal(12, 2), commission)
-                .input('payment_method', sql.NVarChar, payment_method || 'mock')
-                .query("INSERT INTO payments (user_id, booking_id, amount, commission, payment_method, status) VALUES (@user_id, @booking_id, @amount, @commission, @payment_method, 'completed')");
-        }
+                if (!isPayOS) {
+                        await pool.request()
+                                .input('user_id', sql.Int, req.user.id).input('booking_id', sql.Int, result.recordset[0].id)
+                                .input('amount', sql.Decimal(12, 2), total + commission).input('commission', sql.Decimal(12, 2), commission)
+                                .input('payment_method', sql.NVarChar, payment_method || 'mock')
+                                .query("INSERT INTO payments (user_id, booking_id, amount, commission, payment_method, status) VALUES (@user_id, @booking_id, @amount, @commission, @payment_method, 'completed')");
+                }
 
         res.status(201).json({ message: 'Đặt sân thành công', bookingId: result.recordset[0].id, total: total + commission });
     } catch (err) {
@@ -62,7 +62,7 @@ export const getOwnerBookings = async (req, res) => {
     try {
         const pool = await poolPromise;
         const result = await pool.request().input('owner_id', sql.Int, req.user.id)
-            .query('SELECT b.*, c.name AS court_name, u.full_name AS user_name FROM bookings b JOIN courts c ON b.court_id = c.id JOIN facilities f ON c.facility_id = f.id JOIN users u ON b.user_id = u.id WHERE f.owner_id = @owner_id ORDER BY b.created_at DESC');
+            .query('SELECT b.*, c.name AS court_name, u.full_name AS user_name FROM bookings b JOIN courts c ON b.court_id = c.id JOIN users u ON b.user_id = u.id WHERE c.owner_id = @owner_id ORDER BY b.created_at DESC');
         res.json(result.recordset);
     } catch (err) {
         res.status(500).json({ message: 'Lỗi server' });

@@ -1,77 +1,86 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
 import api from '../api/axios'
 import styles from '../styles/Dashboard.module.css'
 
 export default function OwnerCourts() {
-    const navigate = useNavigate()
-    const [facilities, setFacilities] = useState([])
-    const [courtsByFacility, setCourtsByFacility] = useState<Record<number, any[]>>({})
+    const [courts, setCourts] = useState([])
     const [loading, setLoading] = useState(true)
+    const [showCreate, setShowCreate] = useState(false)
+    const [creating, setCreating] = useState(false)
+    const [createForm, setCreateForm] = useState({
+        name: '', address: '', description: '', price_per_hour: '', latitude: '', longitude: '', image: ''
+    })
 
     useEffect(() => {
-        loadData()
+        loadCourts()
     }, [])
 
-    const loadData = async () => {
+    const loadCourts = async () => {
         try {
-            // Fetch owner's facilities
-            const facRes = await api.get('/facilities/my')
-            const facs = facRes.data
-            setFacilities(facs)
-
-            // For each facility, fetch its courts
-            const courtsMap: Record<number, any[]> = {}
-            await Promise.all(facs.map(async (f: any) => {
-                const cRes = await api.get(`/facilities/${f.id}/courts`)
-                courtsMap[f.id] = cRes.data
-            }))
-
-            setCourtsByFacility(courtsMap)
+            const res = await api.get('/courts/my')
+            setCourts(res.data)
         } catch (err) {
-            console.error('Failed to load owner data:', err)
+            console.error('Failed to load courts:', err)
         } finally {
             setLoading(false)
         }
     }
 
-    const handleToggleFacilityActive = async (facility: any) => {
+    const handleCreateCourt = async () => {
+        if (!createForm.name || !createForm.address || !createForm.price_per_hour) {
+            alert('Vui lòng điền tên sân, địa chỉ và giá')
+            return
+        }
+        setCreating(true)
         try {
-            await api.put(`/facilities/${facility.id}`, {
-                ...facility,
-                gallery: facility.gallery ? JSON.parse(facility.gallery) : null,
-                amenities: facility.amenities ? JSON.parse(facility.amenities) : null,
-                is_active: !facility.is_active
+            await api.post('/courts', {
+                name: createForm.name,
+                address: createForm.address,
+                description: createForm.description,
+                image: createForm.image || null,
+                price_per_hour: parseFloat(createForm.price_per_hour),
+                latitude: createForm.latitude ? parseFloat(createForm.latitude) : null,
+                longitude: createForm.longitude ? parseFloat(createForm.longitude) : null
             })
-            loadData()
-        } catch (err: any) {
-            alert(err.response?.data?.message || 'Lỗi cập nhật cơ sở')
+            setShowCreate(false)
+            setCreateForm({ name: '', address: '', description: '', price_per_hour: '', latitude: '', longitude: '', image: '' })
+            loadCourts()
+        } catch (err) {
+            alert(err.response?.data?.message || 'Lỗi tạo sân')
+        } finally {
+            setCreating(false)
         }
     }
 
-    const handleToggleCourtActive = async (court: any) => {
+    const handleToggleActive = async (court) => {
         try {
             await api.put(`/courts/${court.id}`, {
-                ...court,
+                name: court.name,
+                address: court.address,
+                description: court.description,
+                image: court.image,
+                price_per_hour: court.price_per_hour,
+                latitude: court.latitude,
+                longitude: court.longitude,
                 is_active: !court.is_active
             })
-            loadData()
-        } catch (err: any) {
-            alert(err.response?.data?.message || 'Lỗi cập nhật sân')
+            loadCourts()
+        } catch (err) {
+            alert(err.response?.data?.message || 'Lỗi cập nhật')
         }
     }
 
-    const handleDeleteCourt = async (court: any) => {
-        if (!confirm(`Bạn chắc chắn muốn xóa sân "${court.name}"?`)) return
+    const handleDelete = async (courtId) => {
+        if (!confirm('Bạn chắc chắn muốn xóa sân này?')) return
         try {
-            await api.delete(`/courts/${court.id}`)
-            loadData()
-        } catch (err: any) {
+            await api.delete(`/courts/${courtId}`)
+            loadCourts()
+        } catch (err) {
             alert(err.response?.data?.message || 'Lỗi xóa sân')
         }
     }
 
-    const formatPrice = (p: any) => new Intl.NumberFormat('vi-VN').format(p) + 'đ'
+    const formatPrice = (p) => new Intl.NumberFormat('vi-VN').format(p) + 'đ'
 
     if (loading) return <div className={styles.dashboardPage} style={{ textAlign: 'center', padding: '60px 20px' }}>⏳ Đang tải...</div>
 
@@ -79,76 +88,89 @@ export default function OwnerCourts() {
         <div className={styles.dashboardPage}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
                 <div>
-                    <h1 className="page-title">⚙️ Quản lý Cơ Sở & Sân</h1>
-                    <p className="page-subtitle">Thêm cơ sở mới và quản lý các sân trực thuộc</p>
+                    <h1 className="page-title">⚙️ Quản lý sân</h1>
+                    <p className="page-subtitle">Thêm, sửa, xóa sân của bạn</p>
                 </div>
-                <button className="btn btn-primary" onClick={() => navigate('/owner/facilities/new')}>+ Thêm cơ sở mới</button>
+                <button className="btn btn-primary" onClick={() => setShowCreate(!showCreate)}>+ Thêm sân mới</button>
             </div>
 
-            {facilities.length > 0 ? facilities.map((fac: any) => (
-                <div key={fac.id} className="glass-card" style={{ marginBottom: '30px', padding: '20px' }}>
-
-                    {/* Facility Header */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '15px', marginBottom: '15px' }}>
-                        <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
-                            <div style={{ width: '60px', height: '60px', borderRadius: 'var(--radius-md)', background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem' }}>
-                                🏭
+            {/* Create Court Form */}
+            {showCreate && (
+                <div className="glass-card" style={{ marginBottom: '20px', animation: 'fadeInUp 0.3s ease' }}>
+                    <h3 className={styles.sectionTitle}>🏟️ Thêm sân mới</h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                            <div className="input-group">
+                                <label>Tên sân</label>
+                                <input className="input-field" placeholder="VD: Sân Pickleball ABC"
+                                    value={createForm.name} onChange={e => setCreateForm(p => ({ ...p, name: e.target.value }))} />
                             </div>
-                            <div>
-                                <h2 style={{ margin: '0 0 5px 0', fontSize: '1.25rem', color: 'var(--text-primary)' }}>{fac.name}</h2>
-                                <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>📍 {fac.address}</p>
+                            <div className="input-group">
+                                <label>Giá / giờ (VNĐ)</label>
+                                <input className="input-field" type="number" placeholder="150000"
+                                    value={createForm.price_per_hour} onChange={e => setCreateForm(p => ({ ...p, price_per_hour: e.target.value }))} />
                             </div>
                         </div>
-                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                            <span className={`badge ${fac.is_active ? 'badge-green' : 'badge-red'}`}>
-                                {fac.is_active ? 'Hoạt động' : 'Tạm ngưng'}
-                            </span>
-                            <button className="btn btn-secondary btn-sm" onClick={() => handleToggleFacilityActive(fac)}>
-                                {fac.is_active ? '⏸ Tạm ngưng cơ sở' : '▶ Kích hoạt cơ sở'}
-                            </button>
-                            <button className="btn btn-primary btn-sm" onClick={() => navigate(`/owner/facilities/${fac.id}/courts/new`)}>
-                                + Thêm sân con
+                        <div className="input-group">
+                            <label>Địa chỉ</label>
+                            <input className="input-field" placeholder="123 Đường ABC, Quận XYZ, Đà Nẵng"
+                                value={createForm.address} onChange={e => setCreateForm(p => ({ ...p, address: e.target.value }))} />
+                        </div>
+                        <div className="input-group">
+                            <label>Mô tả</label>
+                            <textarea className="input-field" rows={3} placeholder="Mô tả sân, tiện ích..." style={{ resize: 'vertical' }}
+                                value={createForm.description} onChange={e => setCreateForm(p => ({ ...p, description: e.target.value }))} />
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                            <div className="input-group">
+                                <label>Vĩ độ</label>
+                                <input className="input-field" placeholder="16.0544"
+                                    value={createForm.latitude} onChange={e => setCreateForm(p => ({ ...p, latitude: e.target.value }))} />
+                            </div>
+                            <div className="input-group">
+                                <label>Kinh độ</label>
+                                <input className="input-field" placeholder="108.2022"
+                                    value={createForm.longitude} onChange={e => setCreateForm(p => ({ ...p, longitude: e.target.value }))} />
+                            </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                            <button className="btn btn-secondary" onClick={() => setShowCreate(false)}>Hủy</button>
+                            <button className="btn btn-primary" onClick={handleCreateCourt} disabled={creating}>
+                                {creating ? '⏳...' : '💾 Lưu sân'}
                             </button>
                         </div>
                     </div>
+                </div>
+            )}
 
-                    {/* Courts List */}
-                    <h3 style={{ fontSize: '1rem', color: 'var(--text-primary)', marginBottom: '15px' }}>Danh sách sân:</h3>
-                    {courtsByFacility[fac.id] && courtsByFacility[fac.id].length > 0 ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            {courtsByFacility[fac.id].map(court => (
-                                <div key={court.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)' }}>
-                                    <div>
-                                        <h4 style={{ margin: '0 0 5px 0', color: 'var(--text-primary)' }}>{court.name}</h4>
-                                        <div style={{ display: 'flex', gap: '15px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                                            <span>🏓 {court.court_type === 'indoor' ? 'Trong nhà' : court.court_type === 'roofed' ? 'Có mái che' : 'Ngoài trời'}</span>
-                                            <span>🏷️ {court.surface_type === 'carpet' ? 'Sân thảm' : 'Sân cứng'}</span>
-                                            <span>💰 {formatPrice(court.price_per_hour)}/h</span>
-                                            {court.peak_price && <span>🔥 Giờ vàng: {formatPrice(court.peak_price)}/h ({court.peak_start_time?.slice(0, 5)} - {court.peak_end_time?.slice(0, 5)})</span>}
-                                        </div>
-                                    </div>
-                                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                                        <span className={`badge ${court.is_active && court.status === 'active' ? 'badge-green' : court.status === 'maintenance' ? 'badge-yellow' : 'badge-red'}`}>
-                                            {court.status === 'maintenance' ? 'Bảo trì' : court.is_active ? 'Hoạt động' : 'Tạm ngưng'}
-                                        </span>
-                                        <button className="btn btn-secondary btn-sm" onClick={() => handleToggleCourtActive(court)}>
-                                            {court.is_active ? '⏸ Ngưng' : '▶ Bật'}
-                                        </button>
-                                        <button className="btn btn-danger btn-sm" onClick={() => handleDeleteCourt(court)}>🗑️</button>
-                                    </div>
-                                </div>
-                            ))}
+            {/* Court List */}
+            {courts.length > 0 ? courts.map(court => (
+                <div key={court.id} className={styles.courtManageCard}>
+                    <div className={styles.courtManageIcon}>🏟️</div>
+                    <div className={styles.courtManageInfo}>
+                        <div className={styles.courtManageName}>{court.name}</div>
+                        <div className={styles.courtManageAddress}>{court.address}</div>
+                        <div className={styles.courtManageStats}>
+                            <span className={styles.courtManageStat}>💰 {formatPrice(court.price_per_hour)}/h</span>
+                            <span className={styles.courtManageStat}>📋 {court.booking_count || 0} booking</span>
+                            <span className={styles.courtManageStat}>⭐ {court.avg_rating ? parseFloat(court.avg_rating).toFixed(1) : 'N/A'}</span>
                         </div>
-                    ) : (
-                        <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)' }}>
-                            Chưa có sân nào thuộc cơ sở này.
-                        </div>
-                    )}
-
+                    </div>
+                    <div className={styles.courtManageActions}>
+                        <span className={`badge ${court.is_active ? 'badge-green' : 'badge-red'}`}>
+                            {court.is_active ? 'Hoạt động' : 'Tạm ngưng'}
+                        </span>
+                        <button className="btn btn-secondary btn-sm" onClick={() => handleToggleActive(court)}>
+                            {court.is_active ? '⏸ Tạm ngưng' : '▶ Kích hoạt'}
+                        </button>
+                        <button className="btn btn-danger btn-sm" onClick={() => handleDelete(court.id)}>
+                            🗑️ Xóa
+                        </button>
+                    </div>
                 </div>
             )) : (
-                <div className="glass-card" style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-secondary)' }}>
-                    🏭 Bạn chưa có cơ sở nào. Nhấn "+ Thêm cơ sở mới" để mở rộng kinh doanh!
+                <div className="glass-card" style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-secondary)' }}>
+                    🏟️ Chưa có sân nào. Nhấn "Thêm sân mới" để bắt đầu!
                 </div>
             )}
         </div>
