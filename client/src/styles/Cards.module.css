@@ -70,9 +70,22 @@
 .postImage {
     width: 100%;
     border-radius: var(--radius-md);
-    margin-bottom: 14px;
     max-height: 400px;
     object-fit: cover;
+    display: block;
+    transition: opacity 0.2s;
+}
+
+.postImage:hover {
+    opacity: 0.9;
+}
+
+.imageHint {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    text-align: center;
+    padding: 4px 0 10px;
+    letter-spacing: 0.02em;
 }
 
 .postActions {
@@ -196,6 +209,64 @@
     padding-top: 14px;
     border-top: 1px solid var(--border-glass);
     animation: fadeInUp 0.3s ease;
+}
+
+/* header action buttons (hide & delete) */
+.hideBtn,
+.deleteBtn,
+.menuBtn {
+    background: var(--accent-green-dim);
+    color: var(--accent-green);
+    border: 1px solid var(--accent-green);
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 50%;
+    transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.hideBtn:hover,
+.deleteBtn:hover,
+.menuBtn:hover {
+    background: var(--accent-green);
+    color: var(--bg-card);
+    border-color: var(--accent-green-dark);
+}
+
+.menuDropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    background: var(--bg-card);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    min-width: 120px;
+}
+
+.menuItem {
+    padding: 8px 12px;
+    background: none;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    transition: background var(--transition-fast);
+}
+
+.menuItem:hover {
+    background: var(--bg-glass);
+}
+
+.hiddenNotice {
+    padding: 40px 20px;
+    text-align: center;
+    color: var(--text-muted);
+    font-style: italic;
 }
 
 .commentsList {

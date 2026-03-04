@@ -56,7 +56,7 @@ export default function Settings() {
             })
             setPasswordForm({ current_password: '', new_password: '', confirm_password: '' })
             alert('✅ Đổi mật khẩu thành công!')
-        } catch (err) {
+        } catch (err: any) {
             alert(err.response?.data?.message || 'Lỗi đổi mật khẩu')
         } finally {
             setChangingPassword(false)

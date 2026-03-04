@@ -19,8 +19,8 @@ import UserDashboard from './pages/UserDashboard'
 import OwnerDashboard from './pages/OwnerDashboard'
 import OwnerCourts from './pages/OwnerCourts'
 import AdminDashboard from './pages/AdminDashboard'
+import PostPhoto from './pages/PostPhoto'
 import OwnerCourtDetail from './pages/OwnerCourtDetail'
-
 
 export default function App() {
     const { user } = useAuth()
@@ -33,6 +33,8 @@ export default function App() {
                 <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
                 <Route path="/register" element={user ? <Navigate to="/" /> : <Register />} />
                 <Route path="/forgot-password" element={user ? <Navigate to="/" /> : <ForgotPassword />} />
+                {/* Photo permalink — accessible without login */}
+                <Route path="/post/:id/photo" element={<PostPhoto />} />
 
                 {/* Protected - All authenticated users */}
                 <Route path="/" element={

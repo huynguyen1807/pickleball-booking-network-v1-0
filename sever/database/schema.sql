@@ -22,8 +22,8 @@ CREATE TABLE users (
   status NVARCHAR(20) DEFAULT 'active' CHECK (status IN ('active','pending','rejected')),
   latitude DECIMAL(10,7),
   longitude DECIMAL(10,7),
-  created_at DATETIME DEFAULT GETDATE(),
-  updated_at DATETIME DEFAULT GETDATE()
+  created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET(),
+  updated_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
 );
 GO
 
@@ -35,8 +35,8 @@ CREATE TABLE upgrade_requests (
   reason NVARCHAR(MAX),
   status NVARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected')),
   admin_note NVARCHAR(MAX),
-  created_at DATETIME DEFAULT GETDATE(),
-  updated_at DATETIME DEFAULT GETDATE()
+  created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET(),
+  updated_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
 );
 GO
 
@@ -53,7 +53,7 @@ CREATE TABLE courts (
   latitude DECIMAL(10,7),
   longitude DECIMAL(10,7),
   is_active BIT DEFAULT 1,
-  created_at DATETIME DEFAULT GETDATE()
+  created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
 );
 GO
 
@@ -90,10 +90,46 @@ CREATE TABLE posts (
   id INT IDENTITY(1,1) PRIMARY KEY,
   user_id INT NOT NULL FOREIGN KEY REFERENCES users(id) ON DELETE CASCADE,
   content NVARCHAR(MAX) NOT NULL,
-  image NVARCHAR(500),
+  image NVARCHAR(MAX),
   post_type NVARCHAR(20) DEFAULT 'share' CHECK (post_type IN ('find_player','share','ad','event')),
   is_promoted BIT DEFAULT 0,
-  created_at DATETIME DEFAULT GETDATE()
+  created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
+);
+GO
+
+-- POST LIKES
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='post_likes' AND xtype='U')
+CREATE TABLE post_likes (
+  id INT IDENTITY(1,1) PRIMARY KEY,
+  post_id INT NOT NULL FOREIGN KEY REFERENCES posts(id) ON DELETE CASCADE,
+  user_id INT NOT NULL FOREIGN KEY REFERENCES users(id) ON DELETE NO ACTION,
+  created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
+);
+GO
+
+-- Ensure a user can like a post only once
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'UQ_post_likes_post_user')
+CREATE UNIQUE INDEX UQ_post_likes_post_user ON post_likes(post_id, user_id);
+GO
+
+-- COMMENTS
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='comments' AND xtype='U')
+CREATE TABLE comments (
+  id INT IDENTITY(1,1) PRIMARY KEY,
+  post_id INT NOT NULL FOREIGN KEY REFERENCES posts(id) ON DELETE CASCADE,
+  user_id INT NOT NULL FOREIGN KEY REFERENCES users(id) ON DELETE NO ACTION,
+  content NVARCHAR(MAX) NOT NULL,
+  created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
+);
+GO
+
+-- POST SHARES
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='post_shares' AND xtype='U')
+CREATE TABLE post_shares (
+  id INT IDENTITY(1,1) PRIMARY KEY,
+  post_id INT NOT NULL FOREIGN KEY REFERENCES posts(id) ON DELETE CASCADE,
+  user_id INT NULL FOREIGN KEY REFERENCES users(id) ON DELETE NO ACTION,
+  created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
 );
 GO
 
@@ -112,7 +148,7 @@ CREATE TABLE bookings (
   commission_amount DECIMAL(12,2),
   status NVARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending','confirmed','cancelled','completed')),
   payment_method NVARCHAR(50),
-  created_at DATETIME DEFAULT GETDATE()
+  created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
 );
 GO
 
@@ -131,7 +167,7 @@ CREATE TABLE matches (
   total_cost DECIMAL(12,2) NOT NULL,
   commission_rate DECIMAL(4,2) DEFAULT 0.05,
   status NVARCHAR(20) DEFAULT 'waiting' CHECK (status IN ('waiting','confirmed','completed','cancelled')),
-  created_at DATETIME DEFAULT GETDATE()
+  created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
 );
 GO
 
@@ -144,7 +180,7 @@ CREATE TABLE match_players (
   status NVARCHAR(20) DEFAULT 'joined' CHECK (status IN ('joined','left')),
   payment_status NVARCHAR(20) DEFAULT 'pending' CHECK (payment_status IN ('pending','paid')),
   amount_due DECIMAL(12,2),
-  created_at DATETIME DEFAULT GETDATE()
+  created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
 );
 GO
 
@@ -158,8 +194,9 @@ CREATE TABLE payments (
   amount DECIMAL(12,2) NOT NULL,
   commission DECIMAL(12,2) DEFAULT 0,
   payment_method NVARCHAR(50) DEFAULT 'mock',
+  transaction_id NVARCHAR(100) UNIQUE,
   status NVARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending','completed','failed','refunded')),
-  created_at DATETIME DEFAULT GETDATE()
+  created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
 );
 GO
 
@@ -173,7 +210,7 @@ CREATE TABLE notifications (
   type NVARCHAR(50),
   reference_id INT,
   is_read BIT DEFAULT 0,
-  created_at DATETIME DEFAULT GETDATE()
+  created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
 );
 GO
 
@@ -183,7 +220,7 @@ CREATE TABLE chat_rooms (
   id INT IDENTITY(1,1) PRIMARY KEY,
   match_id INT FOREIGN KEY REFERENCES matches(id),
   name NVARCHAR(200),
-  created_at DATETIME DEFAULT GETDATE()
+  created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
 );
 GO
 
@@ -203,7 +240,7 @@ CREATE TABLE messages (
   chat_room_id INT NOT NULL FOREIGN KEY REFERENCES chat_rooms(id) ON DELETE CASCADE,
   user_id INT NOT NULL FOREIGN KEY REFERENCES users(id),
   content NVARCHAR(MAX) NOT NULL,
-  created_at DATETIME DEFAULT GETDATE()
+  created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
 );
 GO
 
@@ -215,7 +252,7 @@ CREATE TABLE reviews (
   court_id INT NOT NULL FOREIGN KEY REFERENCES courts(id),
   rating INT NOT NULL CHECK (rating >= 1 AND rating <= 5),
   comment NVARCHAR(MAX),
-  created_at DATETIME DEFAULT GETDATE()
+  created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
 );
 GO
 
@@ -223,4 +260,9 @@ GO
 IF NOT EXISTS (SELECT id FROM users WHERE email = 'admin@pickleball.vn')
 INSERT INTO users (email, password, full_name, phone, role, status)
 VALUES ('admin@pickleball.vn', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Admin System', '0900000000', 'admin', 'active');
+GO
+
+-- MIGRATION: Expand posts.image column to hold base64 images (run once automatically by db.ts on startup)
+IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='posts' AND COLUMN_NAME='image' AND DATA_TYPE='nvarchar' AND CHARACTER_MAXIMUM_LENGTH=500)
+    ALTER TABLE posts ALTER COLUMN image NVARCHAR(MAX);
 GO

@@ -92,9 +92,9 @@ export default function OwnerCourtDetail() {
               <button className="btn btn-primary btn-sm" onClick={() => setEditingCourt(true)}>
                 ✏️ Chỉnh sửa sân
               </button>
-              <button className="btn btn-danger btn-sm" onClick={deleteCourt}>
+              {/* <button className="btn btn-danger btn-sm" onClick={deleteCourt}>
                 🗑️ Xóa sân
-              </button>
+              </button> */}
             </div>
           </div>
 
@@ -174,12 +174,12 @@ export default function OwnerCourtDetail() {
                 ✏️ Sửa
               </button>
 
-              <button
+              {/* <button
                 className="btn btn-danger btn-sm"
                 onClick={() => deleteSubCourt(sc.id)}
               >
                 🗑️ Xóa
-              </button>
+              </button> */}
             </div>
           </div>
         ))

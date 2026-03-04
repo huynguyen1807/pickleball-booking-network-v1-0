@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../api/axios'
+import PaymentModal from '../components/PaymentModal'
+import { PayOSPayment } from '../components/PayOSPayment'
 import styles from '../styles/Booking.module.css'
 
 export default function Booking() {
@@ -13,6 +15,9 @@ export default function Booking() {
     const [loading, setLoading] = useState(true)
     const [submitting, setSubmitting] = useState(false)
     const [bookingResult, setBookingResult] = useState(null)
+    const [bookingId, setBookingId] = useState(null)
+    const [showPaymentModal, setShowPaymentModal] = useState(false)
+    const [paymentData, setPaymentData] = useState(null)
 
     const bookingDate = searchParams.get('date') || new Date().toISOString().split('T')[0]
     const startTime = searchParams.get('start') || '18:00'
@@ -51,10 +56,11 @@ export default function Booking() {
                 booking_date: bookingDate,
                 start_time: startTime,
                 end_time: endTime,
-                payment_method: payment
+                payment_method: 'payos'
             })
+            setBookingId(res.data.bookingId)  // ← Fix: Đọc bookingId thay vì id
             setBookingResult(res.data)
-            setStep(3)
+            setStep(2)
         } catch (err) {
             alert(err.response?.data?.message || 'Đặt sân thất bại')
         } finally {
@@ -62,17 +68,21 @@ export default function Booking() {
         }
     }
 
+    const handlePaymentSuccess = (data) => {
+        if (data.method === 'payos') {
+            setPaymentData(data)
+        }
+    }
+
+    const handlePayOSSuccess = () => {
+        setStep(3)
+        setPaymentData(null)
+    }
+
     const steps = [
         { num: 1, label: 'Xác nhận' },
         { num: 2, label: 'Thanh toán' },
         { num: 3, label: 'Hoàn tất' }
-    ]
-
-    const paymentMethods = [
-        { key: 'momo', icon: '📱', name: 'MoMo', desc: 'Ví điện tử MoMo' },
-        { key: 'vnpay', icon: '🏦', name: 'VNPay', desc: 'Thẻ ATM / Internet Banking' },
-        { key: 'card', icon: '💳', name: 'Visa/Mastercard', desc: 'Thẻ quốc tế' },
-        { key: 'cash', icon: '💵', name: 'Thanh toán tại sân', desc: 'Thanh toán khi đến sân' }
     ]
 
     if (loading) return <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-secondary)' }}>⏳ Đang tải...</div>
@@ -104,8 +114,8 @@ export default function Booking() {
                         <div className={styles.summaryRow}><span>Phí dịch vụ (5%)</span><span>{formatPrice(commission)}</span></div>
                         <div className={`${styles.summaryRow} ${styles.summaryTotal}`}><span>Tổng cộng</span><span>{formatPrice(total)}</span></div>
                     </div>
-                    <button className="btn btn-primary btn-lg" style={{ width: '100%' }} onClick={() => setStep(2)}>
-                        Tiếp tục →
+                    <button className="btn btn-primary btn-lg" style={{ width: '100%' }} disabled={submitting} onClick={handleConfirmBooking}>
+                        {submitting ? '⏳ Đang tạo booking...' : 'Tiếp tục →'}
                     </button>
                 </div>
             )}
@@ -113,28 +123,23 @@ export default function Booking() {
             {step === 2 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                     <div className="glass-card">
-                        <h3 className={styles.sectionTitle}>💳 Chọn phương thức thanh toán</h3>
-                        <div className={styles.paymentMethods}>
-                            {paymentMethods.map(pm => (
-                                <div
-                                    key={pm.key}
-                                    className={`${styles.paymentOption} ${payment === pm.key ? styles.selectedPayment : ''}`}
-                                    onClick={() => setPayment(pm.key)}
-                                >
-                                    <span className={styles.paymentIcon}>{pm.icon}</span>
-                                    <div>
-                                        <div className={styles.paymentName}>{pm.name}</div>
-                                        <div className={styles.paymentDesc}>{pm.desc}</div>
-                                    </div>
-                                </div>
-                            ))}
+                        <h3 className={styles.sectionTitle}>💳 Thanh toán với PayOS</h3>
+                        <div style={{ padding: '20px', background: '#f0f8ff', borderRadius: '8px', borderLeft: '4px solid #667eea', marginBottom: '20px' }}>
+                            <p style={{ color: '#0c5460', margin: 0 }}>
+                                ✓ Quét QR code hoặc chuyển khoản trực tiếp<br/>
+                                ✓ Hỗ trợ 24/7 qua Napas (liên ngân hàng)<br/>
+                                ✓ Thanh toán an toàn với mã xác thực
+                            </p>
                         </div>
+                        <p style={{ textAlign: 'center', fontSize: '18px', fontWeight: 600, color: '#2c3e50', marginBottom: '20px' }}>
+                            Tổng thanh toán: <span style={{ color: '#667eea' }}>{formatPrice(total)}</span>
+                        </p>
                     </div>
                     <div style={{ display: 'flex', gap: '12px' }}>
                         <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setStep(1)}>← Quay lại</button>
-                        <button className="btn btn-primary" style={{ flex: 2 }} disabled={!payment || submitting}
-                            onClick={handleConfirmBooking}>
-                            {submitting ? '⏳ Đang xử lý...' : `Thanh toán ${formatPrice(total)}`}
+                        <button className="btn btn-primary" style={{ flex: 2 }} disabled={submitting || !bookingId}
+                            onClick={() => setShowPaymentModal(true)}>
+                            {submitting ? '⏳ Đang xử lý...' : '💳 Tiến hành thanh toán'}
                         </button>
                     </div>
                 </div>
@@ -152,6 +157,68 @@ export default function Booking() {
                     <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
                         <button className="btn btn-primary" onClick={() => navigate('/')}>Về trang chủ</button>
                         <button className="btn btn-secondary" onClick={() => navigate('/dashboard')}>Xem lịch sử</button>
+                    </div>
+                </div>
+            )}
+
+            {/* Payment Modal */}
+            <PaymentModal
+                isOpen={showPaymentModal && step === 2}
+                bookingId={bookingId}
+                amount={total}
+                onClose={() => setShowPaymentModal(false)}
+                onSuccess={handlePaymentSuccess}
+            />
+
+            {/* PayOS QR Code Display Modal */}
+            {paymentData && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0, 0, 0, 0.5)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 2000
+                }}>
+                    <div style={{
+                        background: 'white',
+                        borderRadius: '12px',
+                        maxWidth: '700px',
+                        width: '95%',
+                        maxHeight: '90vh',
+                        overflowY: 'auto',
+                        boxShadow: '0 10px 40px rgba(0, 0, 0, 0.3)',
+                        position: 'relative'
+                    }}>
+                        <button
+                            onClick={() => setPaymentData(null)}
+                            style={{
+                                position: 'absolute',
+                                top: '20px',
+                                right: '20px',
+                                background: 'none',
+                                border: 'none',
+                                fontSize: '28px',
+                                cursor: 'pointer',
+                                color: '#666',
+                                zIndex: 10
+                            }}
+                        >
+                            ×
+                        </button>
+                        <PayOSPayment
+                            checkoutUrl={paymentData.checkoutUrl}
+                            qrCode={paymentData.qrCode}
+                            orderCode={paymentData.orderCode}
+                            paymentLinkId={paymentData.paymentLinkId}
+                            amount={paymentData.amount}
+                            onSuccess={handlePayOSSuccess}
+                            onCancel={() => setPaymentData(null)}
+                        />
                     </div>
                 </div>
             )}

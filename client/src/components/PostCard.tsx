@@ -1,10 +1,26 @@
-import { useState } from 'react'
+import React, { useState, useEffect, FormEvent } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { useNavigate } from 'react-router-dom'
+import api from '../api/axios'
+import { io as socketIO } from 'socket.io-client'
 import styles from '../styles/Cards.module.css'
 
-export default function PostCard({ post }) {
+type PostType = any
+type CommentType = any
+
+interface PostCardProps {
+    post?: PostType
+    isHidden?: boolean
+    onDeleted?: (id: number) => void
+    onHide?: (id: number) => void
+}
+
+export default function PostCard({ post, isHidden = false, onDeleted, onHide }: PostCardProps) {
     const { user } = useAuth()
-    const data = post || {
+    const navigate = useNavigate()
+    // normalize post object: prefer `user_name`, fallback to `full_name`
+    const normalizedPost = post ? { ...post, user_name: post.user_name || post.full_name } : null
+    const data = normalizedPost || {
         id: 1,
         user_name: 'Nguyễn Văn A',
         user_role: 'user',
@@ -18,35 +34,98 @@ export default function PostCard({ post }) {
     }
 
     const [liked, setLiked] = useState(false)
+    const [, setTick] = useState(0)
     const [likeCount, setLikeCount] = useState(data.likes || 0)
     const [showShare, setShowShare] = useState(false)
     const [showComments, setShowComments] = useState(false)
-    const [commentsList, setCommentsList] = useState([])
+    const [commentsList, setCommentsList] = useState<CommentType[]>([])
     const [commentText, setCommentText] = useState('')
     const [commentCount, setCommentCount] = useState(data.comments || 0)
+    const [shareCount, setShareCount] = useState(data.shares || 0)
 
-    const getInitials = (name) => name ? name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '?'
-    const timeAgo = (date) => {
-        const diff = Date.now() - new Date(date).getTime()
+    useEffect(() => {
+        // initialize counts if props changed
+        setLikeCount(data.likes || 0)
+        setCommentCount(data.comments || 0)
+        setShareCount(data.shares || 0)
+    }, [post?.id])
+
+    // Auto-refresh time display every 30 seconds
+    useEffect(() => {
+        const timer = setInterval(() => setTick(t => t + 1), 30000)
+        return () => clearInterval(timer)
+    }, [])
+
+    // Real-time socket updates for this post
+    useEffect(() => {
+        if (!data.id) return
+        const socket = socketIO('http://localhost:5000', { transports: ['websocket'] })
+        socket.emit('join_post', data.id)
+        socket.on('post_liked', (ev: { postId: number; likes: number }) => {
+            if (ev.postId === data.id) setLikeCount(ev.likes)
+        })
+        socket.on('post_commented', (ev: { postId: number; comments: number }) => {
+            if (ev.postId === data.id) setCommentCount(ev.comments)
+        })
+        return () => {
+            socket.emit('leave_post', data.id)
+            socket.disconnect()
+        }
+    }, [data.id])
+
+    useEffect(() => {
+        if (showComments) {
+            // load comments from server
+            (async () => {
+                try {
+                    const res = await api.get(`/posts/${data.id}/comments`)
+                    setCommentsList(res.data)
+                } catch (err) {
+                    console.error('Load comments error', err)
+                }
+            })()
+        }
+    }, [showComments, data.id])
+
+    const getInitials = (name?: string | null) => name ? name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) : '?'
+    const timeAgo = (date?: string | Date | null) => {
+        if (!date) return ''
+        const d = new Date(date)
+        const diff = Date.now() - d.getTime()
+        if (diff < 0) return 'Vừa xong'
         const mins = Math.floor(diff / 60000)
+        if (mins < 1) return 'Vừa xong'
         if (mins < 60) return `${mins} phút trước`
         const hours = Math.floor(mins / 60)
         if (hours < 24) return `${hours} giờ trước`
-        return `${Math.floor(hours / 24)} ngày trước`
+        if (hours < 48) return `Hôm qua lúc ${d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`
+        return d.toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
     }
 
-    const typeLabels = {
+    const typeLabels: Record<string, { text: string; class: string }> = {
         find_player: { text: '🎯 Tìm người chơi', class: 'green' },
         share: { text: '📸 Chia sẻ', class: 'blue' },
         ad: { text: '📢 Quảng cáo', class: 'yellow' },
         event: { text: '🎉 Sự kiện', class: 'purple' }
     }
+    const typeInfo = (typeLabels[(data.post_type as string) || 'share'] || typeLabels.share)
 
-    const typeInfo = typeLabels[data.post_type] || typeLabels.share
-
-    const handleLike = () => {
-        setLiked(prev => !prev)
-        setLikeCount(prev => liked ? prev - 1 : prev + 1)
+    const handleLike = async () => {
+        if (!user) return alert('Vui lòng đăng nhập để tương tác')
+        try {
+            if (!liked) {
+                const res = await api.post(`/posts/${data.id}/like`)
+                setLikeCount(res.data.likes ?? (likeCount + 1))
+                setLiked(true)
+            } else {
+                const res = await api.delete(`/posts/${data.id}/like`)
+                setLikeCount(res.data.likes ?? Math.max(0, likeCount - 1))
+                setLiked(false)
+            }
+        } catch (err: any) {
+            console.error('Like error', err)
+            alert(err?.response?.data?.message || 'Lỗi khi tương tác')
+        }
     }
 
     const shareUrl = encodeURIComponent(window.location.origin + `/post/${data.id}`)
@@ -55,35 +134,103 @@ export default function PostCard({ post }) {
     const handleShareFacebook = () => {
         window.open(`https://www.facebook.com/sharer/sharer.php?u=${shareUrl}&quote=${shareText}`, '_blank', 'width=600,height=400')
         setShowShare(false)
+        // record share (only if logged in)
+        if (user) api.post(`/posts/${data.id}/share`).then(r => setShareCount(r.data.shares)).catch(() => { })
     }
 
     const handleShareMessenger = () => {
         window.open(`https://www.facebook.com/dialog/send?link=${shareUrl}&app_id=0&redirect_uri=${encodeURIComponent(window.location.href)}`, '_blank', 'width=600,height=400')
         setShowShare(false)
+        if (user) api.post(`/posts/${data.id}/share`).then(r => setShareCount(r.data.shares)).catch(() => { })
     }
 
     const handleCopyLink = () => {
         navigator.clipboard.writeText(window.location.origin + `/post/${data.id}`)
         setShowShare(false)
         alert('Đã sao chép link!')
+        if (user) api.post(`/posts/${data.id}/share`).then(r => setShareCount(r.data.shares)).catch(() => { })
     }
 
-    const handleAddComment = (e) => {
+    const handleAddComment = async (e: FormEvent) => {
         e.preventDefault()
+        if (!user) return alert('Vui lòng đăng nhập để bình luận')
         if (!commentText.trim()) return
-        setCommentsList(prev => [...prev, {
-            id: Date.now(),
-            user_name: user?.full_name || 'Bạn',
-            content: commentText,
-            created_at: new Date().toISOString()
-        }])
-        setCommentCount(prev => prev + 1)
-        setCommentText('')
+        try {
+            const res = await api.post(`/posts/${data.id}/comments`, { content: commentText })
+            // server returns created comment
+            setCommentsList(prev => [res.data.comment, ...prev])
+            setCommentCount(res.data.comments || (commentCount + 1))
+            setCommentText('')
+        } catch (err) {
+            const eErr: any = err
+            console.error('Comment error', eErr)
+            alert(eErr?.response?.data?.message || 'Lỗi khi gửi bình luận')
+        }
+    }
+
+    const canDelete = user && (user.id === data.user_id || user.role === 'admin')
+    const [showMenu, setShowMenu] = useState(false)
+
+    const toggleMenu = () => setShowMenu(prev => !prev)
+
+    const handleActionHide = () => {
+        onHide && onHide(data.id)
+        setShowMenu(false)
+    }
+
+    const handleActionDelete = async () => {
+        if (!window.confirm('Bạn có chắc muốn xóa bài viết này?')) return
+        try {
+            await api.delete(`/posts/${data.id}`)
+            onDeleted && onDeleted(data.id)
+        } catch (err) {
+            console.error('Delete error', err)
+            alert(err.response?.data?.message || 'Lỗi khi xóa bài viết')
+        }
+        setShowMenu(false)
+    }
+
+    // show minimal card when hidden
+    if (isHidden) {
+        return (
+            <div className={`${styles.postCard} ${data.is_promoted ? styles.promoted : ''}`}>
+                {/* still render menu so user can unhide or delete */}
+                <div style={{ position: 'absolute', top: 8, right: 8 }}>
+                    <button className={styles.menuBtn} onClick={toggleMenu} title="Tùy chọn">
+                        ⋮
+                    </button>
+                    {showMenu && (
+                        <div className={styles.menuDropdown} onMouseLeave={() => setShowMenu(false)}>
+                            <button className={styles.menuItem} onClick={handleActionHide}>Bỏ ẩn bài viết</button>
+                            {canDelete && <button className={styles.menuItem} onClick={handleActionDelete}>Xóa bài viết</button>}
+                        </div>
+                    )}
+                </div>
+                <div className={styles.hiddenNotice}>Bài viết đã bị ẩn</div>
+            </div>
+        )
     }
 
     return (
         <div className={`${styles.postCard} ${data.is_promoted ? styles.promoted : ''}`}>
             {data.is_promoted && <div className={styles.promotedBadge}>⚡ Được tài trợ</div>}
+            {/* overflow menu */}
+            <div style={{ position: 'absolute', top: 8, right: 8 }}>
+                <button className={styles.menuBtn} onClick={toggleMenu} title="Tùy chọn">
+                    ⋯
+                </button>
+                {showMenu && (
+                    <div className={styles.menuDropdown} onMouseLeave={() => setShowMenu(false)}>
+                        {!isHidden && (
+                            <button className={styles.menuItem} onClick={handleActionHide}>Ẩn bài viết</button>
+                        )}
+                        {isHidden && (
+                            <button className={styles.menuItem} onClick={handleActionHide}>Bỏ ẩn bài viết</button>
+                        )}
+                        {canDelete && <button className={styles.menuItem} onClick={handleActionDelete}>Xóa bài viết</button>}
+                    </div>
+                )}
+            </div>
 
             <div className={styles.postHeader}>
                 <div className="avatar">{getInitials(data.user_name)}</div>
@@ -99,7 +246,18 @@ export default function PostCard({ post }) {
 
             <div className={styles.postContent}>{data.content}</div>
 
-            {data.image && <img src={data.image} alt="" className={styles.postImage} />}
+            {data.image && (
+                <>
+                    <button
+                        onClick={() => navigate(`/post/${data.id}/photo`)}
+                        style={{ display: 'block', width: '100%', padding: 0, border: 'none', background: 'none', cursor: 'zoom-in' }}
+                        title="Click để xem ảnh phóng to"
+                    >
+                        <img src={data.image} alt="" className={styles.postImage} style={{ pointerEvents: 'none' }} />
+                    </button>
+                    <div className={styles.imageHint}>🔍 Click ảnh để xem toàn màn hình</div>
+                </>
+            )}
 
             {/* Like / Comment / Share Actions */}
             <div className={styles.postActions}>
@@ -175,16 +333,19 @@ export default function PostCard({ post }) {
                     {/* Comment list */}
                     {commentsList.length > 0 && (
                         <div className={styles.commentsList}>
-                            {commentsList.map(c => (
-                                <div key={c.id} className={styles.commentItem}>
-                                    <div className={`avatar avatar-sm ${styles.commentAvatar}`}>{getInitials(c.user_name)}</div>
-                                    <div className={styles.commentBubble}>
-                                        <span className={styles.commentUser}>{c.user_name}</span>
-                                        <span className={styles.commentText}>{c.content}</span>
-                                        <span className={styles.commentTime}>{timeAgo(c.created_at)}</span>
+                            {commentsList.map((c: any) => {
+                                const commenterName = c.user_name || c.full_name || 'Người dùng'
+                                return (
+                                    <div key={c.id} className={styles.commentItem}>
+                                        <div className={`avatar avatar-sm ${styles.commentAvatar}`}>{getInitials(commenterName)}</div>
+                                        <div className={styles.commentBubble}>
+                                            <span className={styles.commentUser}>{commenterName}</span>
+                                            <span className={styles.commentText}>{c.content}</span>
+                                            <span className={styles.commentTime}>{timeAgo(c.created_at)}</span>
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
+                                )
+                            })}
                         </div>
                     )}
 
