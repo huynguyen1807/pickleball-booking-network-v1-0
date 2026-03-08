@@ -10,15 +10,41 @@ export const createBooking = async (req, res) => {
         const pool = await poolPromise;
         const isPayOS = payment_method === 'payos';
 
-        const court = await pool.request().input('id', sql.Int, court_id)
-            .query('SELECT price_per_hour FROM courts WHERE id = @id AND is_active = 1');
-        if (court.recordset.length === 0) return res.status(404).json({ message: 'Sân không tồn tại' });
+        const courtQuery = await pool.request().input('id', sql.Int, court_id)
+            .query('SELECT price_per_hour, peak_start_time, peak_end_time, peak_price FROM courts WHERE id = @id AND is_active = 1');
+        if (courtQuery.recordset.length === 0) return res.status(404).json({ message: 'Sân không tồn tại' });
 
-        const startH = parseInt(start_time.split(':')[0]);
-        const endH = parseInt(end_time.split(':')[0]);
-        const hours = endH - startH;
-        const total = court.recordset[0].price_per_hour * hours;
-        const commission = total * COMMISSION;
+        const court = courtQuery.recordset[0];
+
+        const startH = parseFloat(start_time.split(':')[0]) + parseFloat(start_time.split(':')[1]) / 60;
+        const endH = parseFloat(end_time.split(':')[0]) + parseFloat(end_time.split(':')[1]) / 60;
+
+        const extractTimeH = (timeStr: any) => {
+            if (!timeStr) return null;
+            const str = timeStr instanceof Date ? timeStr.toISOString() : String(timeStr);
+            const match = str.match(/\d{2}:\d{2}/);
+            if (!match) return null;
+            const [h, m] = match[0].split(':').map(Number);
+            return h + m / 60;
+        };
+
+        const peakStartH = extractTimeH(court.peak_start_time);
+        const peakEndH = extractTimeH(court.peak_end_time);
+
+        let peakHours = 0;
+        if (court.peak_price && peakStartH !== null && peakEndH !== null) {
+            const overlapStart = Math.max(startH, peakStartH);
+            const overlapEnd = Math.min(endH, peakEndH);
+            if (overlapStart < overlapEnd) {
+                peakHours = overlapEnd - overlapStart;
+            }
+        }
+
+        const regularHours = (endH - startH) - peakHours;
+        const regularPrice = regularHours * court.price_per_hour;
+        const peakPriceTotal = peakHours * (court.peak_price || court.price_per_hour);
+        const total = Math.round(regularPrice + peakPriceTotal);
+        const commission = Math.round(total * COMMISSION);
 
         const result = await pool.request()
             .input('user_id', sql.Int, req.user.id).input('court_id', sql.Int, court_id)
@@ -40,8 +66,8 @@ export const createBooking = async (req, res) => {
 
         res.status(201).json({ message: 'Đặt sân thành công', bookingId: result.recordset[0].id, total: total + commission });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: 'Lỗi server' });
+        console.error("LỖI TAO BOOKING:", err);
+        res.status(500).json({ message: 'Lỗi server', error: err.message });
     }
 };
 
@@ -86,3 +112,24 @@ export const cancelBooking = async (req, res) => {
     }
 };
 
+// Get booked slots for a court on a specific date
+export const getBookedSlots = async (req, res) => {
+    try {
+        const { courtId, date } = req.params;
+        const pool = await poolPromise;
+        const result = await pool.request()
+            .input('court_id', sql.Int, courtId)
+            .input('booking_date', sql.Date, date)
+            .query(`
+                SELECT start_time, end_time 
+                FROM bookings 
+                WHERE court_id = @court_id 
+                AND booking_date = @booking_date
+                AND status IN ('confirmed', 'pending')
+            `);
+        res.json(result.recordset);
+    } catch (err) {
+        console.error("Lỗi lấy khung giờ đã đặt:", err);
+        res.status(500).json({ message: 'Lỗi server' });
+    }
+};
