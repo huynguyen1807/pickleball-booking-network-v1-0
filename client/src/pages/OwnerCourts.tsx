@@ -8,6 +8,7 @@ export default function OwnerCourts() {
     const [facilities, setFacilities] = useState([])
     const [courtsByFacility, setCourtsByFacility] = useState<Record<number, any[]>>({})
     const [loading, setLoading] = useState(true)
+
     const [editCourt, setEditCourt] = useState<any>(null)
     const [submitting, setSubmitting] = useState(false)
     const [editForm, setEditForm] = useState({
