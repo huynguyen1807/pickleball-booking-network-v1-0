@@ -40,26 +40,14 @@ CREATE TABLE upgrade_requests (
 );
 GO
 
--- FACILITIES
-IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='facilities' AND xtype='U')
-CREATE TABLE facilities (
+-- COURTS
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='courts' AND xtype='U')
+CREATE TABLE courts (
   id INT IDENTITY(1,1) PRIMARY KEY,
   owner_id INT NOT NULL FOREIGN KEY REFERENCES users(id) ON DELETE CASCADE,
   name NVARCHAR(200) NOT NULL,
   address NVARCHAR(500) NOT NULL,
   description NVARCHAR(MAX),
-  image NVARCHAR(500),
-  is_active BIT DEFAULT 1,
-  created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
-);
-GO
-
--- COURTS
-IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='courts' AND xtype='U')
-CREATE TABLE courts (
-  id INT IDENTITY(1,1) PRIMARY KEY,
-  facility_id INT NOT NULL FOREIGN KEY REFERENCES facilities(id) ON DELETE CASCADE,
-  name NVARCHAR(200) NOT NULL,
   image NVARCHAR(500),
   price_per_hour DECIMAL(12,2) NOT NULL,
   latitude DECIMAL(10,7),
