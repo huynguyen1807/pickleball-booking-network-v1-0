@@ -186,6 +186,7 @@ img {
     border-radius: var(--radius-lg);
     padding: 24px;
     transition: all var(--transition-normal);
+    
 }
 
 .glass-card:hover {

@@ -14,7 +14,16 @@ export default function OwnerCourtDetail() {
   const [showCreate, setShowCreate] = useState(false)
   const [editingSubCourt, setEditingSubCourt] = useState(null)
   const [editingCourt, setEditingCourt] = useState(false)
-  const [courtForm, setCourtForm] = useState({ name: '', address: '', description: '', price_per_hour: 0 })
+  const [courtForm, setCourtForm] = useState({
+    name: '', address: '', description: '',
+    price_per_hour: 0,
+    peak_start_time: '17:00',
+    peak_end_time: '21:00',
+    peak_price_per_hour: 0,
+    weekend_price_per_hour: 0,
+    min_booking_minutes: 30,
+    slot_step_minutes: 15
+  })
 
   useEffect(() => {
     loadDetail()
@@ -24,7 +33,18 @@ export default function OwnerCourtDetail() {
     try {
       const res = await api.get(`/courts/${id}`)
       setCourt(res.data)
-      setCourtForm({ name: res.data.name, address: res.data.address, description: res.data.description, price_per_hour: res.data.price_per_hour || 0 })
+      setCourtForm({
+        name: res.data.name,
+        address: res.data.address,
+        description: res.data.description,
+        price_per_hour: res.data.price_per_hour || 0,
+        peak_start_time: res.data.peak_start_time || '17:00',
+        peak_end_time: res.data.peak_end_time || '21:00',
+        peak_price_per_hour: res.data.peak_price_per_hour || 0,
+        weekend_price_per_hour: res.data.weekend_price_per_hour || 0,
+        min_booking_minutes: res.data.min_booking_minutes || 30,
+        slot_step_minutes: res.data.slot_step_minutes || 15
+      })
 
       const sub = await api.get(`/courts/${id}/sub-courts`)
       setSubCourts(sub.data)
@@ -84,8 +104,117 @@ export default function OwnerCourtDetail() {
 
   return (
     <div className="dashboardPage" style={{ paddingTop: '80px' }}>
+      {/* forms moved to sub-court section */}
+
+      {editingCourt && (
+        <div className="glass-card" style={{ margin: '20px 200px 50px 200px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+            <h3 style={{ margin: 0 }}>✏️ Cập nhập thông tin sân</h3>
+            <button 
+              className="btn btn-secondary btn-sm" 
+              onClick={() => setEditingCourt(false)}
+              style={{ padding: '6px 12px', fontSize: '0.875rem' }}
+            >
+              ✕ Đóng
+            </button>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div className="input-group">
+              <label>Tên sân</label>
+              <input
+                type="text"
+                className="input-field"
+                value={courtForm.name}
+                onChange={e => setCourtForm(p => ({ ...p, name: e.target.value }))}
+              />
+            </div>
+
+            <div className="input-group">
+              <label>Giá / giờ</label>
+              <input
+                type="number"
+                className="input-field"
+                step="0.01"
+                value={courtForm.price_per_hour}
+                onChange={e => setCourtForm(p => ({ ...p, price_per_hour: parseFloat(e.target.value) || 0 }))}
+              />
+            </div>
+          </div>
+
+          <div className="input-group">
+            <label>Địa chỉ</label>
+            <input
+              type="text"
+              className="input-field"
+              value={courtForm.address}
+              onChange={e => setCourtForm(p => ({ ...p, address: e.target.value }))}
+            />
+          </div>
+
+          <div className="input-group">
+            <label>Mô tả</label>
+            <textarea
+              className="input-field"
+              rows={4}
+              value={courtForm.description}
+              onChange={e => setCourtForm(p => ({ ...p, description: e.target.value }))}
+              style={{ resize: 'vertical' }}
+            />
+          </div>
+
+          <div className="input-group">
+            <label>Giá / giờ (mặc định)</label>
+            <input type="number" step="0.01" value={courtForm.price_per_hour}
+                   onChange={e=>setCourtForm(p=>({...p, price_per_hour:parseFloat(e.target.value)||0}))}/>
+          </div>
+
+          <div className="input-group">
+            <label>Khung giờ vàng</label>
+            <div style={{display:'flex', gap:8}}>
+              <input type="time" value={courtForm.peak_start_time}
+                     onChange={e=>setCourtForm(p=>({...p,peak_start_time:e.target.value}))}/>
+              <span>→</span>
+              <input type="time" value={courtForm.peak_end_time}
+                     onChange={e=>setCourtForm(p=>({...p,peak_end_time:e.target.value}))}/>
+              <input type="number" step="0.01" placeholder="Giá giờ vàng"
+                     value={courtForm.peak_price_per_hour}
+                     onChange={e=>setCourtForm(p=>({...p,peak_price_per_hour:parseFloat(e.target.value)||0}))}/>
+            </div>
+          </div>
+
+          <div className="input-group">
+            <label>Giá cuối tuần (T7 & CN)</label>
+            <input type="number" step="0.01" value={courtForm.weekend_price_per_hour}
+                   onChange={e=>setCourtForm(p=>({...p,weekend_price_per_hour:parseFloat(e.target.value)||0}))}/>
+          </div>
+
+          <div className="input-group">
+            <label>Min. mỗi slot (phút)</label>
+            <input type="number" value={courtForm.min_booking_minutes}
+                   onChange={e=>setCourtForm(p=>({...p,min_booking_minutes:parseInt(e.target.value)||30}))}/>
+          </div>
+
+          <div className="input-group">
+            <label>Bước nhảy (phút)</label>
+            <input type="number" value={courtForm.slot_step_minutes}
+                   onChange={e=>setCourtForm(p=>({...p,slot_step_minutes:parseInt(e.target.value)||15}))}/>
+          </div>
+
+          <div style={{ marginTop: '20px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+            <button className="btn btn-secondary btn-sm" onClick={() => setEditingCourt(false)}>
+              Hủy
+            </button>
+            <button className="btn btn-primary btn-sm" onClick={updateCourt}>
+              💾 Lưu thay đổi
+            </button>
+          </div>
+        </div>
+      )}
+
       {!editingCourt && (
-        <div className="glass-card" style={{ marginBottom: '24px' }}>
+        <div className="glass-card" style={{ margin: '10px 500px 50px 500px' }}>
+          <h3 style={{ marginBottom: '24px' }}>✏️ Thông tin cơ sở {court.name}</h3>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '16px' }}>
             <h2>🏟️ {court.name}</h2>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -128,16 +257,34 @@ export default function OwnerCourtDetail() {
 
       <hr />
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '20px 300px 20px 300px' }}>
         <h3>🎯 Danh sách sân con ({subCourts.length})</h3>
         <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
           ➕ Thêm sân con
         </button>
       </div>
 
+      {/* forms for sub-courts */}
+      {showCreate && (
+        <SubCourtForm
+          courtId={id}
+          onClose={() => setShowCreate(false)}
+          onSuccess={loadDetail}
+        />
+      )}
+
+      {editingSubCourt && (
+        <SubCourtForm
+          courtId={id}
+          subCourt={editingSubCourt}
+          onClose={() => setEditingSubCourt(null)}
+          onSuccess={loadDetail}
+        />
+      )}
+
       {subCourts && subCourts.length > 0 ? (
         subCourts.map(sc => (
-          <div key={sc.id} className="glass-card">
+          <div key={sc.id} className="glass-card" style={{ margin: '10px 500px 50px 500px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '12px' }}>
               <div>
                 <h4 style={{ margin: '0 0 4px 0' }}>{sc.name}</h4>
@@ -189,75 +336,6 @@ export default function OwnerCourtDetail() {
         </div>
       )}
 
-      {showCreate && (
-        <SubCourtForm
-          courtId={id}
-          onClose={() => setShowCreate(false)}
-          onSuccess={loadDetail}
-        />
-      )}
-
-      {editingSubCourt && (
-        <SubCourtForm
-          courtId={id}
-          subCourt={editingSubCourt}
-          onClose={() => setEditingSubCourt(null)}
-          onSuccess={loadDetail}
-        />
-      )}
-
-      {editingCourt && (
-        <div className="glass-card" style={{ marginBottom: '24px', backgroundColor: 'rgba(59, 130, 246, 0.05)', borderLeft: '4px solid var(--primary-color)' }}>
-          <h3 style={{ marginBottom: '16px' }}>✏️ Cập nhập thông tin sân</h3>
-
-          <div className="input-group">
-            <label>Tên sân</label>
-            <input
-              type="text"
-              className="input-field"
-              value={courtForm.name}
-              onChange={e => setCourtForm(p => ({ ...p, name: e.target.value }))}
-            />
-          </div>
-
-          <div className="input-group">
-            <label>Giá / giờ</label>
-            <input
-              type="number"
-              className="input-field"
-              step="0.01"
-              value={courtForm.price_per_hour}
-              onChange={e => setCourtForm(p => ({ ...p, price_per_hour: parseFloat(e.target.value) || 0 }))}
-            />
-          </div>
-
-          <div className="input-group">
-            <label>Địa chỉ</label>
-            <input
-              type="text"
-              className="input-field"
-              value={courtForm.address}
-              onChange={e => setCourtForm(p => ({ ...p, address: e.target.value }))}
-            />
-          </div>
-
-          <div className="input-group">
-            <label>Mô tả</label>
-            <textarea
-              className="input-field"
-              rows={3}
-              value={courtForm.description}
-              onChange={e => setCourtForm(p => ({ ...p, description: e.target.value }))}
-              style={{ resize: 'vertical' }}
-            />
-          </div>
-
-          <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
-            <button className="btn btn-primary" onClick={updateCourt}>💾 Lưu thay đổi</button>
-            <button className="btn btn-secondary" onClick={() => setEditingCourt(false)}>Hủy</button>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

@@ -3,7 +3,7 @@ import { sql, poolPromise } from '../config/db';
 // Create court (owner)
 export const createCourt = async (req, res) => {
     try {
-        const { name, address, description, image, number_of_small_court, latitude, longitude } = req.body;
+        const { name, address, description, image, number_of_small_court, latitude, longitude, price_per_hour, peak_start_time, peak_end_time, peak_price_per_hour, weekend_price_per_hour, min_booking_minutes, slot_step_minutes } = req.body;
         const pool = await poolPromise;
         const result = await pool.request()
             .input('owner_id', sql.Int, req.user.id)
@@ -14,9 +14,16 @@ export const createCourt = async (req, res) => {
             .input('number_of_small_court', sql.Decimal(12, 2), number_of_small_court)
             .input('latitude', sql.Decimal(10, 7), latitude || null)
             .input('longitude', sql.Decimal(10, 7), longitude || null)
-            .query(`INSERT INTO courts (owner_id, name, address, description, image, number_of_small_court, latitude, longitude)
+            .input('price_per_hour', sql.Decimal(12,2), price_per_hour || 0)
+            .input('peak_start_time', sql.Time, peak_start_time || null)
+            .input('peak_end_time', sql.Time, peak_end_time || null)
+            .input('peak_price_per_hour', sql.Decimal(12,2), peak_price_per_hour || 0)
+            .input('weekend_price_per_hour', sql.Decimal(12,2), weekend_price_per_hour || 0)
+            .input('min_booking_minutes', sql.Int, min_booking_minutes || 30)
+            .input('slot_step_minutes', sql.Int, slot_step_minutes || 15)
+            .query(`INSERT INTO courts (owner_id, name, address, description, image, number_of_small_court, latitude, longitude, price_per_hour, peak_start_time, peak_end_time, peak_price_per_hour, weekend_price_per_hour, min_booking_minutes, slot_step_minutes)
               OUTPUT INSERTED.id
-              VALUES (@owner_id, @name, @address, @description, @image, @number_of_small_court, @latitude, @longitude)`);
+              VALUES (@owner_id, @name, @address, @description, @image, @number_of_small_court, @latitude, @longitude, @price_per_hour, @peak_start_time, @peak_end_time, @peak_price_per_hour, @weekend_price_per_hour, @min_booking_minutes, @slot_step_minutes)`);
         res.status(201).json({ message: 'Đã thêm sân', courtId: result.recordset[0].id });
     } catch (err) {
         res.status(500).json({ message: 'Lỗi server' });
@@ -68,7 +75,7 @@ export const getCourtById = async (req, res) => {
 // Update court (owner)
 export const updateCourt = async (req, res) => {
     try {
-        let { name, address, description, image, number_of_small_court, latitude, longitude, is_active } = req.body;
+        let { name, address, description, image, number_of_small_court, latitude, longitude, is_active, price_per_hour, peak_start_time, peak_end_time, peak_price_per_hour, weekend_price_per_hour, min_booking_minutes, slot_step_minutes } = req.body;
         const pool = await poolPromise;
         const court = await pool.request().input('id', sql.Int, req.params.id).query('SELECT owner_id FROM courts WHERE id = @id');
         if (court.recordset.length === 0) return res.status(404).json({ message: 'Không tìm thấy sân' });
@@ -85,7 +92,13 @@ export const updateCourt = async (req, res) => {
         latitude = latitude ?? curr.latitude;
         longitude = longitude ?? curr.longitude;
         is_active = (typeof is_active === 'boolean') ? is_active : curr.is_active;
-        // price_per_hour = price_per_hour ?? curr.price_per_hour;
+        price_per_hour = price_per_hour ?? curr.price_per_hour;
+        peak_start_time = peak_start_time ?? curr.peak_start_time;
+        peak_end_time = peak_end_time ?? curr.peak_end_time;
+        peak_price_per_hour = peak_price_per_hour ?? curr.peak_price_per_hour;
+        weekend_price_per_hour = weekend_price_per_hour ?? curr.weekend_price_per_hour;
+        min_booking_minutes = min_booking_minutes ?? curr.min_booking_minutes;
+        slot_step_minutes = slot_step_minutes ?? curr.slot_step_minutes;
 
         await pool.request()
             .input('name', sql.NVarChar, name)
@@ -96,9 +109,15 @@ export const updateCourt = async (req, res) => {
             .input('latitude', sql.Decimal(10, 7), latitude)
             .input('longitude', sql.Decimal(10, 7), longitude)
             .input('is_active', sql.Bit, is_active)
-            // .input('price_per_hour', sql.Decimal(12,2), price_per_hour)
+            .input('price_per_hour', sql.Decimal(12,2), price_per_hour)
+            .input('peak_start_time', sql.Time, peak_start_time)
+            .input('peak_end_time', sql.Time, peak_end_time)
+            .input('peak_price_per_hour', sql.Decimal(12,2), peak_price_per_hour)
+            .input('weekend_price_per_hour', sql.Decimal(12,2), weekend_price_per_hour)
+            .input('min_booking_minutes', sql.Int, min_booking_minutes)
+            .input('slot_step_minutes', sql.Int, slot_step_minutes)
             .input('id', sql.Int, req.params.id)
-            .query('UPDATE courts SET name=@name, address=@address, description=@description, image=@image, number_of_small_court=@number_of_small_court, latitude=@latitude, longitude=@longitude, is_active=@is_active WHERE id=@id');
+            .query('UPDATE courts SET name=@name, address=@address, description=@description, image=@image, number_of_small_court=@number_of_small_court, latitude=@latitude, longitude=@longitude, is_active=@is_active, price_per_hour=@price_per_hour, peak_start_time=@peak_start_time, peak_end_time=@peak_end_time, peak_price_per_hour=@peak_price_per_hour, weekend_price_per_hour=@weekend_price_per_hour, min_booking_minutes=@min_booking_minutes, slot_step_minutes=@slot_step_minutes WHERE id=@id');
         res.json({ message: 'Cập nhật sân thành công' });
     } catch (err) {
         console.error(err);
@@ -316,7 +335,6 @@ export const updateSubCourtStatus = async (req, res) => {
     }
 
     const courtId = subCourtCheck.recordset[0].court_id
-
     if (courtIdParam && courtIdParam !== courtId) {
       return res.status(400).json({ message: 'Sân con không thuộc sân cha' })
     }

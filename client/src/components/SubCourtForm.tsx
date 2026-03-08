@@ -85,7 +85,7 @@ export default function SubCourtForm({ courtId, subCourt, onClose, onSuccess }: 
         />
       </div>
 
-      {subCourt && (
+      {/* {subCourt && (
         <select
           value={form.status}
           onChange={e => setForm(p => ({ ...p, status: e.target.value }))}
@@ -93,7 +93,7 @@ export default function SubCourtForm({ courtId, subCourt, onClose, onSuccess }: 
           <option value="active">Hoạt động</option>
           <option value="maintenance">Bảo trì</option>
         </select>
-      )}
+      )} */}
 
       {error && <div style={{ color: '#ef4444', marginBottom: 12 }}>⚠️ {error}</div>}
 

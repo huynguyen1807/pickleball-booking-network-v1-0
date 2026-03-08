@@ -21,6 +21,8 @@ const TIME_SLOTS = [
     { id: 14, start: '22:00', end: '23:00', label: '22:00 - 23:00' }
 ]
 
+
+
 export default function CourtDetail() {
     const { id } = useParams()
     const navigate = useNavigate()
