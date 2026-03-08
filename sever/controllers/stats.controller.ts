@@ -22,10 +22,10 @@ export const getOwnerStats = async (req, res) => {
     try {
         const pool = await poolPromise;
         const uid = req.user.id;
-        const r1 = await pool.request().input('uid', sql.Int, uid).query('SELECT COUNT(*) AS total_bookings FROM bookings b JOIN courts c ON b.court_id = c.id WHERE c.owner_id = @uid');
-        const r2 = await pool.request().input('uid', sql.Int, uid).query("SELECT ISNULL(SUM(b.total_price - b.commission_amount),0) AS revenue FROM bookings b JOIN courts c ON b.court_id = c.id WHERE c.owner_id = @uid AND b.status IN ('confirmed','completed')");
-        const r3 = await pool.request().input('uid', sql.Int, uid).query('SELECT COUNT(*) AS match_count FROM matches m JOIN courts c ON m.court_id = c.id WHERE c.owner_id = @uid');
-        const r4 = await pool.request().input('uid', sql.Int, uid).query('SELECT COUNT(*) AS court_count FROM courts WHERE owner_id = @uid');
+        const r1 = await pool.request().input('uid', sql.Int, uid).query('SELECT COUNT(*) AS total_bookings FROM bookings b JOIN courts c ON b.court_id = c.id JOIN facilities f ON c.facility_id = f.id WHERE f.owner_id = @uid');
+        const r2 = await pool.request().input('uid', sql.Int, uid).query("SELECT ISNULL(SUM(b.total_price - b.commission_amount),0) AS revenue FROM bookings b JOIN courts c ON b.court_id = c.id JOIN facilities f ON c.facility_id = f.id WHERE f.owner_id = @uid AND b.status IN ('confirmed','completed')");
+        const r3 = await pool.request().input('uid', sql.Int, uid).query('SELECT COUNT(*) AS match_count FROM matches m JOIN courts c ON m.court_id = c.id JOIN facilities f ON c.facility_id = f.id WHERE f.owner_id = @uid');
+        const r4 = await pool.request().input('uid', sql.Int, uid).query('SELECT COUNT(*) AS court_count FROM courts c JOIN facilities f ON c.facility_id = f.id WHERE f.owner_id = @uid');
         const tb = r1.recordset[0].total_bookings;
         const cc = r4.recordset[0].court_count;
         const occupancy = tb > 0 ? Math.min(Math.round((tb / (cc * 30)) * 100), 100) : 0;
