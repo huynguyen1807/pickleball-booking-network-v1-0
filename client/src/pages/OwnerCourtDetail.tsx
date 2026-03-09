@@ -15,14 +15,7 @@ export default function OwnerCourtDetail() {
   const [editingSubCourt, setEditingSubCourt] = useState(null)
   const [editingCourt, setEditingCourt] = useState(false)
   const [courtForm, setCourtForm] = useState({
-    name: '', address: '', description: '',
-    price_per_hour: 0,
-    peak_start_time: '17:00',
-    peak_end_time: '21:00',
-    peak_price_per_hour: 0,
-    weekend_price_per_hour: 0,
-    min_booking_minutes: 30,
-    slot_step_minutes: 15
+    name: '', address: '', description: ''
   })
 
   useEffect(() => {
@@ -36,14 +29,7 @@ export default function OwnerCourtDetail() {
       setCourtForm({
         name: res.data.name,
         address: res.data.address,
-        description: res.data.description,
-        price_per_hour: res.data.price_per_hour || 0,
-        peak_start_time: res.data.peak_start_time || '17:00',
-        peak_end_time: res.data.peak_end_time || '21:00',
-        peak_price_per_hour: res.data.peak_price_per_hour || 0,
-        weekend_price_per_hour: res.data.weekend_price_per_hour || 0,
-        min_booking_minutes: res.data.min_booking_minutes || 30,
-        slot_step_minutes: res.data.slot_step_minutes || 15
+        description: res.data.description
       })
 
       const sub = await api.get(`/courts/${id}/sub-courts`)
@@ -129,17 +115,6 @@ export default function OwnerCourtDetail() {
                 onChange={e => setCourtForm(p => ({ ...p, name: e.target.value }))}
               />
             </div>
-
-            <div className="input-group">
-              <label>Giá / giờ</label>
-              <input
-                type="number"
-                className="input-field"
-                step="0.01"
-                value={courtForm.price_per_hour}
-                onChange={e => setCourtForm(p => ({ ...p, price_per_hour: parseFloat(e.target.value) || 0 }))}
-              />
-            </div>
           </div>
 
           <div className="input-group">
@@ -161,44 +136,6 @@ export default function OwnerCourtDetail() {
               onChange={e => setCourtForm(p => ({ ...p, description: e.target.value }))}
               style={{ resize: 'vertical' }}
             />
-          </div>
-
-          <div className="input-group">
-            <label>Giá / giờ (mặc định)</label>
-            <input type="number" step="0.01" value={courtForm.price_per_hour}
-                   onChange={e=>setCourtForm(p=>({...p, price_per_hour:parseFloat(e.target.value)||0}))}/>
-          </div>
-
-          <div className="input-group">
-            <label>Khung giờ vàng</label>
-            <div style={{display:'flex', gap:8}}>
-              <input type="time" value={courtForm.peak_start_time}
-                     onChange={e=>setCourtForm(p=>({...p,peak_start_time:e.target.value}))}/>
-              <span>→</span>
-              <input type="time" value={courtForm.peak_end_time}
-                     onChange={e=>setCourtForm(p=>({...p,peak_end_time:e.target.value}))}/>
-              <input type="number" step="0.01" placeholder="Giá giờ vàng"
-                     value={courtForm.peak_price_per_hour}
-                     onChange={e=>setCourtForm(p=>({...p,peak_price_per_hour:parseFloat(e.target.value)||0}))}/>
-            </div>
-          </div>
-
-          <div className="input-group">
-            <label>Giá cuối tuần (T7 & CN)</label>
-            <input type="number" step="0.01" value={courtForm.weekend_price_per_hour}
-                   onChange={e=>setCourtForm(p=>({...p,weekend_price_per_hour:parseFloat(e.target.value)||0}))}/>
-          </div>
-
-          <div className="input-group">
-            <label>Min. mỗi slot (phút)</label>
-            <input type="number" value={courtForm.min_booking_minutes}
-                   onChange={e=>setCourtForm(p=>({...p,min_booking_minutes:parseInt(e.target.value)||30}))}/>
-          </div>
-
-          <div className="input-group">
-            <label>Bước nhảy (phút)</label>
-            <input type="number" value={courtForm.slot_step_minutes}
-                   onChange={e=>setCourtForm(p=>({...p,slot_step_minutes:parseInt(e.target.value)||15}))}/>
           </div>
 
           <div style={{ marginTop: '20px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
@@ -245,6 +182,10 @@ export default function OwnerCourtDetail() {
             <p style={{ fontSize: '0.95rem', marginTop: '4px', lineHeight: '1.5' }}>
               {court.description || '(Chưa có mô tả)'}
             </p>
+          </div>
+
+          <div style={{ marginTop: '16px', padding: '12px', backgroundColor: 'rgba(59, 130, 246, 0.05)', borderRadius: '6px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+            <span>ℹ️ Cấu hình giá và khung giờ được thiết lập riêng cho từng sân con</span>
           </div>
 
           <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
@@ -305,6 +246,16 @@ export default function OwnerCourtDetail() {
                 {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(sc.price_per_hour || 0)}
               </p>
             </div>
+
+            {/* <div style={{ marginTop: '12px', padding: '12px', backgroundColor: 'rgba(59, 130, 246, 0.05)', borderRadius: '6px', fontSize: '0.875rem' }}>
+              <div style={{ color: 'var(--text-muted)', marginBottom: '8px' }}>💰 Cấu hình giá</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                <div><span style={{color:'var(--text-muted)'}}>Giờ vàng:</span> <b>{sc.peak_start_time}-{sc.peak_end_time}</b></div>
+                <div><span style={{color:'var(--text-muted)'}}>Giá giờ vàng:</span> <b>{sc.peak_price_per_hour > 0 ? new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(sc.peak_price_per_hour) : '(không)'}</b></div>
+                <div><span style={{color:'var(--text-muted)'}}>Giá cuối tuần:</span> <b>{sc.weekend_price_per_hour > 0 ? new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(sc.weekend_price_per_hour) : '(không)'}</b></div>
+                <div><span style={{color:'var(--text-muted)'}}>Min/Bước:</span> <b>{sc.min_booking_minutes}/{sc.slot_step_minutes} phút</b></div>
+              </div>
+            </div> */}
 
             <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
               <button

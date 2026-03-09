@@ -12,6 +12,7 @@ export default function Booking() {
     const [step, setStep] = useState(1)
     const [payment, setPayment] = useState('')
     const [court, setCourt] = useState(null)
+    const [subCourt, setSubCourt] = useState(null)
     const [loading, setLoading] = useState(true)
     const [submitting, setSubmitting] = useState(false)
     const [bookingResult, setBookingResult] = useState(null)
@@ -22,12 +23,21 @@ export default function Booking() {
     const bookingDate = searchParams.get('date') || new Date().toISOString().split('T')[0]
     const startTime = searchParams.get('start') || '18:00'
     const endTime = searchParams.get('end') || '20:00'
+    const subCourtId = searchParams.get('subCourt')
 
     useEffect(() => {
         const loadCourt = async () => {
             try {
                 const res = await api.get(`/courts/${id}`)
                 setCourt(res.data)
+                if (subCourtId) {
+                    try {
+                        const subRes = await api.get(`/courts/${id}/sub-courts/${subCourtId}`)
+                        setSubCourt(subRes.data)
+                    } catch (e) {
+                        console.warn('Cannot load sub-court:', e)
+                    }
+                }
             } catch (err) {
                 console.error('Failed to load court:', err)
             } finally {
@@ -35,10 +45,33 @@ export default function Booking() {
             }
         }
         loadCourt()
-    }, [id])
+    }, [id, subCourtId])
 
-    const hours = parseInt(endTime) - parseInt(startTime)
-    const courtPrice = court ? court.price_per_hour * hours : 0
+    const toMinutes = t => {
+        const [h, m] = t.split(':').map(Number)
+        return h * 60 + m
+    }
+    const duration = toMinutes(endTime) - toMinutes(startTime)
+    
+    const pricingConfig = subCourt || court || {
+        price_per_hour: 100000,
+        peak_start_time: null,
+        peak_end_time: null,
+        peak_price_per_hour: 0,
+        weekend_price_per_hour: 0
+    }
+    
+    const unitPrice = (() => {
+        if (!pricingConfig) return 0
+        const d = new Date(bookingDate).getDay()
+        if ((d === 6 || d === 0) && pricingConfig.weekend_price_per_hour > 0) return pricingConfig.weekend_price_per_hour
+        if (pricingConfig.peak_start_time && pricingConfig.peak_end_time &&
+            startTime >= pricingConfig.peak_start_time &&
+            endTime <= pricingConfig.peak_end_time &&
+            pricingConfig.peak_price_per_hour > 0) return pricingConfig.peak_price_per_hour
+        return pricingConfig.price_per_hour
+    })()
+    const courtPrice = (unitPrice / 60) * duration
     const commission = courtPrice * 0.05
     const total = courtPrice + commission
 
@@ -53,6 +86,7 @@ export default function Booking() {
         try {
             const res = await api.post('/bookings', {
                 court_id: parseInt(id),
+                sub_court_id: subCourtId ? parseInt(subCourtId) : null,
                 booking_date: bookingDate,
                 start_time: startTime,
                 end_time: endTime,
@@ -110,7 +144,7 @@ export default function Booking() {
                         <div className={styles.summaryRow}><span>Sân</span><span style={{ fontWeight: 600 }}>{court.name}</span></div>
                         <div className={styles.summaryRow}><span>Ngày</span><span>{formatDate(bookingDate)}</span></div>
                         <div className={styles.summaryRow}><span>Khung giờ</span><span>{startTime} - {endTime}</span></div>
-                        <div className={styles.summaryRow}><span>Giá sân ({hours}h)</span><span>{formatPrice(courtPrice)}</span></div>
+                        <div className={styles.summaryRow}><span>Giá sân ({duration} phút)</span><span>{formatPrice(courtPrice)}</span></div>
                         <div className={styles.summaryRow}><span>Phí dịch vụ (5%)</span><span>{formatPrice(commission)}</span></div>
                         <div className={`${styles.summaryRow} ${styles.summaryTotal}`}><span>Tổng cộng</span><span>{formatPrice(total)}</span></div>
                     </div>

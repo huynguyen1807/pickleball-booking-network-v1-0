@@ -6,18 +6,71 @@ const COMMISSION = parseFloat(process.env.COMMISSION_RATE) || 0.05;
 // Create booking
 export const createBooking = async (req, res) => {
     try {
-        const { court_id, booking_date, start_time, end_time, payment_method } = req.body;
+        const { court_id, sub_court_id, booking_date, start_time, end_time, payment_method } = req.body;
         const pool = await poolPromise;
         const isPayOS = payment_method === 'payos';
 
+        let pricingRow;
+        if (sub_court_id) {
+            // Get pricing from sub_court
+            const result = await pool.request()
+                .input('id', sql.Int, sub_court_id)
+                .input('court_id', sql.Int, court_id)
+                .query(`SELECT price_per_hour, peak_start_time, peak_end_time, peak_price_per_hour,
+                               weekend_price_per_hour, min_booking_minutes, slot_step_minutes
+                        FROM sub_courts WHERE id = @id AND court_id = @court_id`);
+            if (result.recordset.length === 0) return res.status(404).json({ message: 'Sân con không tồn tại' });
+            pricingRow = result.recordset[0];
+        } else {
+            // Use default values
+            pricingRow = {
+                price_per_hour: 100000,
+                peak_start_time: null,
+                peak_end_time: null,
+                peak_price_per_hour: 0,
+                weekend_price_per_hour: 0,
+                min_booking_minutes: 30,
+                slot_step_minutes: 15
+            };
+        }
+
+        // Verify court exists
         const court = await pool.request().input('id', sql.Int, court_id)
-            .query('SELECT price_per_hour FROM courts WHERE id = @id AND is_active = 1');
+            .query('SELECT id FROM courts WHERE id = @id AND is_active = 1');
         if (court.recordset.length === 0) return res.status(404).json({ message: 'Sân không tồn tại' });
 
-        const startH = parseInt(start_time.split(':')[0]);
-        const endH = parseInt(end_time.split(':')[0]);
-        const hours = endH - startH;
-        const total = court.recordset[0].price_per_hour * hours;
+        const toMinutes = t => {
+            const [h, m] = t.split(':').map(Number);
+            return h * 60 + m;
+        };
+        const startMin = toMinutes(start_time);
+        const endMin = toMinutes(end_time);
+        const duration = endMin - startMin;
+
+        // Validate minimum booking duration
+        if (duration < pricingRow.min_booking_minutes) {
+            return res.status(400).json({ message: `Thời lượng tối thiểu là ${pricingRow.min_booking_minutes} phút` });
+        }
+
+        // Validate slot step
+        if (duration % pricingRow.slot_step_minutes !== 0) {
+            return res.status(400).json({ message: `Mốc thời gian phải là bội của ${pricingRow.slot_step_minutes} phút` });
+        }
+
+        // Determine price based on peak hours and weekend
+        let unitPrice = pricingRow.price_per_hour;
+        const bookingDay = new Date(booking_date).getDay(); // 6 = Sat, 0 = Sun
+        if ((bookingDay === 6 || bookingDay === 0) && pricingRow.weekend_price_per_hour > 0) {
+            unitPrice = pricingRow.weekend_price_per_hour;
+        } else if (
+            pricingRow.peak_start_time && pricingRow.peak_end_time &&
+            start_time >= pricingRow.peak_start_time && end_time <= pricingRow.peak_end_time &&
+            pricingRow.peak_price_per_hour > 0
+        ) {
+            unitPrice = pricingRow.peak_price_per_hour;
+        }
+
+        const total = (unitPrice / 60) * duration;
         const commission = total * COMMISSION;
 
         const result = await pool.request()

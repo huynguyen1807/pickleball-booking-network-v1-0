@@ -53,6 +53,13 @@ CREATE TABLE courts (
   latitude DECIMAL(10,7),
   longitude DECIMAL(10,7),
   is_active BIT DEFAULT 1,
+  price_per_hour DECIMAL(12,2) DEFAULT 0.00,
+  peak_start_time DATETIME NULL,
+  peak_end_time DATETIME NULL,
+  peak_price_per_hour DECIMAL(12,2) DEFAULT 0.00,
+  weekend_price_per_hour DECIMAL(12,2) DEFAULT 0.00,
+  min_booking_minutes INT DEFAULT 30,
+  slot_step_minutes INT DEFAULT 15,
   created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
 );
 GO
@@ -67,9 +74,44 @@ CREATE TABLE sub_courts (
   surface_type NVARCHAR(50) NOT NULL,
   status NVARCHAR(20) DEFAULT 'active' CHECK (status IN ('active','maintenance')),
   price_per_hour DECIMAL(12,2) DEFAULT 0.00,
+  peak_start_time TIMESTAMP NULL,
+  peak_end_time TIMESTAMP NULL,
+  peak_price_per_hour DECIMAL(12,2) DEFAULT 0.00,
+  weekend_price_per_hour DECIMAL(12,2) DEFAULT 0.00,
+  min_booking_minutes INT DEFAULT 30,
+  slot_step_minutes INT DEFAULT 15,
   created_at DATETIME DEFAULT GETDATE(),
   updated_at DATETIME DEFAULT GETDATE()
 );
+GO
+
+-- Add pricing columns to sub_courts if they don't exist
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('sub_courts') AND name = 'price_per_hour')
+  ALTER TABLE sub_courts ADD price_per_hour DECIMAL(12,2) DEFAULT 0.00;
+GO
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('sub_courts') AND name = 'peak_start_time')
+  ALTER TABLE sub_courts ADD peak_start_time TIME NULL;
+GO
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('sub_courts') AND name = 'peak_end_time')
+  ALTER TABLE sub_courts ADD peak_end_time TIME NULL;
+GO
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('sub_courts') AND name = 'peak_price_per_hour')
+  ALTER TABLE sub_courts ADD peak_price_per_hour DECIMAL(12,2) DEFAULT 0.00;
+GO
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('sub_courts') AND name = 'weekend_price_per_hour')
+  ALTER TABLE sub_courts ADD weekend_price_per_hour DECIMAL(12,2) DEFAULT 0.00;
+GO
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('sub_courts') AND name = 'min_booking_minutes')
+  ALTER TABLE sub_courts ADD min_booking_minutes INT DEFAULT 30;
+GO
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('sub_courts') AND name = 'slot_step_minutes')
+  ALTER TABLE sub_courts ADD slot_step_minutes INT DEFAULT 15;
 GO
 
 -- COURT SLOTS

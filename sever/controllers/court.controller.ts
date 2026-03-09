@@ -1,9 +1,29 @@
 import { sql, poolPromise } from '../config/db';
 
+// utility to normalize time strings for SQL TIME parameters
+// - convert empty/undefined to null
+// - append seconds if only hours:minutes provided
+const normalizeSqlTime = (t) => {
+    if (!t) return null;
+
+    let s = String(t)
+
+    if (/^\d{1,2}:\d{2}$/.test(s)) {
+        s = s + ':00'
+    }
+
+    // convert sang Date để mssql hiểu TIME
+    return new Date(`1970-01-01T${s}`)
+}
+
 // Create court (owner)
 export const createCourt = async (req, res) => {
     try {
-        const { name, address, description, image, number_of_small_court, latitude, longitude, price_per_hour, peak_start_time, peak_end_time, peak_price_per_hour, weekend_price_per_hour, min_booking_minutes, slot_step_minutes } = req.body;
+        const {
+            name, address, description, image, number_of_small_court, latitude, longitude,
+            price_per_hour, peak_start_time, peak_end_time, peak_price_per_hour,
+            weekend_price_per_hour, min_booking_minutes, slot_step_minutes
+        } = req.body;
         const pool = await poolPromise;
         const result = await pool.request()
             .input('owner_id', sql.Int, req.user.id)
@@ -14,11 +34,11 @@ export const createCourt = async (req, res) => {
             .input('number_of_small_court', sql.Decimal(12, 2), number_of_small_court)
             .input('latitude', sql.Decimal(10, 7), latitude || null)
             .input('longitude', sql.Decimal(10, 7), longitude || null)
-            .input('price_per_hour', sql.Decimal(12,2), price_per_hour || 0)
-            .input('peak_start_time', sql.Time, peak_start_time || null)
-            .input('peak_end_time', sql.Time, peak_end_time || null)
-            .input('peak_price_per_hour', sql.Decimal(12,2), peak_price_per_hour || 0)
-            .input('weekend_price_per_hour', sql.Decimal(12,2), weekend_price_per_hour || 0)
+            .input('price_per_hour', sql.Decimal(12, 2), price_per_hour || 0)
+            .input('peak_start_time', sql.Time, normalizeSqlTime(peak_start_time))
+            .input('peak_end_time', sql.Time, normalizeSqlTime(peak_end_time))
+            .input('peak_price_per_hour', sql.Decimal(12, 2), peak_price_per_hour || 0)
+            .input('weekend_price_per_hour', sql.Decimal(12, 2), weekend_price_per_hour || 0)
             .input('min_booking_minutes', sql.Int, min_booking_minutes || 30)
             .input('slot_step_minutes', sql.Int, slot_step_minutes || 15)
             .query(`INSERT INTO courts (owner_id, name, address, description, image, number_of_small_court, latitude, longitude, price_per_hour, peak_start_time, peak_end_time, peak_price_per_hour, weekend_price_per_hour, min_booking_minutes, slot_step_minutes)
@@ -75,7 +95,11 @@ export const getCourtById = async (req, res) => {
 // Update court (owner)
 export const updateCourt = async (req, res) => {
     try {
-        let { name, address, description, image, number_of_small_court, latitude, longitude, is_active, price_per_hour, peak_start_time, peak_end_time, peak_price_per_hour, weekend_price_per_hour, min_booking_minutes, slot_step_minutes } = req.body;
+        let {
+            name, address, description, image, number_of_small_court, latitude, longitude, is_active,
+            price_per_hour, peak_start_time, peak_end_time, peak_price_per_hour,
+            weekend_price_per_hour, min_booking_minutes, slot_step_minutes
+        } = req.body;
         const pool = await poolPromise;
         const court = await pool.request().input('id', sql.Int, req.params.id).query('SELECT owner_id FROM courts WHERE id = @id');
         if (court.recordset.length === 0) return res.status(404).json({ message: 'Không tìm thấy sân' });
@@ -100,6 +124,10 @@ export const updateCourt = async (req, res) => {
         min_booking_minutes = min_booking_minutes ?? curr.min_booking_minutes;
         slot_step_minutes = slot_step_minutes ?? curr.slot_step_minutes;
 
+        // sanitize empty string values so SQL driver doesn't reject them
+        peak_start_time = normalizeSqlTime(peak_start_time);
+        peak_end_time = normalizeSqlTime(peak_end_time);
+
         await pool.request()
             .input('name', sql.NVarChar, name)
             .input('address', sql.NVarChar, address)
@@ -109,11 +137,11 @@ export const updateCourt = async (req, res) => {
             .input('latitude', sql.Decimal(10, 7), latitude)
             .input('longitude', sql.Decimal(10, 7), longitude)
             .input('is_active', sql.Bit, is_active)
-            .input('price_per_hour', sql.Decimal(12,2), price_per_hour)
-            .input('peak_start_time', sql.Time, peak_start_time)
-            .input('peak_end_time', sql.Time, peak_end_time)
-            .input('peak_price_per_hour', sql.Decimal(12,2), peak_price_per_hour)
-            .input('weekend_price_per_hour', sql.Decimal(12,2), weekend_price_per_hour)
+            .input('price_per_hour', sql.Decimal(12, 2), price_per_hour)
+            .input('peak_start_time', sql.Time, normalizeSqlTime(peak_start_time))
+            .input('peak_end_time', sql.Time, normalizeSqlTime(peak_end_time))
+            .input('peak_price_per_hour', sql.Decimal(12, 2), peak_price_per_hour)
+            .input('weekend_price_per_hour', sql.Decimal(12, 2), weekend_price_per_hour)
             .input('min_booking_minutes', sql.Int, min_booking_minutes)
             .input('slot_step_minutes', sql.Int, slot_step_minutes)
             .input('id', sql.Int, req.params.id)
@@ -215,7 +243,11 @@ export const getSubCourtById = async (req, res) => {
 
 export const createSubCourt = async (req, res) => {
   try {
-    const { name, court_type, surface_type, status, price_per_hour } = req.body
+    const {
+      name, court_type, surface_type, status, price_per_hour,
+      peak_start_time, peak_end_time, peak_price_per_hour,
+      weekend_price_per_hour, min_booking_minutes, slot_step_minutes
+    } = req.body
     const courtId = Number(req.params.courtId)
 
     if (!name || !court_type || !surface_type) {
@@ -239,17 +271,23 @@ export const createSubCourt = async (req, res) => {
 
     const result = await pool.request()
       .input('court_id', sql.Int, courtId)
-      .input('name', sql.NVarChar, name)
-      .input('court_type', sql.VarChar, court_type)
-      .input('surface_type', sql.VarChar, surface_type)
-      .input('status', sql.VarChar, status || 'active')
-      .input('price_per_hour', sql.Decimal(12,2), price_per_hour || 0)
+.input('name', sql.NVarChar, name)
+.input('court_type', sql.NVarChar, court_type)
+.input('surface_type', sql.NVarChar, surface_type)
+.input('status', sql.NVarChar, status || 'active')
+.input('price_per_hour', sql.Decimal(12,2), price_per_hour || 0)
+.input('peak_start_time', sql.Time, normalizeSqlTime(peak_start_time))
+.input('peak_end_time', sql.Time, normalizeSqlTime(peak_end_time))
+.input('peak_price_per_hour', sql.Decimal(12,2), peak_price_per_hour || 0)
+.input('weekend_price_per_hour', sql.Decimal(12,2), weekend_price_per_hour || 0)
+.input('min_booking_minutes', sql.Int, min_booking_minutes || 30)
+.input('slot_step_minutes', sql.Int, slot_step_minutes || 15)
       .query(`
         INSERT INTO sub_courts
-          (court_id, name, court_type, surface_type, status, price_per_hour)
+          (court_id, name, court_type, surface_type, status, price_per_hour, peak_start_time, peak_end_time, peak_price_per_hour, weekend_price_per_hour, min_booking_minutes, slot_step_minutes)
         OUTPUT INSERTED.*
         VALUES
-          (@court_id, @name, @court_type, @surface_type, @status, @price_per_hour)
+          (@court_id, @name, @court_type, @surface_type, @status, @price_per_hour, @peak_start_time, @peak_end_time, @peak_price_per_hour, @weekend_price_per_hour, @min_booking_minutes, @slot_step_minutes)
       `)
 
     res.status(201).json(result.recordset[0])
@@ -261,7 +299,11 @@ export const createSubCourt = async (req, res) => {
 
 export const updateSubCourt = async (req, res) => {
   try {
-    const { name, court_type, surface_type, status } = req.body
+    const {
+      name, court_type, surface_type, status,
+      price_per_hour, peak_start_time, peak_end_time, peak_price_per_hour,
+      weekend_price_per_hour, min_booking_minutes, slot_step_minutes
+    } = req.body
     const pool = await poolPromise
 
     // xác định courtId từ params nếu có hoặc truy vấn từ sub_courts
@@ -301,6 +343,13 @@ export const updateSubCourt = async (req, res) => {
       .input('court_type', sql.VarChar, court_type)
       .input('surface_type', sql.VarChar, surface_type)
       .input('status', sql.VarChar, status)
+      .input('price_per_hour', sql.Decimal(12,2), price_per_hour)
+      .input('peak_start_time', sql.Time, normalizeSqlTime(peak_start_time))
+      .input('peak_end_time', sql.Time, normalizeSqlTime(peak_end_time))
+      .input('peak_price_per_hour', sql.Decimal(12,2), peak_price_per_hour)
+      .input('weekend_price_per_hour', sql.Decimal(12,2), weekend_price_per_hour)
+      .input('min_booking_minutes', sql.Int, min_booking_minutes)
+      .input('slot_step_minutes', sql.Int, slot_step_minutes)
       .query(`
         UPDATE sub_courts
         SET
@@ -308,6 +357,13 @@ export const updateSubCourt = async (req, res) => {
           court_type = @court_type,
           surface_type = @surface_type,
           status = @status,
+          price_per_hour = @price_per_hour,
+          peak_start_time = @peak_start_time,
+          peak_end_time = @peak_end_time,
+          peak_price_per_hour = @peak_price_per_hour,
+          weekend_price_per_hour = @weekend_price_per_hour,
+          min_booking_minutes = @min_booking_minutes,
+          slot_step_minutes = @slot_step_minutes,
           updated_at = GETDATE()
         OUTPUT INSERTED.*
         WHERE id = @id
@@ -335,6 +391,7 @@ export const updateSubCourtStatus = async (req, res) => {
     }
 
     const courtId = subCourtCheck.recordset[0].court_id
+
     if (courtIdParam && courtIdParam !== courtId) {
       return res.status(400).json({ message: 'Sân con không thuộc sân cha' })
     }

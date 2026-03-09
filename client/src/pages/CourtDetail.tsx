@@ -4,22 +4,24 @@ import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
 import styles from '../styles/Booking.module.css'
 
-const TIME_SLOTS = [
-    { id: 1, start: '06:00', end: '07:00', label: '06:00 - 07:00' },
-    { id: 2, start: '07:00', end: '8:00', label: '07:00 - 8:00' },
-    { id: 3, start: '8:00', end: '9:00', label: '8:00 - 9:00' },
-    { id: 4, start: '9:00', end: '10:00', label: '9:00 - 10:00' },
-    { id: 5, start: '10:00', end: '11:00', label: '10:00 - 11:00' },
-    { id: 6, start: '14:00', end: '15:00', label: '14:00 - 15:00' },
-    { id: 7, start: '15:00', end: '16:00', label: '15:00 - 16:00' },
-    { id: 8, start: '16:00', end: '17:00', label: '16:00 - 17:00' },
-    { id: 9, start: '17:00', end: '18:00', label: '17:00 - 18:00' },
-    { id: 10, start: '18:00', end: '19:00', label: '18:00 - 19:00' },
-    { id: 11, start: '19:00', end: '20:00', label: '19:00 - 20:00' },
-    { id: 12, start: '20:00', end: '21:00', label: '20:00 - 21:00' },
-    { id: 13, start: '21:00', end: '22:00', label: '21:00 - 22:00' },
-    { id: 14, start: '22:00', end: '23:00', label: '22:00 - 23:00' }
-]
+const makeSlots = (minM = 60, stepM = 60) => {
+    const slots = []
+    let start = 6 * 60 // 06:00
+    const end = 23 * 60 // 23:00
+    let id = 1
+    const toTime = m => {
+        const h = Math.floor(m / 60)
+        const mm = m % 60
+        return `${h.toString().padStart(2, '0')}:${mm.toString().padStart(2, '0')}`
+    }
+    while (start + minM <= end) {
+        const st = toTime(start)
+        const en = toTime(start + minM)
+        slots.push({ id: id++, start: st, end: en, label: `${st} - ${en}` })
+        start += stepM
+    }
+    return slots
+}
 
 
 
@@ -75,13 +77,40 @@ export default function CourtDetail() {
 
     const formatPrice = (p) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(p)
 
+    const toMinutes = t => {
+        const [h, m] = t.split(':').map(Number)
+        return h * 60 + m
+    }
+
     if (loading) return <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-secondary)' }}>⏳ Đang tải...</div>
     if (!court) return <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-secondary)' }}>Không tìm thấy sân</div>
 
+    // Use selected sub-court settings or defaults
+    const pricingConfig = selectedSubCourt || {
+        price_per_hour: 100000,
+        peak_start_time: null,
+        peak_end_time: null,
+        peak_price_per_hour: 0,
+        weekend_price_per_hour: 0,
+        min_booking_minutes: 60,
+        slot_step_minutes: 60
+    }
+
+    const TIME_SLOTS = makeSlots(pricingConfig.min_booking_minutes || 60, pricingConfig.slot_step_minutes || 60)
     const selectedSlotData = TIME_SLOTS.find(s => s.id === selectedSlot)
-    const hours = selectedSlotData ? parseInt(selectedSlotData.end) - parseInt(selectedSlotData.start) : 0
-    const pricePerHour = selectedSubCourt?.price_per_hour ?? court.price_per_hour
-    const totalPrice = pricePerHour * hours
+    const duration = selectedSlotData ? toMinutes(selectedSlotData.end) - toMinutes(selectedSlotData.start) : 0
+    
+    const pricePerHour = pricingConfig.price_per_hour
+    const unitPrice = (() => {
+        const d = new Date(selectedDate).getDay()
+        if ((d === 6 || d === 0) && pricingConfig.weekend_price_per_hour > 0) return pricingConfig.weekend_price_per_hour
+        if (pricingConfig.peak_start_time && pricingConfig.peak_end_time &&
+            selectedSlotData && selectedSlotData.start >= pricingConfig.peak_start_time &&
+            selectedSlotData.end <= pricingConfig.peak_end_time &&
+            pricingConfig.peak_price_per_hour > 0) return pricingConfig.peak_price_per_hour
+        return pricePerHour
+    })()
+    const totalPrice = (unitPrice / 60) * duration
 
 
     return (
@@ -215,7 +244,7 @@ export default function CourtDetail() {
                             {selectedSlot && (
                                 <div className={styles.bookingSummary}>
                                     <div className={styles.summaryRow}>
-                                        <span>Giá sân ({hours}h) {selectedSubCourt ? `- ${selectedSubCourt.name}` : ''}</span>
+                                        <span>Giá sân ({Math.round(duration)} phút) {selectedSubCourt ? `- ${selectedSubCourt.name}` : ''}</span>
                                         <span>{formatPrice(totalPrice)}</span>
                                     </div>
                                     
