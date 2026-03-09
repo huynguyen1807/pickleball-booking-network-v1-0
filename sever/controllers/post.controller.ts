@@ -29,8 +29,8 @@ export const createPost = async (req, res) => {
         const pool = await poolPromise;
         const result = await pool.request()
             .input('user_id', sql.Int, req.user.id)
-            .input('content', sql.NVarChar, content)
-            .input('image', sql.NVarChar, image || null)
+            .input('content', sql.NVarChar(sql.MAX), content)
+            .input('image', sql.NVarChar(sql.MAX), image || null)
             .input('post_type', sql.NVarChar, post_type || 'share')
             .query(`INSERT INTO posts (user_id, content, image, post_type) OUTPUT INSERTED.id VALUES (@user_id, @content, @image, @post_type)`);
         res.status(201).json({ message: 'Đã đăng bài', postId: result.recordset[0].id });

@@ -37,8 +37,41 @@ export default function Booking() {
         loadCourt()
     }, [id])
 
-    const hours = parseInt(endTime) - parseInt(startTime)
-    const courtPrice = court ? court.price_per_hour * hours : 0
+    const extractTimeH = (timeStr: string) => {
+        if (!timeStr) return null;
+        const match = timeStr.match(/\d{2}:\d{2}/);
+        if (!match) return null;
+        const [h, m] = match[0].split(':').map(Number);
+        return h + m / 60;
+    }
+
+    const startH = parseFloat(startTime.split(':')[0]) + parseFloat(startTime.split(':')[1] || '0') / 60
+    const endH = parseFloat(endTime.split(':')[0]) + parseFloat(endTime.split(':')[1] || '0') / 60
+
+    let regularHours = 0;
+    let peakHours = 0;
+    let courtPrice = 0;
+    let regularPrice = 0;
+    let peakPriceTotal = 0;
+
+    if (court) {
+        const peakStartH = extractTimeH(court.peak_start_time);
+        const peakEndH = extractTimeH(court.peak_end_time);
+
+        if (court.peak_price && peakStartH !== null && peakEndH !== null) {
+            const overlapStart = Math.max(startH, peakStartH);
+            const overlapEnd = Math.min(endH, peakEndH);
+            if (overlapStart < overlapEnd) {
+                peakHours = overlapEnd - overlapStart;
+            }
+        }
+
+        regularHours = (endH - startH) - peakHours;
+        regularPrice = regularHours * court.price_per_hour;
+        peakPriceTotal = peakHours * (court.peak_price || court.price_per_hour);
+        courtPrice = regularPrice + peakPriceTotal;
+    }
+
     const commission = courtPrice * 0.05
     const total = courtPrice + commission
 
@@ -62,7 +95,7 @@ export default function Booking() {
             setBookingResult(res.data)
             setStep(2)
         } catch (err) {
-            alert(err.response?.data?.message || 'Đặt sân thất bại')
+            alert(err.response?.data?.error || err.response?.data?.message || 'Đặt sân thất bại')
         } finally {
             setSubmitting(false)
         }
@@ -110,7 +143,12 @@ export default function Booking() {
                         <div className={styles.summaryRow}><span>Sân</span><span style={{ fontWeight: 600 }}>{court.name}</span></div>
                         <div className={styles.summaryRow}><span>Ngày</span><span>{formatDate(bookingDate)}</span></div>
                         <div className={styles.summaryRow}><span>Khung giờ</span><span>{startTime} - {endTime}</span></div>
-                        <div className={styles.summaryRow}><span>Giá sân ({hours}h)</span><span>{formatPrice(courtPrice)}</span></div>
+                        {regularHours > 0 && (
+                            <div className={styles.summaryRow}><span>Giá thường ({regularHours.toFixed(1)}h)</span><span>{formatPrice(regularPrice)}</span></div>
+                        )}
+                        {peakHours > 0 && (
+                            <div className={styles.summaryRow} style={{ color: 'var(--accent-orange)' }}><span>🔥 Giờ vàng ({peakHours.toFixed(1)}h)</span><span>{formatPrice(peakPriceTotal)}</span></div>
+                        )}
                         <div className={styles.summaryRow}><span>Phí dịch vụ (5%)</span><span>{formatPrice(commission)}</span></div>
                         <div className={`${styles.summaryRow} ${styles.summaryTotal}`}><span>Tổng cộng</span><span>{formatPrice(total)}</span></div>
                     </div>
@@ -126,8 +164,8 @@ export default function Booking() {
                         <h3 className={styles.sectionTitle}>💳 Thanh toán với PayOS</h3>
                         <div style={{ padding: '20px', background: '#f0f8ff', borderRadius: '8px', borderLeft: '4px solid #667eea', marginBottom: '20px' }}>
                             <p style={{ color: '#0c5460', margin: 0 }}>
-                                ✓ Quét QR code hoặc chuyển khoản trực tiếp<br/>
-                                ✓ Hỗ trợ 24/7 qua Napas (liên ngân hàng)<br/>
+                                ✓ Quét QR code hoặc chuyển khoản trực tiếp<br />
+                                ✓ Hỗ trợ 24/7 qua Napas (liên ngân hàng)<br />
                                 ✓ Thanh toán an toàn với mã xác thực
                             </p>
                         </div>

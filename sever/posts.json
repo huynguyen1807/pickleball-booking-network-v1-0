@@ -1,0 +1,56 @@
+[
+  {
+    "id": 20,
+    "user_id": 1,
+    "content": "Hello world",
+    "img_size": "228"
+  },
+  {
+    "id": 19,
+    "user_id": 4,
+    "content": "omg",
+    "img_size": "347566"
+  },
+  {
+    "id": 18,
+    "user_id": 4,
+    "content": "",
+    "img_size": "350142"
+  },
+  {
+    "id": 17,
+    "user_id": 4,
+    "content": "",
+    "img_size": "359326"
+  },
+  {
+    "id": 16,
+    "user_id": 4,
+    "content": "",
+    "img_size": "388022"
+  },
+  {
+    "id": 15,
+    "user_id": 4,
+    "content": "",
+    "img_size": "331782"
+  },
+  {
+    "id": 14,
+    "user_id": 4,
+    "content": "",
+    "img_size": "339574"
+  },
+  {
+    "id": 13,
+    "user_id": 1,
+    "content": "Test post",
+    "img_size": "6291500"
+  },
+  {
+    "id": 9,
+    "user_id": 1,
+    "content": "",
+    "img_size": "236"
+  }
+]
