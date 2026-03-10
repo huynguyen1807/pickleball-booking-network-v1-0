@@ -124,6 +124,21 @@
     justify-content: center;
 }
 
+.chatBadge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 6px;
+    background: var(--accent-red);
+    color: white;
+    font-size: 0.6rem;
+    font-weight: 700;
+    min-width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    padding: 0 4px;
+}
+
 .profileBtn {
     display: flex;
     align-items: center;

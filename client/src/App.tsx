@@ -23,6 +23,7 @@ import OwnerCreateFacility from './pages/OwnerCreateFacility'
 import OwnerCreateCourt from './pages/OwnerCreateCourt'
 import AdminDashboard from './pages/AdminDashboard'
 import PostPhoto from './pages/PostPhoto'
+import UserProfile from './pages/UserProfile'
 
 export default function App() {
     const { user } = useAuth()
@@ -62,6 +63,9 @@ export default function App() {
                 } />
                 <Route path="/chat" element={
                     <ProtectedRoute><Chat /></ProtectedRoute>
+                } />
+                <Route path="/profile/:id" element={
+                    <ProtectedRoute><UserProfile /></ProtectedRoute>
                 } />
                 <Route path="/settings" element={
                     <ProtectedRoute><Settings /></ProtectedRoute>
