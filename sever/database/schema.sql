@@ -48,7 +48,17 @@ CREATE TABLE facilities (
   name NVARCHAR(200) NOT NULL,
   address NVARCHAR(500) NOT NULL,
   description NVARCHAR(MAX),
-  image NVARCHAR(500),
+
+  phone NVARCHAR(20),
+  open_time VARCHAR(10),
+  close_time VARCHAR(10),
+
+  avatar NVARCHAR(500),
+  cover_image NVARCHAR(500),
+
+  gallery NVARCHAR(MAX),     -- JSON list ảnh
+  amenities NVARCHAR(MAX),   -- JSON list tiện ích
+
   is_active BIT DEFAULT 1,
   created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
 );
@@ -58,12 +68,30 @@ GO
 IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='courts' AND xtype='U')
 CREATE TABLE courts (
   id INT IDENTITY(1,1) PRIMARY KEY,
-  facility_id INT NOT NULL FOREIGN KEY REFERENCES facilities(id) ON DELETE CASCADE,
+
+  facility_id INT NOT NULL
+  FOREIGN KEY REFERENCES facilities(id) ON DELETE CASCADE,
+
   name NVARCHAR(200) NOT NULL,
   image NVARCHAR(500),
+
   price_per_hour DECIMAL(12,2) NOT NULL,
+
   latitude DECIMAL(10,7),
   longitude DECIMAL(10,7),
+
+  court_type NVARCHAR(50),      -- indoor / outdoor
+  surface_type NVARCHAR(50),    -- hard / grass / synthetic
+  status NVARCHAR(20),          -- active / maintenance
+
+  peak_start_time VARCHAR(10),
+  peak_end_time VARCHAR(10),
+  peak_price DECIMAL(12,2),
+
+  weekend_price DECIMAL(12,2),
+
+  slot_step_minutes INT DEFAULT 60,
+
   is_active BIT DEFAULT 1,
   created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
 );

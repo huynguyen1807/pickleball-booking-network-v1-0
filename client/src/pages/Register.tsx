@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import api from '../api/axios'
 import styles from '../styles/Register.module.css'
 
+
 export default function Register() {
     const navigate = useNavigate()
     const [form, setForm] = useState({

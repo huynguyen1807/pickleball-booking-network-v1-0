@@ -129,7 +129,7 @@ export default function OwnerCreateFacility() {
                     </label>
                 </div>
 
-                <h3 className={styles.sectionTitle}>3. Hình ảnh (Tùy chọn)</h3>
+                {/* <h3 className={styles.sectionTitle}>3. Hình ảnh (Tùy chọn)</h3>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '30px' }}>
                     <div className="input-group">
                         <label>Link Ảnh Đại Diện (Logo)</label>
@@ -139,7 +139,7 @@ export default function OwnerCreateFacility() {
                         <label>Link Ảnh Bìa (Cover)</label>
                         <input name="cover_image" className="input-field" placeholder="https://..." value={form.cover_image} onChange={handleChange} />
                     </div>
-                </div>
+                </div> */}
 
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '15px' }}>
                     <button type="button" className="btn btn-secondary" onClick={() => navigate('/owner/courts')}>Hủy</button>
