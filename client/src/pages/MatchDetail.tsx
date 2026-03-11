@@ -56,7 +56,6 @@ export default function MatchDetail() {
     if (!match) return <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-secondary)' }}>Không tìm thấy trận</div>
 
     const costPerPerson = Math.round(match.total_cost / match.max_players)
-    const commission = Math.round(costPerPerson * 0.05)
     const statusLabels = { waiting: 'Đang chờ ghép', confirmed: 'Đã xác nhận', completed: 'Hoàn thành', cancelled: 'Đã hủy' }
 
     const isPlayer = match.players?.some(p => p.user_id === user?.id && p.status === 'joined')
@@ -135,13 +134,9 @@ export default function MatchDetail() {
                             <span>Chia đều ({match.max_players} người)</span>
                             <span>{costPerPerson.toLocaleString('vi-VN')}đ/người</span>
                         </div>
-                        <div className={styles.costRow}>
-                            <span>Phí dịch vụ (5%)</span>
-                            <span>{commission.toLocaleString('vi-VN')}đ/người</span>
-                        </div>
                         <div className={`${styles.costRow} ${styles.costTotal}`}>
                             <span>Mỗi người thanh toán</span>
-                            <span>{(costPerPerson + commission).toLocaleString('vi-VN')}đ</span>
+                            <span>{costPerPerson.toLocaleString('vi-VN')}đ</span>
                         </div>
                     </div>
 

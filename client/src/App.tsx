@@ -23,6 +23,7 @@ import OwnerCreateFacility from './pages/OwnerCreateFacility'
 import OwnerCreateCourt from './pages/OwnerCreateCourt'
 import AdminDashboard from './pages/AdminDashboard'
 import PostPhoto from './pages/PostPhoto'
+import PaymentCancel from './pages/PaymentCancel'
 
 export default function App() {
     const { user } = useAuth()
@@ -88,6 +89,9 @@ export default function App() {
                 <Route path="/admin" element={
                     <ProtectedRoute roles={['admin']}><AdminDashboard /></ProtectedRoute>
                 } />
+
+                {/* Payment result pages */}
+                <Route path="/payment/cancel" element={<PaymentCancel />} />
 
                 {/* Fallback */}
                 <Route path="*" element={<Navigate to="/" />} />
