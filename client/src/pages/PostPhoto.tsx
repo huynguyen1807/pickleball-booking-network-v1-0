@@ -71,7 +71,7 @@ export default function PostPhoto() {
 
     // ESC to go home
     useEffect(() => {
-        const h = (e: KeyboardEvent) => { if (e.key === 'Escape') navigate('/') }
+        const h = (e: KeyboardEvent) => { if (e.key === 'Escape') navigate(-1 as any) }
         document.addEventListener('keydown', h)
         document.body.style.overflow = 'hidden'
         return () => { document.removeEventListener('keydown', h); document.body.style.overflow = '' }
@@ -148,7 +148,7 @@ export default function PostPhoto() {
             <p style={{ color: '#b0b3b8', marginBottom: 20 }}>
                 {notFound ? 'Không tìm thấy bài viết này.' : 'Bài viết này không có ảnh.'}
             </p>
-            <button className={styles.backBtn} onClick={() => navigate('/')}>← Về trang chủ</button>
+            <button className={styles.backBtn} onClick={() => navigate(-1 as any)}>← Về trang chủ</button>
         </div>
     )
 
@@ -157,7 +157,7 @@ export default function PostPhoto() {
             {/* Close / Back to Home button */}
             <button
                 className={styles.closeBtn}
-                onClick={() => navigate('/')}
+                onClick={() => navigate(-1 as any)}
                 title="Về trang chủ (ESC)"
             >
                 ✕
@@ -180,8 +180,8 @@ export default function PostPhoto() {
             {/* Right: Panel */}
             <div className={styles.panel}>
                 <div className={styles.panelHeader}>
-                    <div className={styles.logo} onClick={() => navigate('/')}>🏓 PickleBall</div>
-                    <button className={styles.viewPostBtn} onClick={() => navigate('/')}
+                    <div className={styles.logo} onClick={() => navigate(-1 as any)}>🏓 PickleBall</div>
+                    <button className={styles.viewPostBtn} onClick={() => navigate(-1 as any)}
                         title="Quay về trang chủ">
                         ← Trang chủ
                     </button>

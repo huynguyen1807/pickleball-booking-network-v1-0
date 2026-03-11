@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import Navbar from './components/Navbar'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -26,16 +26,20 @@ import PostPhoto from './pages/PostPhoto'
 
 export default function App() {
     const { user } = useAuth()
+    const location = useLocation()
+
+    // If navigated from PostCard (has background state), render the background page + modal overlay
+    const background = (location.state as any)?.background
 
     return (
         <>
             {user && <Navbar />}
-            <Routes>
+            <Routes location={background || location}>
                 {/* Public */}
                 <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
                 <Route path="/register" element={user ? <Navigate to="/" /> : <Register />} />
                 <Route path="/forgot-password" element={user ? <Navigate to="/" /> : <ForgotPassword />} />
-                {/* Photo permalink — accessible without login */}
+                {/* Photo permalink — accessible without login (when opened directly, no background) */}
                 <Route path="/post/:id/photo" element={<PostPhoto />} />
 
                 {/* Protected - All authenticated users */}
@@ -92,6 +96,13 @@ export default function App() {
                 {/* Fallback */}
                 <Route path="*" element={<Navigate to="/" />} />
             </Routes>
+
+            {/* Modal overlay: only rendered when navigated FROM the feed (has background state) */}
+            {background && (
+                <Routes>
+                    <Route path="/post/:id/photo" element={<PostPhoto />} />
+                </Routes>
+            )}
         </>
     )
 }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, FormEvent } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import api from '../api/axios'
 import { io as socketIO } from 'socket.io-client'
 import styles from '../styles/Cards.module.css'
@@ -18,6 +18,7 @@ interface PostCardProps {
 export default function PostCard({ post, isHidden = false, onDeleted, onHide }: PostCardProps) {
     const { user } = useAuth()
     const navigate = useNavigate()
+    const location = useLocation()
     // normalize post object: prefer `user_name`, fallback to `full_name`
     const normalizedPost = post ? { ...post, user_name: post.user_name || post.full_name } : null
     const data = normalizedPost || {
@@ -249,7 +250,7 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
             {data.image && (
                 <>
                     <button
-                        onClick={() => navigate(`/post/${data.id}/photo`)}
+                        onClick={() => navigate(`/post/${data.id}/photo`, { state: { background: location } })}
                         style={{ display: 'block', width: '100%', padding: 0, border: 'none', background: 'none', cursor: 'zoom-in' }}
                         title="Click để xem ảnh phóng to"
                     >
