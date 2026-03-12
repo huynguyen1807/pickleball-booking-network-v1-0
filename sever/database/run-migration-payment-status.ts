@@ -20,15 +20,10 @@ async function runMigration() {
         const schema = fs.readFileSync(migratePath, 'utf8');
         const batches = schema.split(/\bGO\b/i)
             .map(b => b.trim())
-            .filter(b => b.length > 0)
-            .filter(b => !b.startsWith('--'));
+            .filter(b => b.length > 0);
 
         for (const batch of batches) {
-            try {
-                await pool.request().query(batch);
-            } catch (err: any) {
-                console.warn('⚠️  Warning:', err.message.substring(0, 150));
-            }
+            await pool.request().query(batch);
         }
 
         console.log('\n🎉 Migration 03 completed successfully!');

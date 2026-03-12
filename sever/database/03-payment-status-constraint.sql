@@ -48,7 +48,7 @@ DECLARE @constraintName NVARCHAR(200);
 SELECT @constraintName = name
 FROM sys.check_constraints
 WHERE parent_object_id = OBJECT_ID('payments')
-  AND definition LIKE '%status%';
+    AND parent_column_id = COLUMNPROPERTY(OBJECT_ID('payments'), 'status', 'ColumnId');
 
 IF @constraintName IS NOT NULL
 BEGIN
