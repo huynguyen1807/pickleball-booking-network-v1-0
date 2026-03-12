@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom'
+import UserProfileCard from './UserProfileCard'
 import styles from '../styles/Cards.module.css'
 
 export default function MatchCard({ match }) {
@@ -33,9 +34,17 @@ export default function MatchCard({ match }) {
         <div className={styles.matchCard} onClick={() => navigate(`/matches/${data.id}`)}>
             <div className={styles.matchHeader}>
                 <div className={styles.matchCreator}>
-                    <div className="avatar avatar-sm">
-                        {data.creator_name?.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                    </div>
+                    {data.creator_id ? (
+                        <UserProfileCard userId={data.creator_id}>
+                            <div className="avatar avatar-sm" style={{ cursor: 'pointer' }}>
+                                {data.creator_name?.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                            </div>
+                        </UserProfileCard>
+                    ) : (
+                        <div className="avatar avatar-sm">
+                            {data.creator_name?.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                        </div>
+                    )}
                     <span>{data.creator_name}</span>
                 </div>
                 <span className={`badge badge-${statusInfo.class}`}>{statusInfo.text}</span>

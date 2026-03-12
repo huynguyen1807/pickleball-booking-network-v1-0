@@ -64,6 +64,9 @@ export default function App() {
                 <Route path="/chat" element={
                     <ProtectedRoute><Chat /></ProtectedRoute>
                 } />
+                <Route path="/profile/:id" element={
+                    <ProtectedRoute><UserProfile /></ProtectedRoute>
+                } />
                 <Route path="/settings" element={
                     <ProtectedRoute><Settings /></ProtectedRoute>
                 } />

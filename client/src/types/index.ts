@@ -3,11 +3,13 @@ export interface User {
   email: string;
   full_name: string;
   phone?: string;
+  avatar?: string;
   role: 'user' | 'owner' | 'admin';
   skill_level?: string;
   status: 'active' | 'inactive' | 'pending';
   latitude?: number;
   longitude?: number;
+  created_at?: string;
 }
 
 export interface Court {
@@ -67,4 +69,6 @@ export interface ChatMessage {
   content: string;
   created_at: string;
   full_name?: string;
+  avatar?: string;
+  is_read?: boolean;
 }
