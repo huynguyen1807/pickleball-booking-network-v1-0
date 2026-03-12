@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import api from '../api/axios'
 import { io as socketIO } from 'socket.io-client'
+import UserProfileCard from './UserProfileCard'
 import styles from '../styles/Cards.module.css'
 
 type PostType = any
@@ -233,7 +234,13 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
             </div>
 
             <div className={styles.postHeader}>
-                <div className="avatar">{getInitials(data.user_name)}</div>
+                {data.user_id ? (
+                    <UserProfileCard userId={data.user_id}>
+                        <div className="avatar" style={{ cursor: 'pointer' }}>{getInitials(data.user_name)}</div>
+                    </UserProfileCard>
+                ) : (
+                    <div className="avatar">{getInitials(data.user_name)}</div>
+                )}
                 <div className={styles.postMeta}>
                     <div className={styles.postAuthor}>
                         {data.user_name}
@@ -337,7 +344,13 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
                                 const commenterName = c.user_name || c.full_name || 'Người dùng'
                                 return (
                                     <div key={c.id} className={styles.commentItem}>
-                                        <div className={`avatar avatar-sm ${styles.commentAvatar}`}>{getInitials(commenterName)}</div>
+                                        {c.user_id ? (
+                                            <UserProfileCard userId={c.user_id}>
+                                                <div className={`avatar avatar-sm ${styles.commentAvatar}`} style={{ cursor: 'pointer' }}>{getInitials(commenterName)}</div>
+                                            </UserProfileCard>
+                                        ) : (
+                                            <div className={`avatar avatar-sm ${styles.commentAvatar}`}>{getInitials(commenterName)}</div>
+                                        )}
                                         <div className={styles.commentBubble}>
                                             <span className={styles.commentUser}>{commenterName}</span>
                                             <span className={styles.commentText}>{c.content}</span>

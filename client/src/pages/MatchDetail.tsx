@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
+import UserProfileCard from '../components/UserProfileCard'
 import styles from '../styles/Matchmaking.module.css'
 
 export default function MatchDetail() {
@@ -104,7 +105,9 @@ export default function MatchDetail() {
                     <div className={styles.playersList}>
                         {match.players?.filter(p => p.status === 'joined').map((p, i) => (
                             <div key={i} className={styles.playerItem}>
-                                <div className="avatar avatar-sm">{p.full_name?.charAt(0) || '?'}</div>
+                                <UserProfileCard userId={p.user_id}>
+                                    <div className="avatar avatar-sm" style={{ cursor: 'pointer' }}>{p.full_name?.charAt(0) || '?'}</div>
+                                </UserProfileCard>
                                 <div className={styles.playerInfo}>
                                     <div className={styles.playerName}>{p.full_name}</div>
                                     <div className={styles.playerStatus} style={{ color: 'var(--text-muted)' }}>
