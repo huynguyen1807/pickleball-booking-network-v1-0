@@ -24,7 +24,10 @@ import OwnerCreateCourt from './pages/OwnerCreateCourt'
 import AdminDashboard from './pages/AdminDashboard'
 import PostPhoto from './pages/PostPhoto'
 import PaymentCancel from './pages/PaymentCancel'
+<<<<<<< HEAD
 import UserProfile from './pages/UserProfile'
+=======
+>>>>>>> 36bb8851df66c32c27e302eae63a7e57995268bc
 
 export default function App() {
     const { user } = useAuth()
