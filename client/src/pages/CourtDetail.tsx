@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
+import UserProfileCard from '../components/UserProfileCard'
 import styles from '../styles/Booking.module.css'
 
 
@@ -211,7 +212,13 @@ export default function CourtDetail() {
                             {court.reviews && court.reviews.length > 0 ? court.reviews.map((r, i) => (
                                 <div key={i} className={styles.review}>
                                     <div className={styles.reviewHeader}>
-                                        <div className="avatar avatar-sm">{r.full_name?.charAt(0) || '?'}</div>
+                                        {r.user_id ? (
+                                            <UserProfileCard userId={r.user_id}>
+                                                <div className="avatar avatar-sm" style={{ cursor: 'pointer' }}>{r.full_name?.charAt(0) || '?'}</div>
+                                            </UserProfileCard>
+                                        ) : (
+                                            <div className="avatar avatar-sm">{r.full_name?.charAt(0) || '?'}</div>
+                                        )}
                                         <div>
                                             <div className={styles.reviewUser}>{r.full_name}</div>
                                             <div className={styles.reviewDate}>{new Date(r.created_at).toLocaleDateString('vi-VN')}</div>
@@ -314,7 +321,13 @@ export default function CourtDetail() {
 
                             {/* Owner info */}
                             <div className={styles.ownerInfo}>
-                                <div className="avatar avatar-sm">{court.owner_name?.charAt(0) || '?'}</div>
+                                {court.owner_id ? (
+                                    <UserProfileCard userId={court.owner_id}>
+                                        <div className="avatar avatar-sm" style={{ cursor: 'pointer' }}>{court.owner_name?.charAt(0) || '?'}</div>
+                                    </UserProfileCard>
+                                ) : (
+                                    <div className="avatar avatar-sm">{court.owner_name?.charAt(0) || '?'}</div>
+                                )}
                                 <div>
                                     <div style={{ fontWeight: 600, fontSize: '0.875rem' }}>{court.owner_name}</div>
                                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Chủ sân</div>

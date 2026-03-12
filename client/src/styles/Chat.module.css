@@ -28,6 +28,46 @@
     margin-bottom: 12px;
 }
 
+.chatFilters {
+    display: flex;
+    gap: 6px;
+}
+
+.filterBtn {
+    padding: 5px 12px;
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-full);
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.filterBtn:hover {
+    background: var(--bg-glass-hover);
+    color: var(--text-primary);
+}
+
+.filterBtn.filterActive {
+    background: var(--accent-green-dim);
+    color: var(--accent-green);
+    border-color: rgba(0, 230, 118, 0.3);
+}
+
+.dmBadge {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 6px;
+    background: var(--accent-blue-dim);
+    color: var(--accent-blue);
+    font-size: 0.6rem;
+    font-weight: 700;
+    border-radius: var(--radius-full);
+    vertical-align: middle;
+}
+
 .chatSearch {
     width: 100%;
     padding: 10px 14px;
