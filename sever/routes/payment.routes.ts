@@ -8,7 +8,9 @@ import {
     payosReturn,
     payosCheckStatus,
     payosGetInfo,
-    payosCancelPayment
+    payosCancelPayment,
+    payosCancelReturn,
+    payosCancelByOrderCode
 } from '../controllers/payment.controller';
 
 const router = Router();
@@ -56,6 +58,19 @@ router.get('/payos-info/:paymentLinkId', auth, payosGetInfo);
  * POST /api/payments/payos-cancel/:paymentLinkId
  */
 router.post('/payos-cancel/:paymentLinkId', auth, payosCancelPayment);
+
+/**
+ * PayOS Cancel Redirect Handler (no auth - called by PayOS redirect)
+ * GET /api/payments/payos-cancel-return?orderCode=...
+ * Updates payment/booking to cancelled, then redirects to frontend
+ */
+router.get('/payos-cancel-return', payosCancelReturn);
+
+/**
+ * Cancel by OrderCode (JSON - called by frontend when 15-min timer expires)
+ * PATCH /api/payments/cancel-by-order?orderCode=...
+ */
+router.patch('/cancel-by-order', payosCancelByOrderCode);
 
 export default router;
 

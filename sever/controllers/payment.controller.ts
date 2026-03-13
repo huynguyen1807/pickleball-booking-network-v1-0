@@ -12,7 +12,7 @@ const PAYOS_API_KEY = process.env.PAYOS_API_KEY || '';
 const PAYOS_CHECKSUM_KEY = process.env.PAYOS_CHECKSUM_KEY || '';
 const PAYOS_API_URL = process.env.PAYOS_API_URL || 'https://api-merchant.payos.vn';
 const PAYOS_RETURN_URL = process.env.PAYOS_RETURN_URL || 'http://localhost:5173/payment/result';
-const PAYOS_CANCEL_URL = process.env.PAYOS_CANCEL_URL || 'http://localhost:5173/payment/cancel';
+const PAYOS_CANCEL_URL = process.env.PAYOS_CANCEL_URL || 'http://localhost:5000/api/payments/payos-cancel-return';
 const PAYOS_WEBHOOK_URL = process.env.PAYOS_WEBHOOK_URL || 'http://localhost:3000/api/payments/payos-webhook';
 
 // ===== Helper Functions =====
@@ -502,6 +502,134 @@ export const payosCancelPayment = async (req: any, res: any) => {
         }, 'Đã hủy thanh toán');
     } catch (err: any) {
         return serverError(res, 'Lỗi server', err);
+    }
+};
+
+/**
+ * 7️⃣ Handle PayOS Cancel Redirect
+ * Route: GET /api/payments/payos-cancel-return?orderCode=xxx
+ *
+ * PayOS redirect user về đây khi hủy thanh toán.
+ * Cập nhật status thành cancelled rồi redirect về frontend.
+ */
+export const payosCancelReturn = async (req: any, res: any) => {
+    const { orderCode } = req.query;
+    const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+    try {
+        if (orderCode) {
+            const pool = await poolPromise;
+            const transactionPattern = `payos_${orderCode}_%`;
+
+            // Tìm và cập nhật payment + booking thành cancelled
+            const payment = await pool.request()
+                .input('transaction_pattern', sql.NVarChar, transactionPattern)
+                .query(`
+                    SELECT id, booking_id FROM payments
+                    WHERE transaction_id LIKE @transaction_pattern AND status = 'pending'
+                `);
+
+            if (payment.recordset.length > 0) {
+                const { id: paymentId, booking_id: bookingId } = payment.recordset[0];
+
+                await updatePaymentStatus(paymentId, 'cancelled');
+
+                if (bookingId) {
+                    await pool.request()
+                        .input('id', sql.Int, bookingId)
+                        .query(`UPDATE bookings SET status = 'cancelled' WHERE id = @id AND status = 'pending'`);
+                }
+
+                console.log(`PayOS Cancel Return: Payment ${orderCode} cancelled`);
+            }
+        }
+    } catch (err: any) {
+        console.error('PayOS Cancel Return Error:', err.message);
+    }
+
+    // Redirect về frontend dù có lỗi hay không
+    res.redirect(`${FRONTEND_URL}/payment/cancel?orderCode=${orderCode || ''}`);
+};
+
+/**
+ * 8️⃣ Cancel Payment by OrderCode (JSON response — called from frontend when timer expires)
+ * Route: PATCH /api/payments/cancel-by-order?orderCode=xxx
+ */
+export const payosCancelByOrderCode = async (req: any, res: any) => {
+    try {
+        const { orderCode, newStatus } = req.query;
+        if (!orderCode) return errorResponse(res, 'Thiếu orderCode');
+
+        // Only allow safe status values from this endpoint
+        const allowedStatuses = ['cancelled', 'expired'];
+        const targetStatus: string = allowedStatuses.includes(newStatus as string)
+            ? (newStatus as string)
+            : 'cancelled';
+
+        const pool = await poolPromise;
+        const transactionPattern = `payos_${orderCode}_%`;
+
+        const payment = await pool.request()
+            .input('pattern', sql.NVarChar, transactionPattern)
+            .query(`SELECT id, booking_id, status FROM payments WHERE transaction_id LIKE @pattern`);
+
+        if (payment.recordset.length === 0) {
+            return errorResponse(res, 'Không tìm thấy giao dịch');
+        }
+
+        const record = payment.recordset[0];
+        if (record.status !== 'pending') {
+            return successResponse(res, { status: record.status }, 'Giao dịch đã được xử lý');
+        }
+
+        await updatePaymentStatus(record.id, targetStatus);
+
+        // Booking always goes to 'cancelled' regardless of payment expiry/cancel
+        if (record.booking_id) {
+            await pool.request()
+                .input('id', sql.Int, record.booking_id)
+                .query(`UPDATE bookings SET status = 'cancelled' WHERE id = @id AND status = 'pending'`);
+        }
+
+        return successResponse(res, { status: targetStatus }, `Đã cập nhật giao dịch: ${targetStatus}`);
+    } catch (err: any) {
+        return serverError(res, 'Lỗi server', err);
+    }
+};
+
+/**
+ * Auto-cancel expired payments (called by scheduled job in index.ts)
+ * Cancels pending PayOS payments older than 15 minutes
+ */
+export const cancelExpiredPayments = async (): Promise<void> => {
+    try {
+        const pool = await poolPromise;
+
+        // Cancel associated bookings first (while join is still valid)
+        await pool.request().query(`
+            UPDATE b SET b.status = 'cancelled'
+            FROM bookings b
+            INNER JOIN payments p ON p.booking_id = b.id
+            WHERE p.status = 'pending'
+              AND p.transaction_id LIKE 'payos_%'
+              AND p.created_at < DATEADD(MINUTE, -15, GETDATE())
+              AND b.status = 'pending'
+        `);
+
+        // Mark expired payments as expired (not cancelled — user didn't cancel)
+        const result = await pool.request().query(`
+            UPDATE payments SET status = 'expired'
+            WHERE status = 'pending'
+              AND transaction_id LIKE 'payos_%'
+              AND created_at < DATEADD(MINUTE, -15, GETDATE())
+        `);
+
+        const count = result.rowsAffected[0];
+        if (count > 0) {
+            console.log(`[Auto-expire] Đã hết hạn ${count} giao dịch`);
+        }
+    } catch (err: any) {
+        console.error('[Auto-expire] Lỗi:', err.message);
     }
 };
 

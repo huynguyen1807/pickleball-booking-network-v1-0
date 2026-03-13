@@ -162,8 +162,6 @@ export default function CourtDetail() {
         totalPrice = regularPrice + peakPriceTotal;
     }
 
-    const commission = totalPrice * 0.05
-
     return (
         <div className={styles.detailPage}>
             <div className={styles.detailContainer}>
@@ -302,13 +300,9 @@ export default function CourtDetail() {
                                             <span>{formatPrice(peakPriceTotal)}</span>
                                         </div>
                                     )}
-                                    <div className={styles.summaryRow}>
-                                        <span>Phí dịch vụ (5%)</span>
-                                        <span>{formatPrice(commission)}</span>
-                                    </div>
                                     <div className={`${styles.summaryRow} ${styles.summaryTotal}`}>
                                         <span>Tổng cộng</span>
-                                        <span>{formatPrice(totalPrice + commission)}</span>
+                                        <span>{formatPrice(totalPrice)}</span>
                                     </div>
                                 </div>
                             )}
