@@ -1,51 +1,36 @@
 import { sql, poolPromise } from '../config/db';
 
-// utility to normalize time strings for SQL TIME parameters
-// - convert empty/undefined to null
-// - append seconds if only hours:minutes provided
-const normalizeSqlTime = (t) => {
-    if (!t) return null;
-
-    let s = String(t)
-
-    if (/^\d{1,2}:\d{2}$/.test(s)) {
-        s = s + ':00'
-    }
-
-    // convert sang Date để mssql hiểu TIME
-    return new Date(`1970-01-01T${s}`)
-}
-
 // Create court (owner)
 export const createCourt = async (req, res) => {
     try {
-        const {
-            name, address, description, image, number_of_small_court, latitude, longitude,
-            price_per_hour, peak_start_time, peak_end_time, peak_price_per_hour,
-            weekend_price_per_hour, min_booking_minutes, slot_step_minutes
-        } = req.body;
+        const { facility_id, name, image, price_per_hour, latitude, longitude, court_type, surface_type, status, peak_start_time, peak_end_time, peak_price, weekend_price, slot_step_minutes } = req.body;
         const pool = await poolPromise;
+
+        const facility = await pool.request().input('id', sql.Int, facility_id).query('SELECT owner_id FROM facilities WHERE id = @id');
+        if (facility.recordset.length === 0) return res.status(404).json({ message: 'Không tìm thấy cơ sở' });
+        if (facility.recordset[0].owner_id !== req.user.id) return res.status(403).json({ message: 'Không có quyền' });
+
         const result = await pool.request()
-            .input('owner_id', sql.Int, req.user.id)
+            .input('facility_id', sql.Int, facility_id)
             .input('name', sql.NVarChar, name)
-            .input('address', sql.NVarChar, address)
-            .input('description', sql.NVarChar, description)
-            .input('image', sql.NVarChar, image)
-            .input('number_of_small_court', sql.Decimal(12, 2), number_of_small_court)
+            .input('image', sql.NVarChar, image || null)
+            .input('price_per_hour', sql.Decimal(12, 2), price_per_hour)
             .input('latitude', sql.Decimal(10, 7), latitude || null)
             .input('longitude', sql.Decimal(10, 7), longitude || null)
-            .input('price_per_hour', sql.Decimal(12, 2), price_per_hour || 0)
-            .input('peak_start_time', sql.Time, normalizeSqlTime(peak_start_time))
-            .input('peak_end_time', sql.Time, normalizeSqlTime(peak_end_time))
-            .input('peak_price_per_hour', sql.Decimal(12, 2), peak_price_per_hour || 0)
-            .input('weekend_price_per_hour', sql.Decimal(12, 2), weekend_price_per_hour || 0)
-            .input('min_booking_minutes', sql.Int, min_booking_minutes || 30)
-            .input('slot_step_minutes', sql.Int, slot_step_minutes || 15)
-            .query(`INSERT INTO courts (owner_id, name, address, description, image, number_of_small_court, latitude, longitude, price_per_hour, peak_start_time, peak_end_time, peak_price_per_hour, weekend_price_per_hour, min_booking_minutes, slot_step_minutes)
+            .input('court_type', sql.NVarChar, court_type || 'outdoor')
+            .input('surface_type', sql.NVarChar, surface_type || 'hard')
+            .input('status', sql.NVarChar, status || 'active')
+            .input('peak_start_time', sql.VarChar, peak_start_time || null)
+            .input('peak_end_time', sql.VarChar, peak_end_time || null)
+            .input('peak_price', sql.Decimal(12, 2), peak_price || null)
+            .input('weekend_price', sql.Decimal(12, 2), weekend_price || null)
+            .input('slot_step_minutes', sql.Int, slot_step_minutes || 30)
+            .query(`INSERT INTO courts (facility_id, name, image, price_per_hour, latitude, longitude, court_type, surface_type, status, peak_start_time, peak_end_time, peak_price, weekend_price, slot_step_minutes)
               OUTPUT INSERTED.id
-              VALUES (@owner_id, @name, @address, @description, @image, @number_of_small_court, @latitude, @longitude, @price_per_hour, @peak_start_time, @peak_end_time, @peak_price_per_hour, @weekend_price_per_hour, @min_booking_minutes, @slot_step_minutes)`);
+              VALUES (@facility_id, @name, @image, @price_per_hour, @latitude, @longitude, @court_type, @surface_type, @status, @peak_start_time, @peak_end_time, @peak_price, @weekend_price, @slot_step_minutes)`);
         res.status(201).json({ message: 'Đã thêm sân', courtId: result.recordset[0].id });
     } catch (err) {
+        console.error("Court creation error:", err);
         res.status(500).json({ message: 'Lỗi server' });
     }
 };
@@ -55,11 +40,12 @@ export const getAllCourts = async (req, res) => {
     try {
         const pool = await poolPromise;
         const result = await pool.request().query(`
-      SELECT c.*, u.full_name AS owner_name,
+      SELECT c.*, f.name AS facility_name, f.owner_id, u.full_name AS owner_name,
         (SELECT AVG(CAST(rating AS FLOAT)) FROM reviews WHERE court_id = c.id) AS avg_rating,
-        (SELECT COUNT(*) FROM bookings WHERE court_id = c.id) AS booking_count,
-        (SELECT COUNT(*) FROM sub_courts WHERE court_id = c.id) AS sub_courts_count
-      FROM courts c JOIN users u ON c.owner_id = u.id
+        (SELECT COUNT(*) FROM bookings WHERE court_id = c.id) AS booking_count
+      FROM courts c 
+      JOIN facilities f ON c.facility_id = f.id
+      JOIN users u ON f.owner_id = u.id
       WHERE c.is_active = 1 ORDER BY c.created_at DESC
     `);
         res.json(result.recordset);
@@ -75,10 +61,13 @@ export const getCourtById = async (req, res) => {
         const result = await pool.request()
             .input('id', sql.Int, req.params.id)
             .query(`
-        SELECT c.*, u.full_name AS owner_name,
+        SELECT c.*, f.name AS facility_name, f.owner_id, u.full_name AS owner_name, f.address,
           (SELECT AVG(CAST(rating AS FLOAT)) FROM reviews WHERE court_id = c.id) AS avg_rating,
           (SELECT COUNT(*) FROM bookings WHERE court_id = c.id) AS booking_count
-        FROM courts c JOIN users u ON c.owner_id = u.id WHERE c.id = @id
+        FROM courts c 
+        JOIN facilities f ON c.facility_id = f.id
+        JOIN users u ON f.owner_id = u.id 
+        WHERE c.id = @id
       `);
         if (result.recordset.length === 0) return res.status(404).json({ message: 'Không tìm thấy sân' });
 
@@ -95,60 +84,43 @@ export const getCourtById = async (req, res) => {
 // Update court (owner)
 export const updateCourt = async (req, res) => {
     try {
-        let {
-            name, address, description, image, number_of_small_court, latitude, longitude, is_active,
-            price_per_hour, peak_start_time, peak_end_time, peak_price_per_hour,
-            weekend_price_per_hour, min_booking_minutes, slot_step_minutes
-        } = req.body;
+        const { facility_id, name, image, price_per_hour, latitude, longitude, is_active, court_type, surface_type, status, peak_start_time, peak_end_time, peak_price, weekend_price, slot_step_minutes } = req.body;
         const pool = await poolPromise;
-        const court = await pool.request().input('id', sql.Int, req.params.id).query('SELECT owner_id FROM courts WHERE id = @id');
+        const court = await pool.request().input('id', sql.Int, req.params.id).query(`
+            SELECT c.*, f.owner_id 
+            FROM courts c 
+            JOIN facilities f ON c.facility_id = f.id 
+            WHERE c.id = @id
+        `);
         if (court.recordset.length === 0) return res.status(404).json({ message: 'Không tìm thấy sân' });
         if (court.recordset[0].owner_id !== req.user.id) return res.status(403).json({ message: 'Không có quyền' });
 
-        // allow partial updates by falling back to existing values
-        const existing = await pool.request().input('id', sql.Int, req.params.id).query('SELECT * FROM courts WHERE id = @id');
-        const curr = existing.recordset[0] || {};
-        name = name ?? curr.name;
-        address = address ?? curr.address;
-        description = description ?? curr.description;
-        image = image ?? curr.image;
-        number_of_small_court = number_of_small_court ?? curr.number_of_small_court;
-        latitude = latitude ?? curr.latitude;
-        longitude = longitude ?? curr.longitude;
-        is_active = (typeof is_active === 'boolean') ? is_active : curr.is_active;
-        price_per_hour = price_per_hour ?? curr.price_per_hour;
-        peak_start_time = peak_start_time ?? curr.peak_start_time;
-        peak_end_time = peak_end_time ?? curr.peak_end_time;
-        peak_price_per_hour = peak_price_per_hour ?? curr.peak_price_per_hour;
-        weekend_price_per_hour = weekend_price_per_hour ?? curr.weekend_price_per_hour;
-        min_booking_minutes = min_booking_minutes ?? curr.min_booking_minutes;
-        slot_step_minutes = slot_step_minutes ?? curr.slot_step_minutes;
-
-        // sanitize empty string values so SQL driver doesn't reject them
-        peak_start_time = normalizeSqlTime(peak_start_time);
-        peak_end_time = normalizeSqlTime(peak_end_time);
-
         await pool.request()
             .input('name', sql.NVarChar, name)
-            .input('address', sql.NVarChar, address)
-            .input('description', sql.NVarChar, description)
-            .input('image', sql.NVarChar, image)
-            .input('number_of_small_court', sql.Decimal(12, 2), number_of_small_court)
-            .input('latitude', sql.Decimal(10, 7), latitude)
-            .input('longitude', sql.Decimal(10, 7), longitude)
-            .input('is_active', sql.Bit, is_active)
+            .input('image', sql.NVarChar, image || null)
             .input('price_per_hour', sql.Decimal(12, 2), price_per_hour)
-            .input('peak_start_time', sql.Time, normalizeSqlTime(peak_start_time))
-            .input('peak_end_time', sql.Time, normalizeSqlTime(peak_end_time))
-            .input('peak_price_per_hour', sql.Decimal(12, 2), peak_price_per_hour)
-            .input('weekend_price_per_hour', sql.Decimal(12, 2), weekend_price_per_hour)
-            .input('min_booking_minutes', sql.Int, min_booking_minutes)
-            .input('slot_step_minutes', sql.Int, slot_step_minutes)
+            .input('latitude', sql.Decimal(10, 7), latitude || null)
+            .input('longitude', sql.Decimal(10, 7), longitude || null)
+            .input('is_active', sql.Bit, is_active)
+            .input('facility_id', sql.Int, facility_id || court.recordset[0].facility_id)
+            .input('court_type', sql.NVarChar, court_type || court.recordset[0].court_type)
+            .input('surface_type', sql.NVarChar, surface_type || court.recordset[0].surface_type)
+            .input('status', sql.NVarChar, status || court.recordset[0].status)
+            .input('peak_start_time', sql.VarChar, peak_start_time || null)
+            .input('peak_end_time', sql.VarChar, peak_end_time || null)
+            .input('peak_price', sql.Decimal(12, 2), peak_price || null)
+            .input('weekend_price', sql.Decimal(12, 2), weekend_price || null)
+            .input('slot_step_minutes', sql.Int, slot_step_minutes || court.recordset[0].slot_step_minutes)
             .input('id', sql.Int, req.params.id)
-            .query('UPDATE courts SET name=@name, address=@address, description=@description, image=@image, number_of_small_court=@number_of_small_court, latitude=@latitude, longitude=@longitude, is_active=@is_active, price_per_hour=@price_per_hour, peak_start_time=@peak_start_time, peak_end_time=@peak_end_time, peak_price_per_hour=@peak_price_per_hour, weekend_price_per_hour=@weekend_price_per_hour, min_booking_minutes=@min_booking_minutes, slot_step_minutes=@slot_step_minutes WHERE id=@id');
+            .query(`UPDATE courts SET 
+                facility_id=@facility_id, name=@name, image=@image, price_per_hour=@price_per_hour, 
+                latitude=@latitude, longitude=@longitude, is_active=@is_active,
+                court_type=@court_type, surface_type=@surface_type, status=@status,
+                peak_start_time=@peak_start_time, peak_end_time=@peak_end_time, peak_price=@peak_price,
+                weekend_price=@weekend_price, slot_step_minutes=@slot_step_minutes
+                WHERE id=@id`);
         res.json({ message: 'Cập nhật sân thành công' });
     } catch (err) {
-        console.error(err);
         res.status(500).json({ message: 'Lỗi server' });
     }
 };
@@ -157,7 +129,12 @@ export const updateCourt = async (req, res) => {
 export const deleteCourt = async (req, res) => {
     try {
         const pool = await poolPromise;
-        const court = await pool.request().input('id', sql.Int, req.params.id).query('SELECT owner_id FROM courts WHERE id = @id');
+        const court = await pool.request().input('id', sql.Int, req.params.id).query(`
+            SELECT c.*, f.owner_id 
+            FROM courts c 
+            JOIN facilities f ON c.facility_id = f.id 
+            WHERE c.id = @id
+        `);
         if (court.recordset.length === 0) return res.status(404).json({ message: 'Không tìm thấy sân' });
         if (court.recordset[0].owner_id !== req.user.id) return res.status(403).json({ message: 'Không có quyền' });
         await pool.request().input('id', sql.Int, req.params.id).query('DELETE FROM courts WHERE id = @id');
@@ -173,10 +150,12 @@ export const getMyCourts = async (req, res) => {
         const pool = await poolPromise;
         const result = await pool.request()
             .input('owner_id', sql.Int, req.user.id)
-            .query(`SELECT c.*, (SELECT AVG(CAST(rating AS FLOAT)) FROM reviews WHERE court_id = c.id) AS avg_rating,
-        (SELECT COUNT(*) FROM bookings WHERE court_id = c.id) AS booking_count,
-        (SELECT COUNT(*) FROM sub_courts WHERE court_id = c.id) AS sub_courts_count
-        FROM courts c WHERE c.owner_id = @owner_id ORDER BY c.created_at DESC`);
+            .query(`SELECT c.*, f.name as facility_name, 
+        (SELECT AVG(CAST(rating AS FLOAT)) FROM reviews WHERE court_id = c.id) AS avg_rating,
+        (SELECT COUNT(*) FROM bookings WHERE court_id = c.id) AS booking_count
+        FROM courts c 
+        JOIN facilities f ON c.facility_id = f.id
+        WHERE f.owner_id = @owner_id ORDER BY c.created_at DESC`);
         res.json(result.recordset);
     } catch (err) {
         res.status(500).json({ message: 'Lỗi server' });
@@ -200,267 +179,3 @@ export const addReview = async (req, res) => {
     }
 };
 
-//Sub_Co
-export const getSubCourtsByCourtId = async (req, res) => {
-  try {
-    const pool = await poolPromise
-    const result = await pool.request()
-      .input('court_id', sql.Int, req.params.courtId)
-      .query(`
-        SELECT *
-        FROM sub_courts
-        WHERE court_id = @court_id
-        ORDER BY id ASC
-      `)
-
-    res.json(result.recordset)
-  } catch (err) {
-    res.status(500).json({ message: 'Lỗi server' })
-  }
-}
-
-export const getSubCourtById = async (req, res) => {
-  try {
-    const pool = await poolPromise
-    const query = req.params.courtId
-      ? `SELECT * FROM sub_courts WHERE id = @id AND court_id = @courtId`
-      : `SELECT * FROM sub_courts WHERE id = @id`
-    const request = pool.request().input('id', sql.Int, req.params.id)
-    if (req.params.courtId) request.input('courtId', sql.Int, req.params.courtId)
-
-    const result = await request.query(query)
-
-    if (result.recordset.length === 0) {
-      return res.status(404).json({ message: 'Không tìm thấy sân con' })
-    }
-
-    res.json(result.recordset[0])
-  } catch (err) {
-    console.error(err)
-    res.status(500).json({ message: 'Lỗi server' })
-  }
-}
-
-export const createSubCourt = async (req, res) => {
-  try {
-    const {
-      name, court_type, surface_type, status, price_per_hour,
-      peak_start_time, peak_end_time, peak_price_per_hour,
-      weekend_price_per_hour, min_booking_minutes, slot_step_minutes
-    } = req.body
-    const courtId = Number(req.params.courtId)
-
-    if (!name || !court_type || !surface_type) {
-      return res.status(400).json({ message: 'Thiếu thông tin sân con' })
-    }
-
-    const pool = await poolPromise
-
-    // check sân cha và quyền owner
-    const parent = await pool.request()
-      .input('id', sql.Int, courtId)
-      .query('SELECT id, owner_id FROM courts WHERE id = @id')
-
-    if (parent.recordset.length === 0) {
-      return res.status(404).json({ message: 'Không tìm thấy sân cha' })
-    }
-
-    if (parent.recordset[0].owner_id !== req.user.id) {
-      return res.status(403).json({ message: 'Không có quyền thêm sân con' })
-    }
-
-    const result = await pool.request()
-      .input('court_id', sql.Int, courtId)
-.input('name', sql.NVarChar, name)
-.input('court_type', sql.NVarChar, court_type)
-.input('surface_type', sql.NVarChar, surface_type)
-.input('status', sql.NVarChar, status || 'active')
-.input('price_per_hour', sql.Decimal(12,2), price_per_hour || 0)
-.input('peak_start_time', sql.Time, normalizeSqlTime(peak_start_time))
-.input('peak_end_time', sql.Time, normalizeSqlTime(peak_end_time))
-.input('peak_price_per_hour', sql.Decimal(12,2), peak_price_per_hour || 0)
-.input('weekend_price_per_hour', sql.Decimal(12,2), weekend_price_per_hour || 0)
-.input('min_booking_minutes', sql.Int, min_booking_minutes || 30)
-.input('slot_step_minutes', sql.Int, slot_step_minutes || 15)
-      .query(`
-        INSERT INTO sub_courts
-          (court_id, name, court_type, surface_type, status, price_per_hour, peak_start_time, peak_end_time, peak_price_per_hour, weekend_price_per_hour, min_booking_minutes, slot_step_minutes)
-        OUTPUT INSERTED.*
-        VALUES
-          (@court_id, @name, @court_type, @surface_type, @status, @price_per_hour, @peak_start_time, @peak_end_time, @peak_price_per_hour, @weekend_price_per_hour, @min_booking_minutes, @slot_step_minutes)
-      `)
-
-    res.status(201).json(result.recordset[0])
-  } catch (err) {
-    console.error(err)
-    res.status(500).json({ message: 'Lỗi server' })
-  }
-}
-
-export const updateSubCourt = async (req, res) => {
-  try {
-    const {
-      name, court_type, surface_type, status,
-      price_per_hour, peak_start_time, peak_end_time, peak_price_per_hour,
-      weekend_price_per_hour, min_booking_minutes, slot_step_minutes
-    } = req.body
-    const pool = await poolPromise
-
-    // xác định courtId từ params nếu có hoặc truy vấn từ sub_courts
-    const courtIdParam = req.params.courtId ? Number(req.params.courtId) : null
-
-    // Kiểm tra sân con tồn tại và lấy court_id
-    const subCourtCheck = await pool.request()
-      .input('id', sql.Int, req.params.id)
-      .query(`SELECT id, court_id FROM sub_courts WHERE id = @id`)
-
-    if (subCourtCheck.recordset.length === 0) {
-      return res.status(404).json({ message: 'Không tìm thấy sân con' })
-    }
-
-    const courtId = subCourtCheck.recordset[0].court_id
-
-    if (courtIdParam && courtIdParam !== courtId) {
-      return res.status(400).json({ message: 'Sân con không thuộc sân cha' })
-    }
-
-    // Kiểm tra owner
-    const courtCheck = await pool.request()
-      .input('id', sql.Int, courtId)
-      .query(`SELECT owner_id FROM courts WHERE id = @id`)
-
-    if (courtCheck.recordset.length === 0) {
-      return res.status(404).json({ message: 'Không tìm thấy sân' })
-    }
-
-    if (courtCheck.recordset[0].owner_id !== req.user.id) {
-      return res.status(403).json({ message: 'Không có quyền cập nhập' })
-    }
-
-    const result = await pool.request()
-      .input('id', sql.Int, req.params.id)
-      .input('name', sql.NVarChar, name)
-      .input('court_type', sql.VarChar, court_type)
-      .input('surface_type', sql.VarChar, surface_type)
-      .input('status', sql.VarChar, status)
-      .input('price_per_hour', sql.Decimal(12,2), price_per_hour)
-      .input('peak_start_time', sql.Time, normalizeSqlTime(peak_start_time))
-      .input('peak_end_time', sql.Time, normalizeSqlTime(peak_end_time))
-      .input('peak_price_per_hour', sql.Decimal(12,2), peak_price_per_hour)
-      .input('weekend_price_per_hour', sql.Decimal(12,2), weekend_price_per_hour)
-      .input('min_booking_minutes', sql.Int, min_booking_minutes)
-      .input('slot_step_minutes', sql.Int, slot_step_minutes)
-      .query(`
-        UPDATE sub_courts
-        SET
-          name = @name,
-          court_type = @court_type,
-          surface_type = @surface_type,
-          status = @status,
-          price_per_hour = @price_per_hour,
-          peak_start_time = @peak_start_time,
-          peak_end_time = @peak_end_time,
-          peak_price_per_hour = @peak_price_per_hour,
-          weekend_price_per_hour = @weekend_price_per_hour,
-          min_booking_minutes = @min_booking_minutes,
-          slot_step_minutes = @slot_step_minutes,
-          updated_at = GETDATE()
-        OUTPUT INSERTED.*
-        WHERE id = @id
-      `)
-
-    res.json(result.recordset[0])
-  } catch (err) {
-    res.status(500).json({ message: 'Lỗi server' })
-  }
-}
-
-export const updateSubCourtStatus = async (req, res) => {
-  try {
-    const pool = await poolPromise
-
-    const courtIdParam = req.params.courtId ? Number(req.params.courtId) : null
-
-    // Kiểm tra sân con tồn tại
-    const subCourtCheck = await pool.request()
-      .input('id', sql.Int, req.params.id)
-      .query(`SELECT id, court_id FROM sub_courts WHERE id = @id`)
-
-    if (subCourtCheck.recordset.length === 0) {
-      return res.status(404).json({ message: 'Không tìm thấy sân con' })
-    }
-
-    const courtId = subCourtCheck.recordset[0].court_id
-
-    if (courtIdParam && courtIdParam !== courtId) {
-      return res.status(400).json({ message: 'Sân con không thuộc sân cha' })
-    }
-
-    // Kiểm tra owner
-    const courtCheck = await pool.request()
-      .input('id', sql.Int, courtId)
-      .query(`SELECT owner_id FROM courts WHERE id = @id`)
-
-    if (courtCheck.recordset.length === 0) {
-      return res.status(404).json({ message: 'Không tìm thấy sân cha' })
-    }
-
-    if (courtCheck.recordset[0].owner_id !== req.user.id) {
-      return res.status(403).json({ message: 'Không có quyền cập nhập' })
-    }
-
-    await pool.request()
-      .input('id', sql.Int, req.params.id)
-      .input('status', sql.VarChar, req.body.status)
-      .query(`
-        UPDATE sub_courts
-        SET status = @status, updated_at = GETDATE()
-        WHERE id = @id
-      `)
-
-    res.json({ message: 'Cập nhật trạng thái thành công' })
-  } catch (err) {
-    console.error('updateSubCourtStatus error', err)
-    res.status(500).json({ message: 'Lỗi server', error: err.message })
-  }
-}
-
-export const deleteSubCourt = async (req, res) => {
-  try {
-    const pool = await poolPromise
-    const courtIdParam = req.params.courtId ? Number(req.params.courtId) : null
-
-    const subCourtCheck = await pool.request()
-      .input('id', sql.Int, req.params.id)
-      .query(`SELECT id, court_id FROM sub_courts WHERE id = @id`)
-
-    if (subCourtCheck.recordset.length === 0) {
-      return res.status(404).json({ message: 'Không tìm thấy sân con' })
-    }
-
-    const courtId = subCourtCheck.recordset[0].court_id
-    if (courtIdParam && courtIdParam !== courtId) {
-      return res.status(400).json({ message: 'Sân con không thuộc sân cha' })
-    }
-
-    // check ownership
-    const courtCheck = await pool.request()
-      .input('id', sql.Int, courtId)
-      .query(`SELECT owner_id FROM courts WHERE id = @id`)
-
-    if (courtCheck.recordset.length === 0) {
-      return res.status(404).json({ message: 'Không tìm thấy sân' })
-    }
-    if (courtCheck.recordset[0].owner_id !== req.user.id) {
-      return res.status(403).json({ message: 'Không có quyền xóa' })
-    }
-
-    await pool.request()
-      .input('id', sql.Int, req.params.id)
-      .query(`DELETE FROM sub_courts WHERE id = @id`)
-
-    res.json({ message: 'Đã xóa sân con' })
-  } catch (err) {
-    res.status(500).json({ message: 'Lỗi server' })
-  }
-}

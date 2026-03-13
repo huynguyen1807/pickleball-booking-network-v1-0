@@ -10,68 +10,41 @@ export const createBooking = async (req, res) => {
         const pool = await poolPromise;
         const isPayOS = payment_method === 'payos';
 
-        let pricingRow;
-        if (sub_court_id) {
-            // Get pricing from sub_court
-            const result = await pool.request()
-                .input('id', sql.Int, sub_court_id)
-                .input('court_id', sql.Int, court_id)
-                .query(`SELECT price_per_hour, peak_start_time, peak_end_time, peak_price_per_hour,
-                               weekend_price_per_hour, min_booking_minutes, slot_step_minutes
-                        FROM sub_courts WHERE id = @id AND court_id = @court_id`);
-            if (result.recordset.length === 0) return res.status(404).json({ message: 'Sân con không tồn tại' });
-            pricingRow = result.recordset[0];
-        } else {
-            // Use default values
-            pricingRow = {
-                price_per_hour: 100000,
-                peak_start_time: null,
-                peak_end_time: null,
-                peak_price_per_hour: 0,
-                weekend_price_per_hour: 0,
-                min_booking_minutes: 30,
-                slot_step_minutes: 15
-            };
-        }
+        const courtQuery = await pool.request().input('id', sql.Int, court_id)
+            .query('SELECT price_per_hour, peak_start_time, peak_end_time, peak_price FROM courts WHERE id = @id AND is_active = 1');
+        if (courtQuery.recordset.length === 0) return res.status(404).json({ message: 'Sân không tồn tại' });
 
-        // Verify court exists
-        const court = await pool.request().input('id', sql.Int, court_id)
-            .query('SELECT id FROM courts WHERE id = @id AND is_active = 1');
-        if (court.recordset.length === 0) return res.status(404).json({ message: 'Sân không tồn tại' });
+        const court = courtQuery.recordset[0];
 
-        const toMinutes = t => {
-            const [h, m] = t.split(':').map(Number);
-            return h * 60 + m;
+        const startH = parseFloat(start_time.split(':')[0]) + parseFloat(start_time.split(':')[1]) / 60;
+        const endH = parseFloat(end_time.split(':')[0]) + parseFloat(end_time.split(':')[1]) / 60;
+
+        const extractTimeH = (timeStr: any) => {
+            if (!timeStr) return null;
+            const str = timeStr instanceof Date ? timeStr.toISOString() : String(timeStr);
+            const match = str.match(/\d{2}:\d{2}/);
+            if (!match) return null;
+            const [h, m] = match[0].split(':').map(Number);
+            return h + m / 60;
         };
-        const startMin = toMinutes(start_time);
-        const endMin = toMinutes(end_time);
-        const duration = endMin - startMin;
 
-        // Validate minimum booking duration
-        if (duration < pricingRow.min_booking_minutes) {
-            return res.status(400).json({ message: `Thời lượng tối thiểu là ${pricingRow.min_booking_minutes} phút` });
+        const peakStartH = extractTimeH(court.peak_start_time);
+        const peakEndH = extractTimeH(court.peak_end_time);
+
+        let peakHours = 0;
+        if (court.peak_price && peakStartH !== null && peakEndH !== null) {
+            const overlapStart = Math.max(startH, peakStartH);
+            const overlapEnd = Math.min(endH, peakEndH);
+            if (overlapStart < overlapEnd) {
+                peakHours = overlapEnd - overlapStart;
+            }
         }
 
-        // Validate slot step
-        if (duration % pricingRow.slot_step_minutes !== 0) {
-            return res.status(400).json({ message: `Mốc thời gian phải là bội của ${pricingRow.slot_step_minutes} phút` });
-        }
-
-        // Determine price based on peak hours and weekend
-        let unitPrice = pricingRow.price_per_hour;
-        const bookingDay = new Date(booking_date).getDay(); // 6 = Sat, 0 = Sun
-        if ((bookingDay === 6 || bookingDay === 0) && pricingRow.weekend_price_per_hour > 0) {
-            unitPrice = pricingRow.weekend_price_per_hour;
-        } else if (
-            pricingRow.peak_start_time && pricingRow.peak_end_time &&
-            start_time >= pricingRow.peak_start_time && end_time <= pricingRow.peak_end_time &&
-            pricingRow.peak_price_per_hour > 0
-        ) {
-            unitPrice = pricingRow.peak_price_per_hour;
-        }
-
-        const total = (unitPrice / 60) * duration;
-        const commission = total * COMMISSION;
+        const regularHours = (endH - startH) - peakHours;
+        const regularPrice = regularHours * court.price_per_hour;
+        const peakPriceTotal = peakHours * (court.peak_price || court.price_per_hour);
+        const total = Math.round(regularPrice + peakPriceTotal);
+        const commission = Math.round(total * COMMISSION);
 
         const result = await pool.request()
             .input('user_id', sql.Int, req.user.id).input('court_id', sql.Int, court_id)
@@ -79,22 +52,22 @@ export const createBooking = async (req, res) => {
             .input('end_time', sql.NVarChar, end_time).input('total_price', sql.Decimal(12, 2), total + commission)
             .input('commission_rate', sql.Decimal(4, 2), COMMISSION).input('commission_amount', sql.Decimal(12, 2), commission)
             .input('payment_method', sql.NVarChar, payment_method || 'mock')
-                        .input('status', sql.NVarChar, isPayOS ? 'pending' : 'confirmed')
+            .input('status', sql.NVarChar, isPayOS ? 'pending' : 'confirmed')
             .query(`INSERT INTO bookings (user_id, court_id, booking_date, start_time, end_time, total_price, commission_rate, commission_amount, payment_method, status)
                             OUTPUT INSERTED.id VALUES (@user_id, @court_id, @booking_date, @start_time, @end_time, @total_price, @commission_rate, @commission_amount, @payment_method, @status)`);
 
-                if (!isPayOS) {
-                        await pool.request()
-                                .input('user_id', sql.Int, req.user.id).input('booking_id', sql.Int, result.recordset[0].id)
-                                .input('amount', sql.Decimal(12, 2), total + commission).input('commission', sql.Decimal(12, 2), commission)
-                                .input('payment_method', sql.NVarChar, payment_method || 'mock')
-                                .query("INSERT INTO payments (user_id, booking_id, amount, commission, payment_method, status) VALUES (@user_id, @booking_id, @amount, @commission, @payment_method, 'completed')");
-                }
+        if (!isPayOS) {
+            await pool.request()
+                .input('user_id', sql.Int, req.user.id).input('booking_id', sql.Int, result.recordset[0].id)
+                .input('amount', sql.Decimal(12, 2), total + commission).input('commission', sql.Decimal(12, 2), commission)
+                .input('payment_method', sql.NVarChar, payment_method || 'mock')
+                .query("INSERT INTO payments (user_id, booking_id, amount, commission, payment_method, status) VALUES (@user_id, @booking_id, @amount, @commission, @payment_method, 'completed')");
+        }
 
         res.status(201).json({ message: 'Đặt sân thành công', bookingId: result.recordset[0].id, total: total + commission });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: 'Lỗi server' });
+        console.error("LỖI TAO BOOKING:", err);
+        res.status(500).json({ message: 'Lỗi server', error: err.message });
     }
 };
 
@@ -115,7 +88,7 @@ export const getOwnerBookings = async (req, res) => {
     try {
         const pool = await poolPromise;
         const result = await pool.request().input('owner_id', sql.Int, req.user.id)
-            .query('SELECT b.*, c.name AS court_name, u.full_name AS user_name FROM bookings b JOIN courts c ON b.court_id = c.id JOIN users u ON b.user_id = u.id WHERE c.owner_id = @owner_id ORDER BY b.created_at DESC');
+            .query('SELECT b.*, c.name AS court_name, u.full_name AS user_name FROM bookings b JOIN courts c ON b.court_id = c.id JOIN facilities f ON c.facility_id = f.id JOIN users u ON b.user_id = u.id WHERE f.owner_id = @owner_id ORDER BY b.created_at DESC');
         res.json(result.recordset);
     } catch (err) {
         res.status(500).json({ message: 'Lỗi server' });
@@ -139,3 +112,24 @@ export const cancelBooking = async (req, res) => {
     }
 };
 
+// Get booked slots for a court on a specific date
+export const getBookedSlots = async (req, res) => {
+    try {
+        const { courtId, date } = req.params;
+        const pool = await poolPromise;
+        const result = await pool.request()
+            .input('court_id', sql.Int, courtId)
+            .input('booking_date', sql.Date, date)
+            .query(`
+                SELECT start_time, end_time 
+                FROM bookings 
+                WHERE court_id = @court_id 
+                AND booking_date = @booking_date
+                AND status IN ('confirmed', 'pending')
+            `);
+        res.json(result.recordset);
+    } catch (err) {
+        console.error("Lỗi lấy khung giờ đã đặt:", err);
+        res.status(500).json({ message: 'Lỗi server' });
+    }
+};

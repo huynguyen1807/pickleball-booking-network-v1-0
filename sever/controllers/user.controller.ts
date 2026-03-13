@@ -22,6 +22,13 @@ export const updateProfile = async (req, res) => {
 export const requestUpgrade = async (req, res) => {
     try {
         const { reason } = req.body;
+
+        // Handle file upload
+        let fileUrl = null;
+        if (req.file) {
+            fileUrl = `/uploads/${req.file.filename}`;
+        }
+
         const pool = await poolPromise;
         const existing = await pool.request()
             .input('user_id', sql.Int, req.user.id)
@@ -32,9 +39,11 @@ export const requestUpgrade = async (req, res) => {
         await pool.request()
             .input('user_id', sql.Int, req.user.id)
             .input('reason', sql.NVarChar, reason)
-            .query('INSERT INTO upgrade_requests (user_id, reason) VALUES (@user_id, @reason)');
+            .input('business_license_url', sql.NVarChar(sql.MAX), fileUrl)
+            .query('INSERT INTO upgrade_requests (user_id, reason, business_license_url) VALUES (@user_id, @reason, @business_license_url)');
         res.status(201).json({ message: 'Yêu cầu nâng cấp đã được gửi' });
     } catch (err) {
+        console.error('Request upgrade error:', err);
         res.status(500).json({ message: 'Lỗi server' });
     }
 };

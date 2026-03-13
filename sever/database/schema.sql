@@ -20,6 +20,8 @@ CREATE TABLE users (
   avatar NVARCHAR(500),
   role NVARCHAR(20) DEFAULT 'user' CHECK (role IN ('user','owner','admin')),
   status NVARCHAR(20) DEFAULT 'active' CHECK (status IN ('active','pending','rejected')),
+  business_license_url NVARCHAR(500) NULL,
+  is_verified BIT DEFAULT 0,
   latitude DECIMAL(10,7),
   longitude DECIMAL(10,7),
   created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET(),
@@ -35,8 +37,33 @@ CREATE TABLE upgrade_requests (
   reason NVARCHAR(MAX),
   status NVARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected')),
   admin_note NVARCHAR(MAX),
+  business_license_url NVARCHAR(MAX),
   created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET(),
   updated_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
+);
+GO
+
+-- FACILITIES
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='facilities' AND xtype='U')
+CREATE TABLE facilities (
+  id INT IDENTITY(1,1) PRIMARY KEY,
+  owner_id INT NOT NULL FOREIGN KEY REFERENCES users(id) ON DELETE CASCADE,
+  name NVARCHAR(200) NOT NULL,
+  address NVARCHAR(500) NOT NULL,
+  description NVARCHAR(MAX),
+
+  phone NVARCHAR(20),
+  open_time VARCHAR(10),
+  close_time VARCHAR(10),
+
+  avatar NVARCHAR(500),
+  cover_image NVARCHAR(500),
+
+  gallery NVARCHAR(MAX),     -- JSON list ảnh
+  amenities NVARCHAR(MAX),   -- JSON list tiện ích
+
+  is_active BIT DEFAULT 1,
+  created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
 );
 GO
 
@@ -44,14 +71,30 @@ GO
 IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='courts' AND xtype='U')
 CREATE TABLE courts (
   id INT IDENTITY(1,1) PRIMARY KEY,
-  owner_id INT NOT NULL FOREIGN KEY REFERENCES users(id) ON DELETE CASCADE,
+
+  facility_id INT NOT NULL
+  FOREIGN KEY REFERENCES facilities(id) ON DELETE CASCADE,
+
   name NVARCHAR(200) NOT NULL,
-  address NVARCHAR(500) NOT NULL,
-  description NVARCHAR(MAX),
   image NVARCHAR(500),
-  number_of_small_court DECIMAL(12,2) NOT NULL,
+
+  price_per_hour DECIMAL(12,2) NOT NULL,
+
   latitude DECIMAL(10,7),
   longitude DECIMAL(10,7),
+
+  court_type NVARCHAR(50),      -- indoor / outdoor
+  surface_type NVARCHAR(50),    -- hard / grass / synthetic
+  status NVARCHAR(20),          -- active / maintenance
+
+  peak_start_time VARCHAR(10),
+  peak_end_time VARCHAR(10),
+  peak_price DECIMAL(12,2),
+
+  weekend_price DECIMAL(12,2),
+
+  slot_step_minutes INT DEFAULT 60,
+
   is_active BIT DEFAULT 1,
   price_per_hour DECIMAL(12,2) DEFAULT 0.00,
   peak_start_time DATETIME NULL,

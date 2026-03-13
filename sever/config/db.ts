@@ -24,8 +24,31 @@ const config = {
 };
 
 const poolPromise = new sql.ConnectionPool(config).connect()
-    .then(pool => {
+    .then(async pool => {
         console.log('✅ SQL Server connected successfully');
+
+        // Auto-migration for posts.image column
+        try {
+            await pool.request().query(`
+                IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='posts' AND COLUMN_NAME='image' AND DATA_TYPE='nvarchar' AND CHARACTER_MAXIMUM_LENGTH=500)
+                BEGIN
+                    ALTER TABLE posts ALTER COLUMN image NVARCHAR(MAX);
+                    PRINT 'Migrated posts.image to NVARCHAR(MAX)';
+                END
+            `);
+
+            // Auto-migration for upgrade_requests.business_license_url column
+            await pool.request().query(`
+                IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='upgrade_requests' AND COLUMN_NAME='business_license_url')
+                BEGIN
+                    ALTER TABLE upgrade_requests ADD business_license_url NVARCHAR(MAX);
+                    PRINT 'Added business_license_url to upgrade_requests';
+                END
+            `);
+        } catch (e) {
+            console.error('Migration failed:', e);
+        }
+
         return pool;
     })
     .catch(err => {

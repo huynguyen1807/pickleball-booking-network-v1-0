@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api/axios'
 import styles from '../styles/Dashboard.module.css'
@@ -60,7 +60,7 @@ export default function OwnerCourts() {
             })
             loadData()
         } catch (err: any) {
-            alert(err.response?.data?.message || 'Lỗi cập nhật cơ sở')
+            alert(err.response?.data?.message || 'Lß╗ùi cß║¡p nhß║¡t c╞í sß╗ƒ')
         }
     }
 
@@ -72,17 +72,17 @@ export default function OwnerCourts() {
             })
             loadData()
         } catch (err: any) {
-            alert(err.response?.data?.message || 'Lỗi cập nhật sân')
+            alert(err.response?.data?.message || 'Lß╗ùi cß║¡p nhß║¡t s├ón')
         }
     }
 
     const handleDeleteCourt = async (court: any) => {
-        if (!confirm(`Bạn chắc chắn muốn xóa sân "${court.name}"?`)) return
+        if (!confirm(`Bß║ín chß║»c chß║»n muß╗æn x├│a s├ón "${court.name}"?`)) return
         try {
             await api.delete(`/courts/${court.id}`)
             loadData()
         } catch (err: any) {
-            alert(err.response?.data?.message || 'Lỗi xóa sân')
+            alert(err.response?.data?.message || 'Lß╗ùi x├│a s├ón')
         }
     }
 
@@ -115,7 +115,7 @@ export default function OwnerCourts() {
     const handleSaveEdit = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!editForm.name || !editForm.price_per_hour) {
-            alert('Vui lòng điền tên sân và đơn giá mặc định')
+            alert('Vui l├▓ng ─æiß╗ün t├¬n s├ón v├á ─æ╞ín gi├í mß║╖c ─æß╗ïnh')
             return
         }
 
@@ -128,27 +128,27 @@ export default function OwnerCourts() {
                 peak_price: editForm.peak_price ? parseFloat(editForm.peak_price) : null,
                 slot_step_minutes: parseInt(editForm.slot_step_minutes)
             })
-            alert('Cập nhật sân thành công!')
+            alert('Cß║¡p nhß║¡t s├ón th├ánh c├┤ng!')
             setEditCourt(null)
             loadData()
         } catch (err: any) {
-            alert(err.response?.data?.message || 'Lỗi khi cập nhật sân')
+            alert(err.response?.data?.message || 'Lß╗ùi khi cß║¡p nhß║¡t s├ón')
         } finally {
             setSubmitting(false)
         }
     }
-    const formatPrice = (p: any) => new Intl.NumberFormat('vi-VN').format(p) + 'đ'
+    const formatPrice = (p: any) => new Intl.NumberFormat('vi-VN').format(p) + '─æ'
 
-    if (loading) return <div className={styles.dashboardPage} style={{ textAlign: 'center', padding: '60px 20px' }}>⏳ Đang tải...</div>
+    if (loading) return <div className={styles.dashboardPage} style={{ textAlign: 'center', padding: '60px 20px' }}>ΓÅ│ ─Éang tß║úi...</div>
 
     return (
         <div className={styles.dashboardPage}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
                 <div>
-                    <h1 className="page-title">⚙️ Quản lý Cơ Sở & Sân</h1>
-                    <p className="page-subtitle">Thêm cơ sở mới và quản lý các sân trực thuộc</p>
+                    <h1 className="page-title">ΓÜÖ∩╕Å Quß║ún l├╜ C╞í Sß╗ƒ & S├ón</h1>
+                    <p className="page-subtitle">Th├¬m c╞í sß╗ƒ mß╗¢i v├á quß║ún l├╜ c├íc s├ón trß╗▒c thuß╗Öc</p>
                 </div>
-                <button className="btn btn-primary" onClick={() => navigate('/owner/facilities/new')}>+ Thêm cơ sở mới</button>
+                <button className="btn btn-primary" onClick={() => navigate('/owner/facilities/new')}>+ Th├¬m c╞í sß╗ƒ mß╗¢i</button>
             </div>
 
             {facilities.length > 0 ? facilities.map((fac: any) => (
@@ -158,28 +158,28 @@ export default function OwnerCourts() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '15px', marginBottom: '15px' }}>
                         <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
                             <div style={{ width: '60px', height: '60px', borderRadius: 'var(--radius-md)', background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem' }}>
-                                🏭
+                                ≡ƒÅ¡
                             </div>
                             <div>
                                 <h2 style={{ margin: '0 0 5px 0', fontSize: '1.25rem', color: 'var(--text-primary)' }}>{fac.name}</h2>
-                                <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>📍 {fac.address}</p>
+                                <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>≡ƒôì {fac.address}</p>
                             </div>
                         </div>
                         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                             <span className={`badge ${fac.is_active ? 'badge-green' : 'badge-red'}`}>
-                                {fac.is_active ? 'Hoạt động' : 'Tạm ngưng'}
+                                {fac.is_active ? 'Hoß║ít ─æß╗Öng' : 'Tß║ím ng╞░ng'}
                             </span>
                             <button className="btn btn-secondary btn-sm" onClick={() => handleToggleFacilityActive(fac)}>
-                                {fac.is_active ? '⏸ Tạm ngưng cơ sở' : '▶ Kích hoạt cơ sở'}
+                                {fac.is_active ? 'ΓÅ╕ Tß║ím ng╞░ng c╞í sß╗ƒ' : 'Γû╢ K├¡ch hoß║ít c╞í sß╗ƒ'}
                             </button>
                             <button className="btn btn-primary btn-sm" onClick={() => navigate(`/owner/facilities/${fac.id}/courts/new`)}>
-                                + Thêm sân con
+                                + Th├¬m s├ón con
                             </button>
                         </div>
                     </div>
 
                     {/* Courts List */}
-                    <h3 style={{ fontSize: '1rem', color: 'var(--text-primary)', marginBottom: '15px' }}>Danh sách sân:</h3>
+                    <h3 style={{ fontSize: '1rem', color: 'var(--text-primary)', marginBottom: '15px' }}>Danh s├ích s├ón:</h3>
                     {courtsByFacility[fac.id] && courtsByFacility[fac.id].length > 0 ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                             {courtsByFacility[fac.id].map(court => (
@@ -187,36 +187,36 @@ export default function OwnerCourts() {
                                     <div>
                                         <h4 style={{ margin: '0 0 5px 0', color: 'var(--text-primary)' }}>{court.name}</h4>
                                         <div style={{ display: 'flex', gap: '15px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                                            <span>🏓 {court.court_type === 'indoor' ? 'Trong nhà' : court.court_type === 'roofed' ? 'Có mái che' : 'Ngoài trời'}</span>
-                                            <span>🏷️ {court.surface_type === 'carpet' ? 'Sân thảm' : 'Sân cứng'}</span>
-                                            <span>💰 {formatPrice(court.price_per_hour)}/h</span>
-                                            {court.peak_price && <span>🔥 Giờ vàng: {formatPrice(court.peak_price)}/h ({court.peak_start_time?.slice(0, 5)} - {court.peak_end_time?.slice(0, 5)})</span>}
+                                            <span>≡ƒÅô {court.court_type === 'indoor' ? 'Trong nh├á' : court.court_type === 'roofed' ? 'C├│ m├íi che' : 'Ngo├ái trß╗¥i'}</span>
+                                            <span>≡ƒÅ╖∩╕Å {court.surface_type === 'carpet' ? 'S├ón thß║úm' : 'S├ón cß╗⌐ng'}</span>
+                                            <span>≡ƒÆ░ {formatPrice(court.price_per_hour)}/h</span>
+                                            {court.peak_price && <span>≡ƒöÑ Giß╗¥ v├áng: {formatPrice(court.peak_price)}/h ({court.peak_start_time?.slice(0, 5)} - {court.peak_end_time?.slice(0, 5)})</span>}
                                         </div>
                                     </div>
                                     <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                                         <span className={`badge ${court.is_active && court.status === 'active' ? 'badge-green' : court.status === 'maintenance' ? 'badge-yellow' : 'badge-red'}`}>
-                                            {court.status === 'maintenance' ? 'Bảo trì' : court.is_active ? 'Hoạt động' : 'Tạm ngưng'}
+                                            {court.status === 'maintenance' ? 'Bß║úo tr├¼' : court.is_active ? 'Hoß║ít ─æß╗Öng' : 'Tß║ím ng╞░ng'}
                                         </span>
                                         <button className="btn btn-secondary btn-sm" onClick={() => openEditModal(court)}>
-                                            ✏️ Sửa
+                                            Γ£Å∩╕Å Sß╗¡a
                                         </button>
                                         <button className="btn btn-secondary btn-sm" onClick={() => handleToggleCourtActive(court)}>
-                                            {court.is_active ? '⏸ Ngưng' : '▶ Bật'}
+                                            {court.is_active ? 'ΓÅ╕ Ng╞░ng' : 'Γû╢ Bß║¡t'}
                                         </button>
-                                        <button className="btn btn-danger btn-sm" onClick={() => handleDeleteCourt(court)}>🗑️</button>
+                                        <button className="btn btn-danger btn-sm" onClick={() => handleDeleteCourt(court)}>≡ƒùæ∩╕Å</button>
                                     </div>
                                 </div>
                             ))}
                         </div>
                     ) : (
                         <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)' }}>
-                            Chưa có sân nào thuộc cơ sở này.
+                            Ch╞░a c├│ s├ón n├áo thuß╗Öc c╞í sß╗ƒ n├áy.
                         </div>
                     )}
                 </div>
             )) : (
                 <div className="glass-card" style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-secondary)' }}>
-                    🏭 Bạn chưa có cơ sở nào. Nhấn "+ Thêm cơ sở mới" để mở rộng kinh doanh!
+                    ≡ƒÅ¡ Bß║ín ch╞░a c├│ c╞í sß╗ƒ n├áo. Nhß║Ñn "+ Th├¬m c╞í sß╗ƒ mß╗¢i" ─æß╗â mß╗ƒ rß╗Öng kinh doanh!
                 </div>
             )
             }
@@ -232,85 +232,85 @@ export default function OwnerCourts() {
                     }}>
                         <form onSubmit={handleSaveEdit} className="glass-card" style={{ padding: '30px', width: '100%', maxWidth: '800px', maxHeight: '90vh', overflowY: 'auto', backgroundColor: 'var(--bg-primary)' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                                <h2 style={{ margin: 0 }}>✏️ Chỉnh sửa Sân</h2>
-                                <button type="button" onClick={() => setEditCourt(null)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--text-primary)' }}>✖</button>
+                                <h2 style={{ margin: 0 }}>Γ£Å∩╕Å Chß╗ënh sß╗¡a S├ón</h2>
+                                <button type="button" onClick={() => setEditCourt(null)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--text-primary)' }}>Γ£û</button>
                             </div>
 
-                            <h3 className={styles.sectionTitle}>1. Cấu hình chung</h3>
+                            <h3 className={styles.sectionTitle}>1. Cß║Ñu h├¼nh chung</h3>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
                                 <div className="input-group">
-                                    <label>Tên Sân *</label>
-                                    <input name="name" className="input-field" placeholder="VD: Sân 1, Sân VIP..." value={editForm.name} onChange={handleEditChange} required />
+                                    <label>T├¬n S├ón *</label>
+                                    <input name="name" className="input-field" placeholder="VD: S├ón 1, S├ón VIP..." value={editForm.name} onChange={handleEditChange} required />
                                 </div>
                                 <div className="input-group">
-                                    <label>Trạng thái</label>
+                                    <label>Trß║íng th├íi</label>
                                     <select name="status" className="input-field" value={editForm.status} onChange={handleEditChange}>
-                                        <option value="active">Đang hoạt động</option>
-                                        <option value="maintenance">Đang bảo trì</option>
+                                        <option value="active">─Éang hoß║ít ─æß╗Öng</option>
+                                        <option value="maintenance">─Éang bß║úo tr├¼</option>
                                     </select>
                                 </div>
                             </div>
 
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '30px' }}>
                                 <div className="input-group">
-                                    <label>Loại sân</label>
+                                    <label>Loß║íi s├ón</label>
                                     <select name="court_type" className="input-field" value={editForm.court_type} onChange={handleEditChange}>
-                                        <option value="outdoor">Ngoài trời (Outdoor)</option>
-                                        <option value="indoor">Trong nhà (Indoor)</option>
-                                        <option value="roofed">Có mái che (Roofed Outdoor)</option>
+                                        <option value="outdoor">Ngo├ái trß╗¥i (Outdoor)</option>
+                                        <option value="indoor">Trong nh├á (Indoor)</option>
+                                        <option value="roofed">C├│ m├íi che (Roofed Outdoor)</option>
                                     </select>
                                 </div>
                                 <div className="input-group">
-                                    <label>Mặt sân</label>
+                                    <label>Mß║╖t s├ón</label>
                                     <select name="surface_type" className="input-field" value={editForm.surface_type} onChange={handleEditChange}>
-                                        <option value="hard">Sân cứng (Hard court)</option>
-                                        <option value="carpet">Sân thảm (Carpet court)</option>
+                                        <option value="hard">S├ón cß╗⌐ng (Hard court)</option>
+                                        <option value="carpet">S├ón thß║úm (Carpet court)</option>
                                     </select>
                                 </div>
                             </div>
 
-                            <h3 className={styles.sectionTitle}>2. Cấu hình Giá & Khung giờ</h3>
+                            <h3 className={styles.sectionTitle}>2. Cß║Ñu h├¼nh Gi├í & Khung giß╗¥</h3>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
                                 <div className="input-group">
-                                    <label>Đơn giá Mặc định (VNĐ/giờ) *</label>
+                                    <label>─É╞ín gi├í Mß║╖c ─æß╗ïnh (VN─É/giß╗¥) *</label>
                                     <input type="number" name="price_per_hour" className="input-field" placeholder="VD: 100000" value={editForm.price_per_hour} onChange={handleEditChange} required />
                                 </div>
                                 <div className="input-group">
-                                    <label>Đơn giá Cuối tuần (VNĐ/giờ)</label>
+                                    <label>─É╞ín gi├í Cuß╗æi tuß║ºn (VN─É/giß╗¥)</label>
                                     <input type="number" name="weekend_price" className="input-field" placeholder="VD: 120000" value={editForm.weekend_price} onChange={handleEditChange} />
                                 </div>
                             </div>
 
                             <div style={{ background: 'var(--bg-tertiary)', padding: '15px', borderRadius: 'var(--radius-md)', marginBottom: '20px' }}>
-                                <h4 style={{ margin: '0 0 10px 0', fontSize: '1rem', color: 'var(--text-secondary)' }}>Khung giờ vàng (Tùy chọn)</h4>
+                                <h4 style={{ margin: '0 0 10px 0', fontSize: '1rem', color: 'var(--text-secondary)' }}>Khung giß╗¥ v├áng (T├╣y chß╗ìn)</h4>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px' }}>
                                     <div className="input-group">
-                                        <label>Giờ bắt đầu</label>
+                                        <label>Giß╗¥ bß║»t ─æß║ºu</label>
                                         <input type="time" name="peak_start_time" className="input-field" value={editForm.peak_start_time} onChange={handleEditChange} />
                                     </div>
                                     <div className="input-group">
-                                        <label>Giờ kết thúc</label>
+                                        <label>Giß╗¥ kß║┐t th├║c</label>
                                         <input type="time" name="peak_end_time" className="input-field" value={editForm.peak_end_time} onChange={handleEditChange} />
                                     </div>
                                     <div className="input-group">
-                                        <label>Giá Giờ vàng (VNĐ)</label>
+                                        <label>Gi├í Giß╗¥ v├áng (VN─É)</label>
                                         <input type="number" name="peak_price" className="input-field" placeholder="VD: 150000" value={editForm.peak_price} onChange={handleEditChange} />
                                     </div>
                                 </div>
                             </div>
 
                             <div className="input-group" style={{ marginBottom: '30px' }}>
-                                <label>Bước nhảy thời gian (Phút)</label>
+                                <label>B╞░ß╗¢c nhß║úy thß╗¥i gian (Ph├║t)</label>
                                 <select name="slot_step_minutes" className="input-field" value={editForm.slot_step_minutes} onChange={handleEditChange}>
-                                    <option value="30">30 Phút</option>
-                                    <option value="60">60 Phút</option>
+                                    <option value="30">30 Ph├║t</option>
+                                    <option value="60">60 Ph├║t</option>
                                 </select>
                             </div>
 
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '15px' }}>
-                                <button type="button" className="btn btn-secondary" onClick={() => setEditCourt(null)}>Hủy</button>
+                                <button type="button" className="btn btn-secondary" onClick={() => setEditCourt(null)}>Hß╗ºy</button>
                                 <button type="submit" className="btn btn-primary" disabled={submitting}>
-                                    {submitting ? '⏳ Đang lưu...' : '💾 Lưu Thay Đổi'}
+                                    {submitting ? 'ΓÅ│ ─Éang l╞░u...' : '≡ƒÆ╛ L╞░u Thay ─Éß╗òi'}
                                 </button>
                             </div>
                         </form>

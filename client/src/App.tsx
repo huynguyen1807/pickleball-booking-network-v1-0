@@ -8,7 +8,8 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import ForgotPassword from './pages/ForgotPassword'
 import Home from './pages/Home'
-import Courts from './pages/Courts'
+import Facilities from './pages/Facilities'
+import FacilityDetail from './pages/FacilityDetail'
 import CourtDetail from './pages/CourtDetail'
 import Booking from './pages/Booking'
 import Matchmaking from './pages/Matchmaking'
@@ -18,6 +19,8 @@ import Settings from './pages/Settings'
 import UserDashboard from './pages/UserDashboard'
 import OwnerDashboard from './pages/OwnerDashboard'
 import OwnerCourts from './pages/OwnerCourts'
+import OwnerCreateFacility from './pages/OwnerCreateFacility'
+import OwnerCreateCourt from './pages/OwnerCreateCourt'
 import AdminDashboard from './pages/AdminDashboard'
 import PostPhoto from './pages/PostPhoto'
 import OwnerCourtDetail from './pages/OwnerCourtDetail'
@@ -40,8 +43,11 @@ export default function App() {
                 <Route path="/" element={
                     <ProtectedRoute><Home /></ProtectedRoute>
                 } />
-                <Route path="/courts" element={
-                    <ProtectedRoute><Courts /></ProtectedRoute>
+                <Route path="/facilities" element={
+                    <ProtectedRoute><Facilities /></ProtectedRoute>
+                } />
+                <Route path="/facilities/:id" element={
+                    <ProtectedRoute><FacilityDetail /></ProtectedRoute>
                 } />
                 <Route path="/courts/:id" element={
                     <ProtectedRoute><CourtDetail /></ProtectedRoute>
@@ -72,8 +78,11 @@ export default function App() {
                 <Route path="/owner/courts" element={
                     <ProtectedRoute roles={['owner']}><OwnerCourts /></ProtectedRoute>
                 } />
-                <Route path="/owner/courtDetail/:id" element={
-                    <ProtectedRoute roles={['owner']}><OwnerCourtDetail /></ProtectedRoute>
+                <Route path="/owner/facilities/new" element={
+                    <ProtectedRoute roles={['owner']}><OwnerCreateFacility /></ProtectedRoute>
+                } />
+                <Route path="/owner/facilities/:facilityId/courts/new" element={
+                    <ProtectedRoute roles={['owner']}><OwnerCreateCourt /></ProtectedRoute>
                 } />
 
                 {/* Admin routes */}

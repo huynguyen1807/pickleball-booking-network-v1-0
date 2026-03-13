@@ -14,6 +14,7 @@ import paymentRoutes from './routes/payment.routes';
 import chatRoutes from './routes/chat.routes';
 import adminRoutes from './routes/admin.routes';
 import statsRoutes from './routes/stats.routes';
+import facilityRoutes from './routes/facility.routes';
 import initSocket from './socket/index';
 
 dotenv.config();
@@ -29,6 +30,9 @@ app.use(cors());
 app.use(express.json({ limit: '15mb' }));
 app.use(express.urlencoded({ limit: '15mb', extended: true }));
 
+// serve uploaded files
+app.use('/uploads', express.static('uploads'));
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
@@ -41,6 +45,7 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/stats', statsRoutes);
+app.use('/api/facilities', facilityRoutes);
 
 // Health check
 app.get('/api/health', (req: Request, res: Response) => {

@@ -39,6 +39,12 @@ export default function CourtCard({ court }) {
                     <span className={styles.courtBookings}>{data.total_bookings} lượt đặt</span>
                 </div>
 
+                {data.owner_name && (
+                    <div style={{ marginTop: '8px', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                        👤 Chủ sân: <span style={{ fontWeight: 600 }}>{data.owner_name}</span>
+                    </div>
+                )}
+
                 <button className="btn btn-primary btn-sm" style={{ width: '100%', marginTop: '12px' }}>
                     Đặt sân ngay
                 </button>

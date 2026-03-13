@@ -9,6 +9,8 @@ export interface User {
   full_name?: string;
   phone?: string;
   skill_level?: string;
+  business_license_url?: string;
+  is_verified?: boolean;
   created_at: Date;
 }
 
