@@ -49,7 +49,7 @@ export const createBooking = async (req, res) => {
         const result = await pool.request()
             .input('user_id', sql.Int, req.user.id).input('court_id', sql.Int, court_id)
             .input('booking_date', sql.Date, booking_date).input('start_time', sql.NVarChar, start_time)
-            .input('end_time', sql.NVarChar, end_time).input('total_price', sql.Decimal(12, 2), total + commission)
+            .input('end_time', sql.NVarChar, end_time).input('total_price', sql.Decimal(12, 2), total)
             .input('commission_rate', sql.Decimal(4, 2), COMMISSION).input('commission_amount', sql.Decimal(12, 2), commission)
             .input('payment_method', sql.NVarChar, payment_method || 'mock')
             .input('status', sql.NVarChar, isPayOS ? 'pending' : 'confirmed')
@@ -59,12 +59,12 @@ export const createBooking = async (req, res) => {
         if (!isPayOS) {
             await pool.request()
                 .input('user_id', sql.Int, req.user.id).input('booking_id', sql.Int, result.recordset[0].id)
-                .input('amount', sql.Decimal(12, 2), total + commission).input('commission', sql.Decimal(12, 2), commission)
+                .input('amount', sql.Decimal(12, 2), total).input('commission', sql.Decimal(12, 2), commission)
                 .input('payment_method', sql.NVarChar, payment_method || 'mock')
                 .query("INSERT INTO payments (user_id, booking_id, amount, commission, payment_method, status) VALUES (@user_id, @booking_id, @amount, @commission, @payment_method, 'completed')");
         }
 
-        res.status(201).json({ message: 'Đặt sân thành công', bookingId: result.recordset[0].id, total: total + commission });
+        res.status(201).json({ message: 'Đặt sân thành công', bookingId: result.recordset[0].id, total });
     } catch (err) {
         console.error("LỖI TAO BOOKING:", err);
         res.status(500).json({ message: 'Lỗi server', error: err.message });
@@ -76,7 +76,25 @@ export const getMyBookings = async (req, res) => {
     try {
         const pool = await poolPromise;
         const result = await pool.request().input('user_id', sql.Int, req.user.id)
-            .query('SELECT b.*, c.name AS court_name, c.address FROM bookings b JOIN courts c ON b.court_id = c.id WHERE b.user_id = @user_id ORDER BY b.created_at DESC');
+            .query(`
+                SELECT
+                    b.id, b.user_id, b.court_id, b.court_slot_id,
+                    b.booking_date,
+                    CONVERT(NVARCHAR(8), b.start_time, 108) AS start_time,
+                    CONVERT(NVARCHAR(8), b.end_time, 108) AS end_time,
+                    b.total_price, b.commission_rate, b.commission_amount,
+                    LTRIM(RTRIM(LOWER(b.status))) AS status,
+                    b.payment_method, b.created_at,
+                    c.name AS court_name,
+                    f.name AS facility_name,
+                    f.address
+                FROM bookings b
+                LEFT JOIN courts c ON b.court_id = c.id
+                LEFT JOIN facilities f ON c.facility_id = f.id
+                WHERE b.user_id = @user_id
+                ORDER BY b.created_at DESC
+            `);
+        console.log('[getMyBookings] user_id:', req.user.id, '| rows:', result.recordset.length, '| statuses:', result.recordset.map((b: any) => b.status));
         res.json(result.recordset);
     } catch (err) {
         res.status(500).json({ message: 'Lỗi server' });

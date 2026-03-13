@@ -82,8 +82,7 @@ export default function Booking() {
         courtPrice = regularPrice + peakPriceTotal;
     }
 
-    const commission = courtPrice * 0.05
-    const total = courtPrice + commission
+    const total = courtPrice
 
     const formatPrice = (p) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(p)
     const formatDate = (d) => {
@@ -160,7 +159,6 @@ export default function Booking() {
                         {peakHours > 0 && (
                             <div className={styles.summaryRow} style={{ color: 'var(--accent-orange)' }}><span>🔥 Giờ vàng ({peakHours.toFixed(1)}h)</span><span>{formatPrice(peakPriceTotal)}</span></div>
                         )}
-                        <div className={styles.summaryRow}><span>Phí dịch vụ (5%)</span><span>{formatPrice(commission)}</span></div>
                         <div className={`${styles.summaryRow} ${styles.summaryTotal}`}><span>Tổng cộng</span><span>{formatPrice(total)}</span></div>
                     </div>
                     <button className="btn btn-primary btn-lg" style={{ width: '100%' }} disabled={submitting} onClick={handleConfirmBooking}>
@@ -261,7 +259,6 @@ export default function Booking() {
                         </button>
                         <PayOSPayment
                             checkoutUrl={paymentData.checkoutUrl}
-                            qrCode={paymentData.qrCode}
                             orderCode={paymentData.orderCode}
                             paymentLinkId={paymentData.paymentLinkId}
                             amount={paymentData.amount}

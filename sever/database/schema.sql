@@ -280,7 +280,7 @@ CREATE TABLE payments (
   commission DECIMAL(12,2) DEFAULT 0,
   payment_method NVARCHAR(50) DEFAULT 'mock',
   transaction_id NVARCHAR(100) UNIQUE,
-  status NVARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending','completed','failed','refunded')),
+  status NVARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending','completed','failed','refunded','cancelled','expired')),
   created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
 );
 GO

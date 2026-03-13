@@ -2,7 +2,10 @@ import { useState, useEffect, useRef } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
+import { io } from 'socket.io-client'
 import styles from '../styles/Navbar.module.css'
+
+const socket = io('http://localhost:5000')
 
 export default function Navbar() {
     const { user, logout } = useAuth()
@@ -11,6 +14,7 @@ export default function Navbar() {
     const [dropdownOpen, setDropdownOpen] = useState(false)
     const [mobileOpen, setMobileOpen] = useState(false)
     const [unreadCount, setUnreadCount] = useState(0)
+    const [chatUnread, setChatUnread] = useState(0)
     const dropdownRef = useRef(null)
 
     useEffect(() => {
@@ -43,6 +47,35 @@ export default function Navbar() {
         loadNotifications()
         const interval = setInterval(loadNotifications, 30000) // refresh every 30s
         return () => clearInterval(interval)
+    }, [user])
+
+    useEffect(() => {
+        if (!user) return
+
+        // Register online
+        socket.emit('user_online', user.id)
+        socket.emit('join_notifications', user.id)
+
+        // Load chat unread
+        const loadChatUnread = async () => {
+            try {
+                const res = await api.get('/chat/unread-count')
+                setChatUnread(res.data.count)
+            } catch { }
+        }
+        loadChatUnread()
+
+        // Listen for DM notifications
+        const handleDM = () => {
+            loadChatUnread()
+        }
+        socket.on('dm_notification', handleDM)
+
+        const chatInterval = setInterval(loadChatUnread, 30000)
+        return () => {
+            socket.off('dm_notification', handleDM)
+            clearInterval(chatInterval)
+        }
     }, [user])
 
     const handleLogout = () => {
@@ -100,6 +133,7 @@ export default function Navbar() {
                     <NavLink to="/chat" className={({ isActive }) => `${styles.navLink} ${isActive ? styles.active : ''}`}
                         onClick={() => setMobileOpen(false)}>
                         💬 Chat
+                        {chatUnread > 0 && <span className={styles.chatBadge}>{chatUnread}</span>}
                     </NavLink>
                 </li>
                 {user.role === 'owner' && (

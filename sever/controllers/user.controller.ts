@@ -1,5 +1,43 @@
 import { sql, poolPromise } from '../config/db';
 
+// Get public profile by user ID
+export const getUserProfile = async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request()
+            .input('id', sql.Int, req.params.id)
+            .query(`
+                SELECT u.id, u.full_name, u.avatar, u.role, u.phone, u.status, u.created_at,
+                    (SELECT COUNT(*) FROM bookings WHERE user_id = u.id) AS total_bookings,
+                    (SELECT COUNT(*) FROM match_players WHERE user_id = u.id AND status = 'joined') AS total_matches,
+                    (SELECT COUNT(*) FROM posts WHERE user_id = u.id) AS total_posts
+                FROM users u WHERE u.id = @id
+            `);
+        if (result.recordset.length === 0) return res.status(404).json({ message: 'Không tìm thấy người dùng' });
+        res.json(result.recordset[0]);
+    } catch (err) {
+        res.status(500).json({ message: 'Lỗi server' });
+    }
+};
+
+// Get brief user info (for hover card)
+export const getUserBrief = async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request()
+            .input('id', sql.Int, req.params.id)
+            .query(`
+                SELECT u.id, u.full_name, u.avatar, u.role, u.status, u.created_at,
+                    (SELECT COUNT(*) FROM match_players WHERE user_id = u.id AND status = 'joined') AS total_matches
+                FROM users u WHERE u.id = @id
+            `);
+        if (result.recordset.length === 0) return res.status(404).json({ message: 'Không tìm thấy người dùng' });
+        res.json(result.recordset[0]);
+    } catch (err) {
+        res.status(500).json({ message: 'Lỗi server' });
+    }
+};
+
 // Update profile
 export const updateProfile = async (req, res) => {
     try {

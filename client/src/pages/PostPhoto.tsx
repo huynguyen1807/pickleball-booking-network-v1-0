@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
 import { io as socketIO } from 'socket.io-client'
+import UserProfileCard from '../components/UserProfileCard'
 import styles from '../styles/PostPhoto.module.css'
 
 export default function PostPhoto() {
@@ -189,7 +190,13 @@ export default function PostPhoto() {
 
                 {/* Author info */}
                 <div className={styles.authorRow}>
-                    <div className={styles.avatar}>{getInitials(post.user_name)}</div>
+                    {post.user_id ? (
+                        <UserProfileCard userId={post.user_id}>
+                            <div className={styles.avatar} style={{ cursor: 'pointer' }}>{getInitials(post.user_name)}</div>
+                        </UserProfileCard>
+                    ) : (
+                        <div className={styles.avatar}>{getInitials(post.user_name)}</div>
+                    )}
                     <div>
                         <div className={styles.authorName}>{post.user_name}</div>
                         <div className={styles.postTime}>{timeAgo(post.created_at)}</div>
@@ -243,7 +250,13 @@ export default function PostPhoto() {
                             <div className={styles.noComments}>⏳ Đang tải...</div>
                         ) : commentsList.length > 0 ? commentsList.map((c: any) => (
                             <div key={c.id || c.created_at} className={styles.commentItem}>
-                                <div className={styles.commentAvatar}>{getInitials(c.user_name || c.full_name)}</div>
+                                {c.user_id ? (
+                                    <UserProfileCard userId={c.user_id}>
+                                        <div className={styles.commentAvatar} style={{ cursor: 'pointer' }}>{getInitials(c.user_name || c.full_name)}</div>
+                                    </UserProfileCard>
+                                ) : (
+                                    <div className={styles.commentAvatar}>{getInitials(c.user_name || c.full_name)}</div>
+                                )}
                                 <div className={styles.commentBubble}>
                                     <span className={styles.commentUser}>{c.user_name || c.full_name}</span>
                                     <span className={styles.commentText}>{c.content}</span>

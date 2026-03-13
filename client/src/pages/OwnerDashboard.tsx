@@ -27,6 +27,12 @@ export default function OwnerDashboard() {
 
     const formatPrice = (p) => new Intl.NumberFormat('vi-VN').format(p) + 'đ'
     const formatDate = (d) => new Date(d).toLocaleDateString('vi-VN')
+    const isReceivedStatus = (status) => status === 'confirmed' || status === 'completed'
+    const getNetReceived = (booking) => {
+        const total = Number(booking?.total_price || 0)
+        const commission = Number(booking?.commission_amount || 0)
+        return Math.max(total - commission, 0)
+    }
 
     if (loading) return <div className={styles.dashboardPage} style={{ textAlign: 'center', padding: '60px 20px' }}>⏳ Đang tải...</div>
 
@@ -85,7 +91,7 @@ export default function OwnerDashboard() {
                                     <th>Sân</th>
                                     <th>Ngày</th>
                                     <th>Giờ</th>
-                                    <th>Số tiền</th>
+                                    <th>Thực nhận</th>
                                     <th>Trạng thái</th>
                                 </tr>
                             </thead>
@@ -96,7 +102,9 @@ export default function OwnerDashboard() {
                                         <td>{b.court_name}</td>
                                         <td>{formatDate(b.booking_date)}</td>
                                         <td>{b.start_time} - {b.end_time}</td>
-                                        <td style={{ color: 'var(--accent-green)', fontWeight: 600 }}>{formatPrice(b.total_price)}</td>
+                                        <td style={{ color: isReceivedStatus(b.status) ? 'var(--accent-green)' : 'var(--text-muted)', fontWeight: 600 }}>
+                                            {isReceivedStatus(b.status) ? formatPrice(getNetReceived(b)) : '—'}
+                                        </td>
                                         <td>
                                             <span className={`badge ${b.status === 'confirmed' ? 'badge-green' : b.status === 'completed' ? 'badge-blue' : 'badge-yellow'}`}>
                                                 {statusLabels[b.status] || b.status}

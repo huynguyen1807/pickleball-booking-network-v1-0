@@ -2,6 +2,7 @@ import { useEffect, useCallback, useState, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
 import { io as socketIO } from 'socket.io-client'
+import UserProfileCard from './UserProfileCard'
 import styles from '../styles/ImageLightbox.module.css'
 
 interface LightboxProps {
@@ -164,7 +165,13 @@ export default function ImageLightbox({ imageUrl, post, onClose }: LightboxProps
                 <div className={styles.sidePanel}>
                     {/* Author */}
                     <div className={styles.postHeader}>
-                        <div className="avatar avatar-sm">{getInitials(post?.user_name)}</div>
+                        {post?.user_id ? (
+                            <UserProfileCard userId={post.user_id}>
+                                <div className="avatar avatar-sm" style={{ cursor: 'pointer' }}>{getInitials(post?.user_name)}</div>
+                            </UserProfileCard>
+                        ) : (
+                            <div className="avatar avatar-sm">{getInitials(post?.user_name)}</div>
+                        )}
                         <div>
                             <div className={styles.authorName}>{post?.user_name}</div>
                             <div className={styles.postTime}>{timeAgo(post?.created_at)}</div>
@@ -227,9 +234,17 @@ export default function ImageLightbox({ imageUrl, post, onClose }: LightboxProps
                                 <div className={styles.noComments}>⏳ Đang tải...</div>
                             ) : commentsList.length > 0 ? commentsList.map((c: any) => (
                                 <div key={c.id || c.created_at} className={styles.commentItem}>
-                                    <div className="avatar avatar-sm" style={{ flexShrink: 0, fontSize: '0.65rem' }}>
-                                        {getInitials(c.user_name || c.full_name)}
-                                    </div>
+                                    {c.user_id ? (
+                                        <UserProfileCard userId={c.user_id}>
+                                            <div className="avatar avatar-sm" style={{ flexShrink: 0, fontSize: '0.65rem', cursor: 'pointer' }}>
+                                                {getInitials(c.user_name || c.full_name)}
+                                            </div>
+                                        </UserProfileCard>
+                                    ) : (
+                                        <div className="avatar avatar-sm" style={{ flexShrink: 0, fontSize: '0.65rem' }}>
+                                            {getInitials(c.user_name || c.full_name)}
+                                        </div>
+                                    )}
                                     <div className={styles.commentBubble}>
                                         <span className={styles.commentUser}>{c.user_name || c.full_name}</span>
                                         <span className={styles.commentText}>{c.content}</span>

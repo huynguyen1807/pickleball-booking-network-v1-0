@@ -16,6 +16,7 @@ import adminRoutes from './routes/admin.routes';
 import statsRoutes from './routes/stats.routes';
 import facilityRoutes from './routes/facility.routes';
 import initSocket from './socket/index';
+import { cancelExpiredPayments } from './controllers/payment.controller';
 
 dotenv.config();
 
@@ -55,10 +56,16 @@ app.get('/api/health', (req: Request, res: Response) => {
 // Socket.IO
 initSocket(io);
 
+// Auto-cancel expired pending payments every 60 seconds
+setInterval(cancelExpiredPayments, 60 * 1000);
+// Also run once on startup to clear any payments that expired during downtime
+setTimeout(cancelExpiredPayments, 5000);
+
 // Start server
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
     console.log(`\n🏓 Pickleball API Server running on port ${PORT}`);
     console.log(`📡 Socket.IO ready`);
     console.log(`🔗 http://localhost:${PORT}/api/health\n`);
+    console.log(`⏰ Auto-cancel expired payments job started (every 60s)`);
 });

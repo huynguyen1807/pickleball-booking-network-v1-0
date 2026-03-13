@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
+import UserProfileCard from '../components/UserProfileCard'
 import styles from '../styles/Matchmaking.module.css'
 
 export default function MatchDetail() {
@@ -56,7 +57,6 @@ export default function MatchDetail() {
     if (!match) return <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-secondary)' }}>Không tìm thấy trận</div>
 
     const costPerPerson = Math.round(match.total_cost / match.max_players)
-    const commission = Math.round(costPerPerson * 0.05)
     const statusLabels = { waiting: 'Đang chờ ghép', confirmed: 'Đã xác nhận', completed: 'Hoàn thành', cancelled: 'Đã hủy' }
 
     const isPlayer = match.players?.some(p => p.user_id === user?.id && p.status === 'joined')
@@ -105,7 +105,9 @@ export default function MatchDetail() {
                     <div className={styles.playersList}>
                         {match.players?.filter(p => p.status === 'joined').map((p, i) => (
                             <div key={i} className={styles.playerItem}>
-                                <div className="avatar avatar-sm">{p.full_name?.charAt(0) || '?'}</div>
+                                <UserProfileCard userId={p.user_id}>
+                                    <div className="avatar avatar-sm" style={{ cursor: 'pointer' }}>{p.full_name?.charAt(0) || '?'}</div>
+                                </UserProfileCard>
                                 <div className={styles.playerInfo}>
                                     <div className={styles.playerName}>{p.full_name}</div>
                                     <div className={styles.playerStatus} style={{ color: 'var(--text-muted)' }}>
@@ -135,13 +137,9 @@ export default function MatchDetail() {
                             <span>Chia đều ({match.max_players} người)</span>
                             <span>{costPerPerson.toLocaleString('vi-VN')}đ/người</span>
                         </div>
-                        <div className={styles.costRow}>
-                            <span>Phí dịch vụ (5%)</span>
-                            <span>{commission.toLocaleString('vi-VN')}đ/người</span>
-                        </div>
                         <div className={`${styles.costRow} ${styles.costTotal}`}>
                             <span>Mỗi người thanh toán</span>
-                            <span>{(costPerPerson + commission).toLocaleString('vi-VN')}đ</span>
+                            <span>{costPerPerson.toLocaleString('vi-VN')}đ</span>
                         </div>
                     </div>
 

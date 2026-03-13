@@ -140,6 +140,7 @@ export const register = async (req, res) => {
         }
 
         // if owner make sure file was uploaded by multer
+        let businessLicenseUrl = null;
         if (role === 'owner') {
             if (!req.file) {
                 return res.status(400).json({ message: 'Vui lòng tải lên giấy phép kinh doanh' });
@@ -155,6 +156,7 @@ export const register = async (req, res) => {
             const filepath = path.join(uploadDir, filename);
             fs.writeFileSync(filepath, req.file.buffer);
             console.log(`[REGISTER] Saved business license file: ${filename}`);
+            businessLicenseUrl = `/uploads/business_licenses/${filename}`;
         }
 
         const pool = await poolPromise
@@ -185,9 +187,10 @@ export const register = async (req, res) => {
             await pool.request()
                 .input('user_id', sql.Int, userId)
                 .input('reason', sql.NVarChar, reason)
+                .input('business_license_url', sql.NVarChar(sql.MAX), businessLicenseUrl)
                 .query(`
-                    INSERT INTO upgrade_requests (user_id, reason, status)
-                    VALUES (@user_id, @reason, 'pending')
+                    INSERT INTO upgrade_requests (user_id, reason, status, business_license_url)
+                    VALUES (@user_id, @reason, 'pending', @business_license_url)
                 `)
         }
 
