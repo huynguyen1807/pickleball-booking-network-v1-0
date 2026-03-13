@@ -12,6 +12,7 @@ export default function Booking() {
     const [step, setStep] = useState(1)
     const [payment, setPayment] = useState('')
     const [court, setCourt] = useState(null)
+    const [subCourt, setSubCourt] = useState(null)
     const [loading, setLoading] = useState(true)
     const [submitting, setSubmitting] = useState(false)
     const [bookingResult, setBookingResult] = useState(null)
@@ -22,12 +23,21 @@ export default function Booking() {
     const bookingDate = searchParams.get('date') || new Date().toISOString().split('T')[0]
     const startTime = searchParams.get('start') || '18:00'
     const endTime = searchParams.get('end') || '20:00'
+    const subCourtId = searchParams.get('subCourt')
 
     useEffect(() => {
         const loadCourt = async () => {
             try {
                 const res = await api.get(`/courts/${id}`)
                 setCourt(res.data)
+                if (subCourtId) {
+                    try {
+                        const subRes = await api.get(`/courts/${id}/sub-courts/${subCourtId}`)
+                        setSubCourt(subRes.data)
+                    } catch (e) {
+                        console.warn('Cannot load sub-court:', e)
+                    }
+                }
             } catch (err) {
                 console.error('Failed to load court:', err)
             } finally {
@@ -35,7 +45,7 @@ export default function Booking() {
             }
         }
         loadCourt()
-    }, [id])
+    }, [id, subCourtId])
 
     const extractTimeH = (timeStr: string) => {
         if (!timeStr) return null;
@@ -85,6 +95,7 @@ export default function Booking() {
         try {
             const res = await api.post('/bookings', {
                 court_id: parseInt(id),
+                sub_court_id: subCourtId ? parseInt(subCourtId) : null,
                 booking_date: bookingDate,
                 start_time: startTime,
                 end_time: endTime,

@@ -29,7 +29,7 @@ export default function Home() {
         loadData()
     }, [])
 
-    const loadData = async () => {
+   const loadData = async () => {
         try {
             const [postsRes, matchesRes, facilitiesRes] = await Promise.all([
                 api.get('/posts'),

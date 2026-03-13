@@ -3,6 +3,8 @@ import jwt from 'jsonwebtoken';
 import nodemailer from 'nodemailer';
 import { sql, poolPromise } from '../config/db';
 import dotenv from 'dotenv';
+import path from 'path';
+import fs from 'fs';
 import type { StringValue } from 'ms';
 dotenv.config();
 
@@ -137,6 +139,26 @@ export const register = async (req, res) => {
             return res.status(400).json({ message: 'Vui lòng nhập lý do muốn trở thành chủ sân' })
         }
 
+        // if owner make sure file was uploaded by multer
+        let businessLicenseUrl = null;
+        if (role === 'owner') {
+            if (!req.file) {
+                return res.status(400).json({ message: 'Vui lòng tải lên giấy phép kinh doanh' });
+            }
+            // save file to disk with email in filename
+            const uploadDir = path.join(__dirname, '../uploads/business_licenses');
+            if (!fs.existsSync(uploadDir)) {
+                fs.mkdirSync(uploadDir, { recursive: true });
+            }
+            const ext = path.extname(req.file.originalname);
+            const base = path.basename(req.file.originalname, ext).replace(/[^a-zA-Z0-9-_\\.]/g, '_');
+            const filename = `${trimmedEmail}_${Date.now()}_${base}${ext}`;
+            const filepath = path.join(uploadDir, filename);
+            fs.writeFileSync(filepath, req.file.buffer);
+            console.log(`[REGISTER] Saved business license file: ${filename}`);
+            businessLicenseUrl = `/uploads/business_licenses/${filename}`;
+        }
+
         const pool = await poolPromise
 
         const hash = await bcrypt.hash(password, 10)
@@ -165,9 +187,10 @@ export const register = async (req, res) => {
             await pool.request()
                 .input('user_id', sql.Int, userId)
                 .input('reason', sql.NVarChar, reason)
+                .input('business_license_url', sql.NVarChar(sql.MAX), businessLicenseUrl)
                 .query(`
-                    INSERT INTO upgrade_requests (user_id, reason, status)
-                    VALUES (@user_id, @reason, 'pending')
+                    INSERT INTO upgrade_requests (user_id, reason, status, business_license_url)
+                    VALUES (@user_id, @reason, 'pending', @business_license_url)
                 `)
         }
 

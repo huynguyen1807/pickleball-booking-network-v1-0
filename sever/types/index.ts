@@ -9,6 +9,8 @@ export interface User {
   full_name?: string;
   phone?: string;
   skill_level?: string;
+  business_license_url?: string;
+  is_verified?: boolean;
   created_at: Date;
 }
 
@@ -26,7 +28,7 @@ export interface Court {
   name: string;
   description?: string;
   location: string;
-  price_per_hour: number;
+  number_of_small_court: number;
   owner_id: number;
   status: 'active' | 'inactive';
   created_at: Date;

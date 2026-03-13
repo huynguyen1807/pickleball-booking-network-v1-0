@@ -6,7 +6,7 @@ const COMMISSION = parseFloat(process.env.COMMISSION_RATE) || 0.05;
 // Create booking
 export const createBooking = async (req, res) => {
     try {
-        const { court_id, booking_date, start_time, end_time, payment_method } = req.body;
+        const { court_id, sub_court_id, booking_date, start_time, end_time, payment_method } = req.body;
         const pool = await poolPromise;
         const isPayOS = payment_method === 'payos';
 

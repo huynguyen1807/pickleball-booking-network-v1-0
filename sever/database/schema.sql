@@ -20,6 +20,8 @@ CREATE TABLE users (
   avatar NVARCHAR(500),
   role NVARCHAR(20) DEFAULT 'user' CHECK (role IN ('user','owner','admin')),
   status NVARCHAR(20) DEFAULT 'active' CHECK (status IN ('active','pending','rejected')),
+  business_license_url NVARCHAR(500) NULL,
+  is_verified BIT DEFAULT 0,
   latitude DECIMAL(10,7),
   longitude DECIMAL(10,7),
   created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET(),
@@ -35,6 +37,7 @@ CREATE TABLE upgrade_requests (
   reason NVARCHAR(MAX),
   status NVARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected')),
   admin_note NVARCHAR(MAX),
+  business_license_url NVARCHAR(MAX),
   created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET(),
   updated_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
 );
@@ -48,7 +51,17 @@ CREATE TABLE facilities (
   name NVARCHAR(200) NOT NULL,
   address NVARCHAR(500) NOT NULL,
   description NVARCHAR(MAX),
-  image NVARCHAR(500),
+
+  phone NVARCHAR(20),
+  open_time VARCHAR(10),
+  close_time VARCHAR(10),
+
+  avatar NVARCHAR(500),
+  cover_image NVARCHAR(500),
+
+  gallery NVARCHAR(MAX),     -- JSON list ảnh
+  amenities NVARCHAR(MAX),   -- JSON list tiện ích
+
   is_active BIT DEFAULT 1,
   created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
 );
@@ -58,15 +71,90 @@ GO
 IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='courts' AND xtype='U')
 CREATE TABLE courts (
   id INT IDENTITY(1,1) PRIMARY KEY,
-  facility_id INT NOT NULL FOREIGN KEY REFERENCES facilities(id) ON DELETE CASCADE,
+
+  facility_id INT NOT NULL
+  FOREIGN KEY REFERENCES facilities(id) ON DELETE CASCADE,
+
   name NVARCHAR(200) NOT NULL,
   image NVARCHAR(500),
+
   price_per_hour DECIMAL(12,2) NOT NULL,
+
   latitude DECIMAL(10,7),
   longitude DECIMAL(10,7),
+
+  court_type NVARCHAR(50),      -- indoor / outdoor
+  surface_type NVARCHAR(50),    -- hard / grass / synthetic
+  status NVARCHAR(20),          -- active / maintenance
+
+  peak_start_time VARCHAR(10),
+  peak_end_time VARCHAR(10),
+  peak_price DECIMAL(12,2),
+
+  weekend_price DECIMAL(12,2),
+
+  slot_step_minutes INT DEFAULT 60,
+
   is_active BIT DEFAULT 1,
+  price_per_hour DECIMAL(12,2) DEFAULT 0.00,
+  peak_start_time DATETIME NULL,
+  peak_end_time DATETIME NULL,
+  peak_price_per_hour DECIMAL(12,2) DEFAULT 0.00,
+  weekend_price_per_hour DECIMAL(12,2) DEFAULT 0.00,
+  min_booking_minutes INT DEFAULT 30,
+  slot_step_minutes INT DEFAULT 15,
   created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
 );
+GO
+
+-- SUB COURTS
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='sub_courts' AND xtype='U')
+CREATE TABLE sub_courts (
+  id INT IDENTITY(1,1) PRIMARY KEY,
+  court_id INT NOT NULL FOREIGN KEY REFERENCES courts(id) ON DELETE CASCADE,
+  name NVARCHAR(200) NOT NULL,
+  court_type NVARCHAR(50) NOT NULL,
+  surface_type NVARCHAR(50) NOT NULL,
+  status NVARCHAR(20) DEFAULT 'active' CHECK (status IN ('active','maintenance')),
+  price_per_hour DECIMAL(12,2) DEFAULT 0.00,
+  peak_start_time TIMESTAMP NULL,
+  peak_end_time TIMESTAMP NULL,
+  peak_price_per_hour DECIMAL(12,2) DEFAULT 0.00,
+  weekend_price_per_hour DECIMAL(12,2) DEFAULT 0.00,
+  min_booking_minutes INT DEFAULT 30,
+  slot_step_minutes INT DEFAULT 15,
+  created_at DATETIME DEFAULT GETDATE(),
+  updated_at DATETIME DEFAULT GETDATE()
+);
+GO
+
+-- Add pricing columns to sub_courts if they don't exist
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('sub_courts') AND name = 'price_per_hour')
+  ALTER TABLE sub_courts ADD price_per_hour DECIMAL(12,2) DEFAULT 0.00;
+GO
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('sub_courts') AND name = 'peak_start_time')
+  ALTER TABLE sub_courts ADD peak_start_time TIME NULL;
+GO
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('sub_courts') AND name = 'peak_end_time')
+  ALTER TABLE sub_courts ADD peak_end_time TIME NULL;
+GO
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('sub_courts') AND name = 'peak_price_per_hour')
+  ALTER TABLE sub_courts ADD peak_price_per_hour DECIMAL(12,2) DEFAULT 0.00;
+GO
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('sub_courts') AND name = 'weekend_price_per_hour')
+  ALTER TABLE sub_courts ADD weekend_price_per_hour DECIMAL(12,2) DEFAULT 0.00;
+GO
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('sub_courts') AND name = 'min_booking_minutes')
+  ALTER TABLE sub_courts ADD min_booking_minutes INT DEFAULT 30;
+GO
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('sub_courts') AND name = 'slot_step_minutes')
+  ALTER TABLE sub_courts ADD slot_step_minutes INT DEFAULT 15;
 GO
 
 -- COURT SLOTS

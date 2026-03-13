@@ -1,5 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import styles from '../styles/Cards.module.css'
+import { useState, useEffect } from 'react'
+
 
 export default function CourtCard({ court }) {
     const navigate = useNavigate()
@@ -12,7 +14,8 @@ export default function CourtCard({ court }) {
         rating: 4.5,
         total_bookings: 128,
         is_active: true,
-        distance: 2.3
+        distance: 2.3,
+        sub_courts_count: 0
     }
 
     const formatPrice = (price) => {
@@ -23,7 +26,7 @@ export default function CourtCard({ court }) {
         <div className={styles.courtCard} onClick={() => navigate(`/courts/${data.id}`)}>
             <div className={styles.courtImage}>
                 <div className={styles.courtImagePlaceholder}>🏟️</div>
-                <div className={styles.courtPrice}>{formatPrice(data.price_per_hour)}/h</div>
+                <div className={styles.courtPrice}>{data.sub_courts_count ?? 0} sân</div>
                 {data.distance && <div className={styles.courtDistance}>📍 {data.distance} km</div>}
             </div>
 

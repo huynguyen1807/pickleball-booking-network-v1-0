@@ -36,6 +36,15 @@ const poolPromise = new sql.ConnectionPool(config).connect()
                     PRINT 'Migrated posts.image to NVARCHAR(MAX)';
                 END
             `);
+
+            // Auto-migration for upgrade_requests.business_license_url column
+            await pool.request().query(`
+                IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='upgrade_requests' AND COLUMN_NAME='business_license_url')
+                BEGIN
+                    ALTER TABLE upgrade_requests ADD business_license_url NVARCHAR(MAX);
+                    PRINT 'Added business_license_url to upgrade_requests';
+                END
+            `);
         } catch (e) {
             console.error('Migration failed:', e);
         }

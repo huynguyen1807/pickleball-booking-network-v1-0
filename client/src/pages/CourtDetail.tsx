@@ -12,6 +12,8 @@ export default function CourtDetail() {
     const navigate = useNavigate()
     const { user } = useAuth()
     const [court, setCourt] = useState(null)
+    const [subCourts, setSubCourts] = useState<any[]>([])
+    const [selectedSubCourt, setSelectedSubCourt] = useState<any>(null)
     const [loading, setLoading] = useState(true)
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
     const [startTime, setStartTime] = useState('')
@@ -45,6 +47,14 @@ export default function CourtDetail() {
         try {
             const res = await api.get(`/courts/${id}`)
             setCourt(res.data)
+            // load sub-courts for this court
+            try {
+                const sub = await api.get(`/courts/${id}/sub-courts`)
+                setSubCourts(sub.data || [])
+                setSelectedSubCourt(sub.data && sub.data.length ? sub.data[0] : null)
+            } catch (e) {
+                console.warn('Không tải được sân con', e)
+            }
         } catch (err) {
             console.error('Failed to load court:', err)
         } finally {
@@ -67,6 +77,11 @@ export default function CourtDetail() {
     }
 
     const formatPrice = (p) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(p)
+
+    const toMinutes = t => {
+        const [h, m] = t.split(':').map(Number)
+        return h * 60 + m
+    }
 
     if (loading) return <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-secondary)' }}>⏳ Đang tải...</div>
     if (!court) return <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-secondary)' }}>Không tìm thấy sân</div>
@@ -192,8 +207,8 @@ export default function CourtDetail() {
                                     <div className={styles.statLabel}>Lượt đặt</div>
                                 </div>
                                 <div className={styles.stat}>
-                                    <div className={styles.statValue}>{formatPrice(court.price_per_hour)}</div>
-                                    <div className={styles.statLabel}>/ giờ</div>
+                                    <div className={styles.statValue}>{subCourts.length || 0}</div>
+                                    <div className={styles.statLabel}> Sân</div>
                                 </div>
                             </div>
                         </div>

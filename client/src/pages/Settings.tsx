@@ -20,6 +20,7 @@ export default function Settings() {
     const [saving, setSaving] = useState(false)
     const [changingPassword, setChangingPassword] = useState(false)
     const [submittingUpgrade, setSubmittingUpgrade] = useState(false)
+    const [licenseFile, setLicenseFile] = useState<File | null>(null)
 
     const handleSaveProfile = async () => {
         setSaving(true)
@@ -64,11 +65,26 @@ export default function Settings() {
     }
 
     const handleUpgradeRequest = async () => {
+        if (!upgradeReason.trim()) {
+            alert('Vui lòng nhập lý do!');
+            return;
+        }
+        if (!licenseFile) {
+            alert('Vui lòng tải lên giấy phép kinh doanh!');
+            return;
+        }
+
         setSubmittingUpgrade(true)
         try {
-            await api.post('/users/upgrade-request', { reason: upgradeReason })
+            const formData = new FormData();
+            formData.append('reason', upgradeReason);
+            formData.append('license', licenseFile);
+
+            await api.post('/users/upgrade-request', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            })
             setUpgradeSubmitted(true)
-        } catch (err) {
+        } catch (err: any) {
             alert(err.response?.data?.message || 'Lỗi gửi yêu cầu')
         } finally {
             setSubmittingUpgrade(false)
@@ -138,14 +154,20 @@ export default function Settings() {
                         ) : (
                             <>
                                 <div className="input-group" style={{ marginBottom: '14px' }}>
-                                    <label>Lý do muốn trở thành Owner</label>
+                                    <label>Lý do muốn trở thành Owner <span style={{ color: 'red' }}>*</span></label>
                                     <textarea className="input-field" rows={3}
                                         placeholder="VD: Tôi có 2 sân pickleball tại Hòa Xuân và muốn cho thuê qua nền tảng..."
                                         value={upgradeReason}
                                         onChange={e => setUpgradeReason(e.target.value)}
                                         style={{ resize: 'vertical' }} />
                                 </div>
-                                <button className="btn btn-primary" disabled={!upgradeReason.trim() || submittingUpgrade}
+                                <div className="input-group" style={{ marginBottom: '14px' }}>
+                                    <label>Giấy phép kinh doanh (Hình ảnh / PDF) <span style={{ color: 'red' }}>*</span></label>
+                                    <input type="file" className="input-field"
+                                        accept="image/jpeg, image/png, image/webp, application/pdf"
+                                        onChange={e => setLicenseFile(e.target.files ? e.target.files[0] : null)} />
+                                </div>
+                                <button className="btn btn-primary" disabled={!upgradeReason.trim() || !licenseFile || submittingUpgrade}
                                     onClick={handleUpgradeRequest}>
                                     {submittingUpgrade ? '⏳...' : '📤 Gửi yêu cầu nâng cấp'}
                                 </button>
