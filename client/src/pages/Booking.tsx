@@ -105,7 +105,9 @@ export default function Booking() {
             setBookingResult(res.data)
             setStep(2)
         } catch (err) {
-            alert(err.response?.data?.error || err.response?.data?.message || 'Đặt sân thất bại')
+            const errData = err.response?.data
+            const msg = errData?.message || errData?.error || 'Đặt sân thất bại'
+            alert('⚠️ ' + msg)
         } finally {
             setSubmitting(false)
         }

@@ -162,6 +162,91 @@ export const getMyCourts = async (req, res) => {
     }
 };
 
+// Get court slots for a specific date (dùng cho lưới slot)
+export const getCourtSlots = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { date } = req.query;
+
+        if (!date) return res.status(400).json({ message: 'Thiếu tham số date' });
+
+        const pool = await poolPromise;
+
+        // Lấy giờ mở/đóng cửa của facility
+        const courtInfo = await pool.request()
+            .input('id', sql.Int, id)
+            .query(`
+                SELECT f.open_time, f.close_time
+                FROM courts c
+                JOIN facilities f ON c.facility_id = f.id
+                WHERE c.id = @id AND c.is_active = 1
+            `);
+
+        if (courtInfo.recordset.length === 0)
+            return res.status(404).json({ message: 'Không tìm thấy sân' });
+
+        const openTime  = courtInfo.recordset[0].open_time  || '06:00';
+        const closeTime = courtInfo.recordset[0].close_time || '22:00';
+
+        // Lấy danh sách slots từ DB (đã được seed)
+        const slotsResult = await pool.request()
+            .input('court_id',  sql.Int,  id)
+            .input('slot_date', sql.Date, date as string)
+            .query(`
+                SELECT
+                    CONVERT(NVARCHAR(5), start_time, 108) AS start_time,
+                    CONVERT(NVARCHAR(5), end_time,   108) AS end_time,
+                    is_available
+                FROM court_slots
+                WHERE court_id  = @court_id
+                  AND slot_date = @slot_date
+                ORDER BY start_time
+            `);
+
+        // Nếu chưa có slot trong DB → tự sinh trên-the-fly
+        if (slotsResult.recordset.length === 0) {
+            // Lấy booking đã có
+            const bookingsResult = await pool.request()
+                .input('court_id',     sql.Int,  id)
+                .input('booking_date', sql.Date, date as string)
+                .query(`
+                    SELECT
+                        CONVERT(NVARCHAR(5), start_time, 108) AS start_time,
+                        CONVERT(NVARCHAR(5), end_time,   108) AS end_time
+                    FROM bookings
+                    WHERE court_id     = @court_id
+                      AND booking_date = @booking_date
+                      AND status IN ('confirmed', 'pending')
+                `);
+            const bookedRanges = bookingsResult.recordset;
+
+            // Sinh slot 30 phút từ open_time đến close_time
+            const slots: any[] = [];
+            const [oh, om] = openTime.split(':').map(Number);
+            const [ch, cm] = closeTime.split(':').map(Number);
+            let curMin = oh * 60 + om;
+            const endMin = ch * 60 + cm;
+
+            while (curMin + 30 <= endMin) {
+                const st = `${String(Math.floor(curMin / 60)).padStart(2, '0')}:${String(curMin % 60).padStart(2, '0')}`;
+                const et = `${String(Math.floor((curMin + 30) / 60)).padStart(2, '0')}:${String((curMin + 30) % 60).padStart(2, '0')}`;
+                const booked = bookedRanges.some(b => st < b.end_time && et > b.start_time);
+                slots.push({ start_time: st, end_time: et, is_available: !booked });
+                curMin += 30;
+            }
+            return res.json(slots);
+        }
+
+        res.json(slotsResult.recordset.map(s => ({
+            ...s,
+            is_available: s.is_available === true || s.is_available === 1
+        })));
+    } catch (err) {
+        console.error('Lỗi lấy court slots:', err);
+        res.status(500).json({ message: 'Lỗi server' });
+    }
+};
+
 // Add review
 export const addReview = async (req, res) => {
     try {
