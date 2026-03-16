@@ -7,13 +7,13 @@ import { successResponse, errorResponse, serverError, webhookResponse } from '..
 dotenv.config();
 
 // ===== PayOS Configuration =====
-const PAYOS_CLIENT_ID = process.env.PAYOS_CLIENT_ID || '';
-const PAYOS_API_KEY = process.env.PAYOS_API_KEY || '';
-const PAYOS_CHECKSUM_KEY = process.env.PAYOS_CHECKSUM_KEY || '';
-const PAYOS_API_URL = process.env.PAYOS_API_URL || 'https://api-merchant.payos.vn';
-const PAYOS_RETURN_URL = process.env.PAYOS_RETURN_URL || 'http://localhost:5173/payment/result';
-const PAYOS_CANCEL_URL = process.env.PAYOS_CANCEL_URL || 'http://localhost:5000/api/payments/payos-cancel-return';
-const PAYOS_WEBHOOK_URL = process.env.PAYOS_WEBHOOK_URL || 'http://localhost:3000/api/payments/payos-webhook';
+const PAYOS_CLIENT_ID = process.env.PAYOS_CLIENT_ID;
+const PAYOS_API_KEY = process.env.PAYOS_API_KEY;
+const PAYOS_CHECKSUM_KEY = process.env.PAYOS_CHECKSUM_KEY;
+const PAYOS_API_URL = process.env.PAYOS_API_URL;
+const PAYOS_RETURN_URL = process.env.PAYOS_RETURN_URL;
+const PAYOS_CANCEL_URL = process.env.PAYOS_CANCEL_URL;
+const PAYOS_WEBHOOK_URL = process.env.PAYOS_WEBHOOK_URL;
 
 // ===== Helper Functions =====
 
@@ -131,6 +131,67 @@ export const updateBookingStatus = async (bookingId: number, status: string) => 
         .input('id', sql.Int, bookingId)
         .input('status', sql.NVarChar, status)
         .query('UPDATE bookings SET status = @status WHERE id = @id');
+};
+
+const mapPayOSStatusToLocal = (payosStatusRaw: any): string => {
+    const payosStatus = String(payosStatusRaw || '').toUpperCase();
+    if (payosStatus === 'PAID') return 'completed';
+    if (payosStatus === 'CANCELLED') return 'cancelled';
+    if (payosStatus === 'EXPIRED') return 'expired';
+    if (payosStatus === 'PENDING') return 'pending';
+    return 'failed';
+};
+
+const syncPendingPaymentFromPayOS = async (orderCode: string | number): Promise<string | null> => {
+    const pool = await poolPromise;
+    const transactionPattern = `payos_${orderCode}_%`;
+
+    const payment = await pool.request()
+        .input('transaction_pattern', sql.NVarChar, transactionPattern)
+        .query(`
+            SELECT TOP 1 id, booking_id, status, transaction_id
+            FROM payments
+            WHERE transaction_id LIKE @transaction_pattern
+            ORDER BY created_at DESC
+        `);
+
+    if (payment.recordset.length === 0) return null;
+
+    const record = payment.recordset[0];
+    if (record.status !== 'pending') return record.status;
+
+    const transactionId: string = record.transaction_id || '';
+    const parts = transactionId.split('_');
+    const paymentLinkId = parts.length >= 3 ? parts.slice(2).join('_') : '';
+    if (!paymentLinkId) return record.status;
+
+    const response = await axios.get(
+        `${PAYOS_API_URL}/v2/payment-requests/${paymentLinkId}`,
+        {
+            headers: {
+                'x-client-id': PAYOS_CLIENT_ID,
+                'x-api-key': PAYOS_API_KEY
+            }
+        }
+    );
+
+    if (response.data?.code !== '00') return record.status;
+
+    const nextStatus = mapPayOSStatusToLocal(response.data?.data?.status);
+    if (nextStatus === 'pending') return record.status;
+
+    await updatePaymentStatus(record.id, nextStatus);
+
+    if (record.booking_id) {
+        const bookingTargetStatus = nextStatus === 'completed' ? 'confirmed' : 'cancelled';
+        await pool.request()
+            .input('id', sql.Int, record.booking_id)
+            .input('status', sql.NVarChar, bookingTargetStatus)
+            .query(`UPDATE bookings SET status = @status WHERE id = @id AND status = 'pending'`);
+    }
+
+    console.log(`[PayOS Sync] orderCode=${orderCode} status=${nextStatus}`);
+    return nextStatus;
 };
 
 // ===== Public Functions =====
@@ -307,7 +368,12 @@ export const payosWebhook = async (req: any, res: any) => {
             const expectedSignature = calculatePayOSSignature(queryString, PAYOS_CHECKSUM_KEY);
 
             if (signature !== expectedSignature) {
-                console.log('PayOS Webhook: Invalid signature');
+                console.log('PayOS Webhook: Invalid signature', {
+                    orderCode: data.orderCode,
+                    receivedSigPrefix: String(signature || '').slice(0, 8),
+                    expectedSigPrefix: String(expectedSignature || '').slice(0, 8),
+                    checksumKeyLength: String(PAYOS_CHECKSUM_KEY || '').length
+                });
                 return res.status(400).json({
                     code: '97',
                     message: 'Invalid signature'
@@ -395,9 +461,23 @@ export const payosReturn = async (req: any, res: any) => {
             return errorResponse(res, 'Thanh toán không tìm thấy');
         }
 
+        if (payment.recordset[0].status === 'pending') {
+            try {
+                await syncPendingPaymentFromPayOS(orderCode);
+            } catch (syncErr: any) {
+                console.warn('PayOS return sync warning:', syncErr.message);
+            }
+        }
+
+        const latest = await pool.request()
+            .input('transaction_pattern', sql.NVarChar, transactionPattern)
+            .query('SELECT TOP 1 status FROM payments WHERE transaction_id LIKE @transaction_pattern ORDER BY created_at DESC');
+
+        const latestStatus = latest.recordset[0]?.status || payment.recordset[0].status;
+
         return successResponse(res, {
-            status: payment.recordset[0].status
-        }, payment.recordset[0].status === 'completed' ?
+            status: latestStatus
+        }, latestStatus === 'completed' ?
             'Thanh toán thành công' :
             'Đang xử lý thanh toán...');
     } catch (err: any) {
@@ -414,6 +494,12 @@ export const payosReturn = async (req: any, res: any) => {
 export const payosCheckStatus = async (req: any, res: any) => {
     try {
         const { orderCode } = req.params;
+
+        try {
+            await syncPendingPaymentFromPayOS(orderCode);
+        } catch (syncErr: any) {
+            console.warn('PayOS status sync warning:', syncErr.message);
+        }
 
         const pool = await poolPromise;
         const transactionPattern = `payos_${orderCode}_%`;
