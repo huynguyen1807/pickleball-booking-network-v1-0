@@ -17,6 +17,7 @@ import statsRoutes from './routes/stats.routes';
 import facilityRoutes from './routes/facility.routes';
 import initSocket from './socket/index';
 import { cancelExpiredPayments } from './controllers/payment.controller';
+import { autoCheckMatches } from './controllers/match.controller';
 
 dotenv.config();
 
@@ -60,6 +61,10 @@ initSocket(io);
 setInterval(cancelExpiredPayments, 60 * 1000);
 // Also run once on startup to clear any payments that expired during downtime
 setTimeout(cancelExpiredPayments, 5000);
+
+// Auto-cancel matches with insufficient players 30 min before start (every 10 min)
+setInterval(autoCheckMatches, 10 * 60 * 1000);
+setTimeout(autoCheckMatches, 15 * 1000);
 
 // Start server
 const PORT = process.env.PORT || 5000;

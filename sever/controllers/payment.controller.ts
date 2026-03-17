@@ -13,7 +13,6 @@ const PAYOS_CHECKSUM_KEY = process.env.PAYOS_CHECKSUM_KEY;
 const PAYOS_API_URL = process.env.PAYOS_API_URL;
 const PAYOS_RETURN_URL = process.env.PAYOS_RETURN_URL;
 const PAYOS_CANCEL_URL = process.env.PAYOS_CANCEL_URL;
-const PAYOS_WEBHOOK_URL = process.env.PAYOS_WEBHOOK_URL;
 
 // ===== Helper Functions =====
 
@@ -37,6 +36,17 @@ export const generateRandomDescription = (): string => {
 };
 
 /**
+ * Tạo description theo loại giao dịch để dễ phân biệt trên sao kê
+ * Ví dụ: BK0012A8F4 / MT0034Z1K9
+ */
+export const generatePaymentDescription = (type: 'booking' | 'match', refId: number): string => {
+    const prefix = type === 'booking' ? 'BK' : 'MT';
+    const ref = String(refId).padStart(4, '0').slice(-4);
+    const randomSuffix = generateRandomDescription().slice(0, 4).toUpperCase();
+    return `${prefix}${ref}${randomSuffix}`;
+};
+
+/**
  * Sắp xếp object theo alphabet
  */
 export const sortParams = (obj: any): any => {
@@ -53,7 +63,12 @@ export const sortParams = (obj: any): any => {
  */
 export const createQueryString = (obj: any): string => {
     return Object.keys(obj)
-        .map(key => `${key}=${obj[key]}`)
+        .filter(key => obj[key] !== undefined)
+        .map(key => {
+            const value = obj[key];
+            // null values must be serialised as empty string to match PayOS backend
+            return `${key}=${value === null ? '' : value}`;
+        })
         .join('&');
 };
 
@@ -65,14 +80,6 @@ export const calculatePayOSSignature = (data: string, checksumKey: string): stri
         .createHmac('sha256', checksumKey)
         .update(Buffer.from(data, 'utf-8'))
         .digest('hex');
-};
-
-/**
- * Verify PayOS Signature
- */
-export const verifyPayOSSignature = (data: string, clientSignature: string, checksumKey: string): boolean => {
-    const serverSignature = calculatePayOSSignature(data, checksumKey);
-    return serverSignature === clientSignature;
 };
 
 // ===== Database Helpers =====
@@ -122,76 +129,87 @@ export const updatePaymentStatus = async (paymentId: number, status: string) => 
         .query('UPDATE payments SET status = @status WHERE id = @id');
 };
 
-/**
- * Update booking status
- */
-export const updateBookingStatus = async (bookingId: number, status: string) => {
-    const pool = await poolPromise;
-    await pool.request()
-        .input('id', sql.Int, bookingId)
-        .input('status', sql.NVarChar, status)
-        .query('UPDATE bookings SET status = @status WHERE id = @id');
+const toValidInt = (value: any): number | null => {
+    const n = Number(value);
+    return Number.isInteger(n) && n > 0 ? n : null;
 };
 
-const mapPayOSStatusToLocal = (payosStatusRaw: any): string => {
-    const payosStatus = String(payosStatusRaw || '').toUpperCase();
-    if (payosStatus === 'PAID') return 'completed';
-    if (payosStatus === 'CANCELLED') return 'cancelled';
-    if (payosStatus === 'EXPIRED') return 'expired';
-    if (payosStatus === 'PENDING') return 'pending';
-    return 'failed';
-};
-
-const syncPendingPaymentFromPayOS = async (orderCode: string | number): Promise<string | null> => {
+const recalcMatchStatus = async (matchId: number): Promise<void> => {
     const pool = await poolPromise;
-    const transactionPattern = `payos_${orderCode}_%`;
 
-    const payment = await pool.request()
-        .input('transaction_pattern', sql.NVarChar, transactionPattern)
+    const summary = await pool.request()
+        .input('match_id', sql.Int, matchId)
         .query(`
-            SELECT TOP 1 id, booking_id, status, transaction_id
-            FROM payments
-            WHERE transaction_id LIKE @transaction_pattern
-            ORDER BY created_at DESC
+            SELECT
+                m.max_players,
+                m.status,
+                SUM(CASE WHEN mp.status = 'joined' THEN 1 ELSE 0 END) AS joined_count,
+                SUM(CASE WHEN mp.status = 'joined' AND mp.payment_status = 'paid' THEN 1 ELSE 0 END) AS paid_joined_count
+            FROM matches m
+            LEFT JOIN match_players mp ON mp.match_id = m.id
+            WHERE m.id = @match_id
+            GROUP BY m.max_players, m.status
         `);
 
-    if (payment.recordset.length === 0) return null;
+    if (summary.recordset.length === 0) return;
 
-    const record = payment.recordset[0];
-    if (record.status !== 'pending') return record.status;
+    const row = summary.recordset[0];
+    const maxPlayers = Number(row.max_players) || 0;
+    const joinedCount = Number(row.joined_count) || 0;
+    const paidJoinedCount = Number(row.paid_joined_count) || 0;
+    const currentStatus = String(row.status || '').toLowerCase();
 
-    const transactionId: string = record.transaction_id || '';
-    const parts = transactionId.split('_');
-    const paymentLinkId = parts.length >= 3 ? parts.slice(2).join('_') : '';
-    if (!paymentLinkId) return record.status;
+    if (['completed', 'finished', 'cancelled'].includes(currentStatus)) return;
 
-    const response = await axios.get(
-        `${PAYOS_API_URL}/v2/payment-requests/${paymentLinkId}`,
-        {
-            headers: {
-                'x-client-id': PAYOS_CLIENT_ID,
-                'x-api-key': PAYOS_API_KEY
-            }
-        }
-    );
-
-    if (response.data?.code !== '00') return record.status;
-
-    const nextStatus = mapPayOSStatusToLocal(response.data?.data?.status);
-    if (nextStatus === 'pending') return record.status;
-
-    await updatePaymentStatus(record.id, nextStatus);
-
-    if (record.booking_id) {
-        const bookingTargetStatus = nextStatus === 'completed' ? 'confirmed' : 'cancelled';
-        await pool.request()
-            .input('id', sql.Int, record.booking_id)
-            .input('status', sql.NVarChar, bookingTargetStatus)
-            .query(`UPDATE bookings SET status = @status WHERE id = @id AND status = 'pending'`);
+    let nextStatus = 'waiting';
+    if (joinedCount >= maxPlayers && maxPlayers > 0) {
+        nextStatus = paidJoinedCount >= maxPlayers ? 'confirmed' : 'full';
     }
 
-    console.log(`[PayOS Sync] orderCode=${orderCode} status=${nextStatus}`);
-    return nextStatus;
+    await pool.request()
+        .input('id', sql.Int, matchId)
+        .input('current_players', sql.Int, joinedCount)
+        .input('status', sql.NVarChar, nextStatus)
+        .query(`
+            UPDATE matches
+            SET current_players = @current_players,
+                status = @status
+            WHERE id = @id AND status NOT IN ('completed', 'finished', 'cancelled')
+        `);
+};
+
+const syncMatchPaymentState = async (paymentRecord: any, nextPaymentStatus: string): Promise<void> => {
+    const matchId = toValidInt(paymentRecord?.match_id);
+    const userId = toValidInt(paymentRecord?.user_id);
+    if (!matchId || !userId) return;
+
+    const pool = await poolPromise;
+
+    if (nextPaymentStatus === 'completed') {
+        await pool.request()
+            .input('match_id', sql.Int, matchId)
+            .input('user_id', sql.Int, userId)
+            .query(`
+                UPDATE match_players
+                SET payment_status = 'paid'
+                WHERE match_id = @match_id
+                  AND user_id = @user_id
+                  AND status = 'joined'
+            `);
+    } else if (['failed', 'cancelled', 'expired'].includes(nextPaymentStatus)) {
+        await pool.request()
+            .input('match_id', sql.Int, matchId)
+            .input('user_id', sql.Int, userId)
+            .query(`
+                UPDATE match_players
+                SET payment_status = 'pending'
+                WHERE match_id = @match_id
+                  AND user_id = @user_id
+                  AND status = 'joined'
+            `);
+    }
+
+    await recalcMatchStatus(matchId);
 };
 
 // ===== Public Functions =====
@@ -205,10 +223,17 @@ export const getPaymentHistory = async (req: any, res: any) => {
         const result = await pool.request()
             .input('user_id', sql.Int, req.user.id)
             .query(`
-                SELECT p.*, b.booking_date, c.name AS court_name, m.match_date
+                SELECT p.*, b.booking_date, c.name AS court_name, m.match_date,
+                       CASE
+                           WHEN p.match_id IS NOT NULL THEN 'match'
+                           WHEN p.booking_id IS NOT NULL THEN 'booking'
+                           ELSE 'other'
+                       END AS transaction_type,
+                       mp.payment_status AS match_player_payment_status
                 FROM payments p
                 LEFT JOIN bookings b ON p.booking_id = b.id
                 LEFT JOIN matches m ON p.match_id = m.id
+                LEFT JOIN match_players mp ON mp.match_id = p.match_id AND mp.user_id = p.user_id
                 LEFT JOIN courts c ON (b.court_id = c.id OR m.court_id = c.id)
                 WHERE p.user_id = @user_id
                 ORDER BY p.created_at DESC
@@ -237,12 +262,15 @@ export const payosInit = async (req: any, res: any) => {
     try {
         const { booking_id, match_id } = req.body;
         const pool = await poolPromise;
+        let paymentDescription = '';
+        const bookingId = booking_id ? Number(booking_id) : null;
+        const matchId = match_id ? Number(match_id) : null;
 
         // Kiểm tra booking hoặc match
         let amount = 0;
-        if (booking_id) {
+        if (bookingId) {
             const booking = await pool.request()
-                .input('id', sql.Int, booking_id)
+            .input('id', sql.Int, bookingId)
                 .query('SELECT user_id, total_price FROM bookings WHERE id = @id');
 
             if (booking.recordset.length === 0) {
@@ -254,17 +282,20 @@ export const payosInit = async (req: any, res: any) => {
             }
 
             amount = booking.recordset[0].total_price;
-        } else if (match_id) {
+            paymentDescription = generatePaymentDescription('booking', bookingId);
+        } else if (matchId) {
             // Handle match payment
             const match = await pool.request()
-                .input('id', sql.Int, match_id)
-                .query('SELECT total_cost FROM matches WHERE id = @id');
+                .input('id', sql.Int, matchId)
+                .query('SELECT total_cost, max_players FROM matches WHERE id = @id');
 
             if (match.recordset.length === 0) {
                 return res.status(404).json({ message: 'Match không tồn tại' });
             }
 
-            amount = match.recordset[0].total_cost / 4; // Chia cho 4 người chơi
+            const { total_cost, max_players } = match.recordset[0];
+            amount = total_cost / (max_players || 4); // Chia theo số người chơi thực tế
+            paymentDescription = generatePaymentDescription('match', matchId);
         } else {
             return res.status(400).json({ message: 'Cần booking_id hoặc match_id' });
         }
@@ -276,7 +307,7 @@ export const payosInit = async (req: any, res: any) => {
         const payosData = {
             orderCode,
             amount: Math.round(amount),
-            description: generateRandomDescription(),
+            description: paymentDescription || generateRandomDescription(),
             returnUrl: PAYOS_RETURN_URL,
             cancelUrl: PAYOS_CANCEL_URL
         };
@@ -292,8 +323,6 @@ export const payosInit = async (req: any, res: any) => {
             signature
         };
 
-        console.log('PayOS Request:', payosPayload);
-
         const payosResponse = await axios.post(
             `${PAYOS_API_URL}/v2/payment-requests`,
             payosPayload,
@@ -306,8 +335,6 @@ export const payosInit = async (req: any, res: any) => {
             }
         );
 
-        console.log('PayOS Response:', payosResponse.data);
-
         if (payosResponse.data.code !== '00') {
             return errorResponse(res, 'Không thể tạo link thanh toán', payosResponse.data.desc);
         }
@@ -317,8 +344,8 @@ export const payosInit = async (req: any, res: any) => {
         // Lưu payment record
         const paymentId = await insertPayment(
             req.user.id,
-            booking_id || null,
-            match_id || null,
+            bookingId,
+            matchId,
             Math.round(amount),
             'payos',
             orderCode,
@@ -352,74 +379,119 @@ export const payosWebhook = async (req: any, res: any) => {
     try {
         const { code, desc, success, data, signature } = req.body;
 
-        console.log('PayOS Webhook Received:', { code, desc, success });
-
-        // Lưu webhook data để verify
-        const webhookData = {
-            code,
-            desc,
-            success
-        };
-
         // Verify signature
         if (data?.orderCode) {
-            const sorted = sortParams(data);
-            const queryString = createQueryString(sorted);
-            const expectedSignature = calculatePayOSSignature(queryString, PAYOS_CHECKSUM_KEY);
+                const sorted = sortParams(data);
+                const queryString = createQueryString(sorted);
+                const expectedSignature = calculatePayOSSignature(queryString, PAYOS_CHECKSUM_KEY);
 
-            if (signature !== expectedSignature) {
-                console.log('PayOS Webhook: Invalid signature', {
-                    orderCode: data.orderCode,
-                    receivedSigPrefix: String(signature || '').slice(0, 8),
-                    expectedSigPrefix: String(expectedSignature || '').slice(0, 8),
-                    checksumKeyLength: String(PAYOS_CHECKSUM_KEY || '').length
-                });
-                return res.status(400).json({
-                    code: '97',
-                    message: 'Invalid signature'
-                });
-            }
+                if (signature !== expectedSignature) {
+                    // Fallback: try with null → "null" (older PayOS SDK behaviour)
+                    const queryStringAlt = Object.keys(sorted)
+                        .filter(key => sorted[key] !== undefined)
+                        .map(key => `${key}=${sorted[key]}`)
+                        .join('&');
+                    const altSignature = calculatePayOSSignature(queryStringAlt, PAYOS_CHECKSUM_KEY);
+
+                    if (signature !== altSignature) {
+                        console.error('PayOS Webhook: Invalid signature (both strategies failed)', {
+                            orderCode: data.orderCode,
+                            receivedSigPrefix: String(signature || '').slice(0, 8),
+                            expectedSigPrefix: String(expectedSignature || '').slice(0, 8),
+                            altSigPrefix: String(altSignature || '').slice(0, 8),
+                            checksumKeyLength: String(PAYOS_CHECKSUM_KEY || '').length
+                        });
+                        return res.status(400).json({
+                            code: '97',
+                            message: 'Invalid signature'
+                        });
+                    }
+                }
         }
 
         const pool = await poolPromise;
-        const transactionPattern = `payos_${data.orderCode}_%`;
 
-        // Tìm payment bằng orderCode
-        const payment = await pool.request()
-            .input('transaction_pattern', sql.NVarChar, transactionPattern)
-            .query(`
-                SELECT p.*, b.id as booking_id
-                FROM payments p
-                LEFT JOIN bookings b ON p.booking_id = b.id
-                WHERE p.transaction_id LIKE @transaction_pattern
-            `);
+        // Ưu tiên tìm theo paymentLinkId (chính xác nhất), fallback qua orderCode.
+        let paymentRecord: any = null;
 
-        if (payment.recordset.length === 0) {
-            console.log('PayOS Webhook: Payment not found');
+        if (data?.paymentLinkId) {
+            const byLink = await pool.request()
+                .input('transaction_suffix', sql.NVarChar, `%_${data.paymentLinkId}`)
+                .query(`
+                    SELECT TOP 1 p.*
+                    FROM payments p
+                    WHERE p.transaction_id LIKE @transaction_suffix
+                    ORDER BY p.created_at DESC
+                `);
+            paymentRecord = byLink.recordset[0] || null;
+        }
+
+        if (!paymentRecord && data?.orderCode) {
+            const transactionPattern = `payos_${data.orderCode}_%`;
+            const byOrderCode = await pool.request()
+                .input('transaction_pattern', sql.NVarChar, transactionPattern)
+                .query(`
+                    SELECT TOP 1 p.*
+                    FROM payments p
+                    WHERE p.transaction_id LIKE @transaction_pattern
+                    ORDER BY p.created_at DESC
+                `);
+            paymentRecord = byOrderCode.recordset[0] || null;
+        }
+
+        if (!paymentRecord) {
             return webhookResponse(res);
         }
 
-        const paymentRecord = payment.recordset[0];
+        if (paymentRecord.status !== 'pending') {
+            return webhookResponse(res);
+        }
 
-        // Cập nhật status dựa trên success flag
-        if (success === true && code === '00') {
-            // Success
+        const isSuccess =
+            success === true ||
+            success === 'true' ||
+            String(code || data?.code || '').toUpperCase() === '00';
+
+        const bookingId = toValidInt(paymentRecord.booking_id);
+
+        if (isSuccess) {
             await updatePaymentStatus(paymentRecord.id, 'completed');
-            if (paymentRecord.booking_id) {
-                // Tìm booking và update
+
+            if (bookingId) {
                 await pool.request()
-                    .input('payment_id', sql.Int, paymentRecord.id)
+                    .input('booking_id', sql.Int, bookingId)
                     .query(`
-                        UPDATE bookings 
-                        SET status = 'confirmed' 
-                        WHERE id = (SELECT booking_id FROM payments WHERE id = @payment_id)
+                        UPDATE bookings
+                        SET status = 'confirmed'
+                        WHERE id = @booking_id AND status = 'pending'
                     `);
+            } else if (paymentRecord.booking_id !== null && paymentRecord.booking_id !== undefined) {
+                console.warn('PayOS Webhook: skip booking sync due to invalid booking_id', {
+                    paymentId: paymentRecord.id,
+                    rawBookingId: paymentRecord.booking_id
+                });
             }
-            console.log(`PayOS Webhook: Payment ${data.orderCode} completed`);
+
+            await syncMatchPaymentState(paymentRecord, 'completed');
         } else {
-            // Failed
             await updatePaymentStatus(paymentRecord.id, 'failed');
-            console.log(`PayOS Webhook: Payment ${data.orderCode} failed - ${desc}`);
+
+            if (bookingId) {
+                await pool.request()
+                    .input('booking_id', sql.Int, bookingId)
+                    .query(`
+                        UPDATE bookings
+                        SET status = 'cancelled'
+                        WHERE id = @booking_id AND status = 'pending'
+                    `);
+            } else if (paymentRecord.booking_id !== null && paymentRecord.booking_id !== undefined) {
+                console.warn('PayOS Webhook: skip booking cancel sync due to invalid booking_id', {
+                    paymentId: paymentRecord.id,
+                    rawBookingId: paymentRecord.booking_id
+                });
+            }
+
+            await syncMatchPaymentState(paymentRecord, 'failed');
         }
 
         // Always return 00
@@ -440,8 +512,6 @@ export const payosReturn = async (req: any, res: any) => {
     try {
         const { orderCode, status } = req.query;
 
-        console.log('PayOS Return:', { orderCode, status });
-
         if (!orderCode) {
             return res.status(400).json({
                 status: 'error',
@@ -459,14 +529,6 @@ export const payosReturn = async (req: any, res: any) => {
 
         if (payment.recordset.length === 0) {
             return errorResponse(res, 'Thanh toán không tìm thấy');
-        }
-
-        if (payment.recordset[0].status === 'pending') {
-            try {
-                await syncPendingPaymentFromPayOS(orderCode);
-            } catch (syncErr: any) {
-                console.warn('PayOS return sync warning:', syncErr.message);
-            }
         }
 
         const latest = await pool.request()
@@ -494,26 +556,29 @@ export const payosReturn = async (req: any, res: any) => {
 export const payosCheckStatus = async (req: any, res: any) => {
     try {
         const { orderCode } = req.params;
-
-        try {
-            await syncPendingPaymentFromPayOS(orderCode);
-        } catch (syncErr: any) {
-            console.warn('PayOS status sync warning:', syncErr.message);
-        }
-
         const pool = await poolPromise;
         const transactionPattern = `payos_${orderCode}_%`;
-        const payment = await pool.request()
+        const latest = await pool.request()
             .input('transaction_pattern', sql.NVarChar, transactionPattern)
-            .query('SELECT status, amount FROM payments WHERE transaction_id LIKE @transaction_pattern');
+            .query(`
+                SELECT TOP 1 id, user_id, booking_id, match_id, status, amount
+                FROM payments
+                WHERE transaction_id LIKE @transaction_pattern
+                ORDER BY created_at DESC
+            `);
 
-        if (payment.recordset.length === 0) {
+        if (latest.recordset.length === 0) {
             return errorResponse(res, 'Thanh toán không tìm thấy', undefined, 404);
         }
 
+        const payment = latest.recordset[0];
+        if (['completed', 'failed', 'cancelled', 'expired'].includes(String(payment.status || '').toLowerCase())) {
+            await syncMatchPaymentState(payment, String(payment.status || '').toLowerCase());
+        }
+
         return successResponse(res, {
-            status: payment.recordset[0].status,
-            amount: payment.recordset[0].amount
+            status: payment.status,
+            amount: payment.amount
         });
     } catch (err: any) {
         return serverError(res, 'Lỗi server', err);
@@ -577,11 +642,32 @@ export const payosCancelPayment = async (req: any, res: any) => {
             return errorResponse(res, 'Không thể hủy thanh toán', response.data.desc);
         }
 
-        // Update payment status
+        // Update payment status + sync booking/match state
         const pool = await poolPromise;
-        await pool.request()
+        const payment = await pool.request()
             .input('transaction_id', sql.NVarChar, `payos_%${paymentLinkId}`)
-            .query(`UPDATE payments SET status = 'cancelled' WHERE transaction_id LIKE @transaction_id`);
+            .query(`
+                SELECT TOP 1 id, user_id, booking_id, match_id, status
+                FROM payments
+                WHERE transaction_id LIKE @transaction_id
+                ORDER BY created_at DESC
+            `);
+
+        if (payment.recordset.length > 0) {
+            const record = payment.recordset[0];
+
+            if (record.status === 'pending') {
+                await updatePaymentStatus(record.id, 'cancelled');
+            }
+
+            if (record.booking_id) {
+                await pool.request()
+                    .input('id', sql.Int, record.booking_id)
+                    .query(`UPDATE bookings SET status = 'cancelled' WHERE id = @id AND status = 'pending'`);
+            }
+
+            await syncMatchPaymentState(record, 'cancelled');
+        }
 
         return successResponse(res, {
             data: response.data.data
@@ -607,26 +693,28 @@ export const payosCancelReturn = async (req: any, res: any) => {
             const pool = await poolPromise;
             const transactionPattern = `payos_${orderCode}_%`;
 
-            // Tìm và cập nhật payment + booking thành cancelled
+            // Tìm và cập nhật payment + booking/match thành cancelled
             const payment = await pool.request()
                 .input('transaction_pattern', sql.NVarChar, transactionPattern)
                 .query(`
-                    SELECT id, booking_id FROM payments
+                    SELECT TOP 1 id, booking_id, match_id, user_id
+                    FROM payments
                     WHERE transaction_id LIKE @transaction_pattern AND status = 'pending'
+                    ORDER BY created_at DESC
                 `);
 
             if (payment.recordset.length > 0) {
-                const { id: paymentId, booking_id: bookingId } = payment.recordset[0];
+                const record = payment.recordset[0];
 
-                await updatePaymentStatus(paymentId, 'cancelled');
+                await updatePaymentStatus(record.id, 'cancelled');
 
-                if (bookingId) {
+                if (record.booking_id) {
                     await pool.request()
-                        .input('id', sql.Int, bookingId)
+                        .input('id', sql.Int, record.booking_id)
                         .query(`UPDATE bookings SET status = 'cancelled' WHERE id = @id AND status = 'pending'`);
                 }
 
-                console.log(`PayOS Cancel Return: Payment ${orderCode} cancelled`);
+                await syncMatchPaymentState(record, 'cancelled');
             }
         }
     } catch (err: any) {
@@ -657,7 +745,12 @@ export const payosCancelByOrderCode = async (req: any, res: any) => {
 
         const payment = await pool.request()
             .input('pattern', sql.NVarChar, transactionPattern)
-            .query(`SELECT id, booking_id, status FROM payments WHERE transaction_id LIKE @pattern`);
+            .query(`
+                SELECT TOP 1 id, booking_id, match_id, user_id, status
+                FROM payments
+                WHERE transaction_id LIKE @pattern
+                ORDER BY created_at DESC
+            `);
 
         if (payment.recordset.length === 0) {
             return errorResponse(res, 'Không tìm thấy giao dịch');
@@ -670,12 +763,13 @@ export const payosCancelByOrderCode = async (req: any, res: any) => {
 
         await updatePaymentStatus(record.id, targetStatus);
 
-        // Booking always goes to 'cancelled' regardless of payment expiry/cancel
         if (record.booking_id) {
             await pool.request()
                 .input('id', sql.Int, record.booking_id)
                 .query(`UPDATE bookings SET status = 'cancelled' WHERE id = @id AND status = 'pending'`);
         }
+
+        await syncMatchPaymentState(record, targetStatus);
 
         return successResponse(res, { status: targetStatus }, `Đã cập nhật giao dịch: ${targetStatus}`);
     } catch (err: any) {
@@ -702,6 +796,14 @@ export const cancelExpiredPayments = async (): Promise<void> => {
               AND b.status = 'pending'
         `);
 
+        const expiredPayments = await pool.request().query(`
+            SELECT id, user_id, booking_id, match_id
+            FROM payments
+            WHERE status = 'pending'
+              AND transaction_id LIKE 'payos_%'
+              AND created_at < DATEADD(MINUTE, -15, GETDATE())
+        `);
+
         // Mark expired payments as expired (not cancelled — user didn't cancel)
         const result = await pool.request().query(`
             UPDATE payments SET status = 'expired'
@@ -710,9 +812,13 @@ export const cancelExpiredPayments = async (): Promise<void> => {
               AND created_at < DATEADD(MINUTE, -15, GETDATE())
         `);
 
+        for (const record of expiredPayments.recordset) {
+            await syncMatchPaymentState(record, 'expired');
+        }
+
         const count = result.rowsAffected[0];
         if (count > 0) {
-            console.log(`[Auto-expire] Đã hết hạn ${count} giao dịch`);
+            // intentionally no info log
         }
     } catch (err: any) {
         console.error('[Auto-expire] Lỗi:', err.message);

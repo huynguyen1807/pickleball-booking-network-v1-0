@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
 import UserProfileCard from '../components/UserProfileCard'
 import styles from '../styles/Booking.module.css'
+import { getTodayYMD } from '../utils/dateTime'
 
 
 
@@ -15,7 +16,7 @@ export default function CourtDetail() {
     const [subCourts, setSubCourts] = useState<any[]>([])
     const [selectedSubCourt, setSelectedSubCourt] = useState<any>(null)
     const [loading, setLoading] = useState(true)
-    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
+    const [selectedDate, setSelectedDate] = useState(getTodayYMD())
     const [startTime, setStartTime] = useState('')
     const [endTime, setEndTime] = useState('')
     const [bookedSlots, setBookedSlots] = useState([])
@@ -107,7 +108,7 @@ export default function CourtDetail() {
         })
     }
 
-    const todayStr = new Date().toISOString().split('T')[0]
+    const todayStr = getTodayYMD()
     const now = new Date()
     const currentH = now.getHours()
     const currentM = now.getMinutes()

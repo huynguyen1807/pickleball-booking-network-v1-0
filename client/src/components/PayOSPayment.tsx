@@ -70,7 +70,6 @@ export function PayOSPayment({
         const currentStatus = res.data?.status ?? res.data?.data?.status;
 
         setPollingCount(prev => prev + 1);
-        console.log(`[PayOS Poll #${pollingCount + 1}]`, res.data);
 
         if (currentStatus === 'completed') {
           setStatus('completed');
