@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
 import UserProfileCard from '../components/UserProfileCard'
+import { useDialog } from '../context/DialogContext'
 import styles from '../styles/Booking.module.css'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -29,6 +30,7 @@ export default function CourtDetail() {
     const { id } = useParams()
     const navigate = useNavigate()
     const { user } = useAuth()
+    const { showAlert } = useDialog()
 
     const [court, setCourt] = useState<any>(null)
     const [loading, setLoading] = useState(true)
@@ -182,7 +184,7 @@ export default function CourtDetail() {
             setReviewForm({ rating: 5, comment: '' })
             loadCourt()
         } catch (err: any) {
-            alert(err.response?.data?.message || 'Lỗi khi đánh giá')
+            await showAlert('Lỗi', err.response?.data?.message || 'Lỗi khi đánh giá')
         } finally {
             setSubmittingReview(false)
         }

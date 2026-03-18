@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import api from '../api/axios'
+import { useDialog } from '../context/DialogContext'
 import styles from '../styles/Dashboard.module.css'
 
 export default function AdminDashboard() {
+    const { showAlert, showConfirm } = useDialog()
     const [requestTab, setRequestTab] = useState('pending')
     const [stats, setStats] = useState(null)
     const [requests, setRequests] = useState([])
@@ -36,13 +38,14 @@ export default function AdminDashboard() {
         const confirmMsg = isReApproval
             ? 'Xác nhận DUYỆT LẠI yêu cầu Owner đã từ chối?'
             : 'Xác nhận duyệt yêu cầu nâng cấp Owner?'
-        if (!confirm(confirmMsg)) return
+        const isConfirm = await showConfirm('Xác nhận', confirmMsg)
+        if (!isConfirm) return
         try {
             await api.put(`/admin/upgrade-requests/${reqId}/approve`)
-            alert('✅ Đã duyệt thành công!')
+            await showAlert('Thành công', '✅ Đã duyệt thành công!')
             loadData()
-        } catch (err) {
-            alert(err.response?.data?.message || 'Lỗi duyệt')
+        } catch (err: any) {
+            await showAlert('Lỗi', err.response?.data?.message || 'Lỗi duyệt')
         }
     }
 
@@ -66,7 +69,7 @@ export default function AdminDashboard() {
             console.log(res.data.dataUrl);
         } catch (error) {
             console.error("Lỗi khi tải file:", error);
-            alert("Không thể tải file giấy phép từ server (File không tồn tại hoặc lỗi server).");
+            await showAlert('Lỗi', "Không thể tải file giấy phép từ server (File không tồn tại hoặc lỗi server).");
             setShowLicenseModal(false);
         }
     }
@@ -76,12 +79,12 @@ export default function AdminDashboard() {
             await api.put(`/admin/upgrade-requests/${rejectData.reqId}/reject`, {
                 admin_note: rejectReason.trim() || null
             })
-            alert(rejectData.isRevoke ? '✅ Đã thu hồi quyền Owner!' : '✅ Đã từ chối yêu cầu!')
+            await showAlert('Thành công', rejectData.isRevoke ? '✅ Đã thu hồi quyền Owner!' : '✅ Đã từ chối yêu cầu!')
             setShowRejectModal(false)
             setRejectReason('')
             loadData()
-        } catch (err) {
-            alert(err.response?.data?.message || 'Lỗi từ chối')
+        } catch (err: any) {
+            await showAlert('Lỗi', err.response?.data?.message || 'Lỗi từ chối')
         }
     }
 

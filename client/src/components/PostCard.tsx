@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import api from '../api/axios'
 import { io as socketIO } from 'socket.io-client'
 import UserProfileCard from './UserProfileCard'
+import { useDialog } from '../context/DialogContext'
 import styles from '../styles/Cards.module.css'
 
 type PostType = any
@@ -19,6 +20,7 @@ interface PostCardProps {
 export default function PostCard({ post, isHidden = false, onDeleted, onHide }: PostCardProps) {
     const { user } = useAuth()
     const navigate = useNavigate()
+    const { showAlert, showConfirm } = useDialog()
     // normalize post object: prefer `user_name`, fallback to `full_name`
     const normalizedPost = post ? { ...post, user_name: post.user_name || post.full_name } : null
     const data = normalizedPost || {
@@ -112,7 +114,7 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
     const typeInfo = (typeLabels[(data.post_type as string) || 'share'] || typeLabels.share)
 
     const handleLike = async () => {
-        if (!user) return alert('Vui lòng đăng nhập để tương tác')
+        if (!user) return await showAlert('Thông báo', 'Vui lòng đăng nhập để tương tác')
         try {
             if (!liked) {
                 const res = await api.post(`/posts/${data.id}/like`)
@@ -125,7 +127,7 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
             }
         } catch (err: any) {
             console.error('Like error', err)
-            alert(err?.response?.data?.message || 'Lỗi khi tương tác')
+            await showAlert('Lỗi', err?.response?.data?.message || 'Lỗi khi tương tác')
         }
     }
 
@@ -145,16 +147,16 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
         if (user) api.post(`/posts/${data.id}/share`).then(r => setShareCount(r.data.shares)).catch(() => { })
     }
 
-    const handleCopyLink = () => {
+    const handleCopyLink = async () => {
         navigator.clipboard.writeText(window.location.origin + `/post/${data.id}`)
         setShowShare(false)
-        alert('Đã sao chép link!')
+        await showAlert('Thành công', 'Đã sao chép link!')
         if (user) api.post(`/posts/${data.id}/share`).then(r => setShareCount(r.data.shares)).catch(() => { })
     }
 
     const handleAddComment = async (e: FormEvent) => {
         e.preventDefault()
-        if (!user) return alert('Vui lòng đăng nhập để bình luận')
+        if (!user) return await showAlert('Thông báo', 'Vui lòng đăng nhập để bình luận')
         if (!commentText.trim()) return
         try {
             const res = await api.post(`/posts/${data.id}/comments`, { content: commentText })
@@ -165,7 +167,7 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
         } catch (err) {
             const eErr: any = err
             console.error('Comment error', eErr)
-            alert(eErr?.response?.data?.message || 'Lỗi khi gửi bình luận')
+            await showAlert('Lỗi', eErr?.response?.data?.message || 'Lỗi khi gửi bình luận')
         }
     }
 
@@ -180,13 +182,14 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
     }
 
     const handleActionDelete = async () => {
-        if (!window.confirm('Bạn có chắc muốn xóa bài viết này?')) return
+        const isConfirm = await showConfirm('Xác nhận', 'Bạn có chắc muốn xóa bài viết này?')
+        if (!isConfirm) return
         try {
             await api.delete(`/posts/${data.id}`)
             onDeleted && onDeleted(data.id)
-        } catch (err) {
+        } catch (err: any) {
             console.error('Delete error', err)
-            alert(err.response?.data?.message || 'Lỗi khi xóa bài viết')
+            await showAlert('Lỗi', err.response?.data?.message || 'Lỗi khi xóa bài viết')
         }
         setShowMenu(false)
     }
