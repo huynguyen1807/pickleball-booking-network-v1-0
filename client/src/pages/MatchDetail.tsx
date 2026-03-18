@@ -22,6 +22,11 @@ const SKILL_LABELS: Record<string, string> = {
     intermediate: '🟡 Trung bình', advanced: '🔴 Nâng cao'
 }
 
+const toId = (value: any): number | null => {
+    const id = Number(value)
+    return Number.isInteger(id) && id > 0 ? id : null
+}
+
 export default function MatchDetail() {
     const { id } = useParams()
     const navigate = useNavigate()
@@ -49,12 +54,16 @@ export default function MatchDetail() {
     useEffect(() => { loadMatch() }, [loadMatch])
 
     // Derived state
-    const isPlayer = match?.players?.some((p: any) => p.user_id === user?.id && p.status === 'joined')
-    const isWaitlisted = match?.players?.some((p: any) => p.user_id === user?.id && p.status === 'waitlist')
-    const isCreator = match?.creator_id === user?.id
+    const currentUserId = toId(user?.id)
+    const creatorId = toId(match?.creator_id)
+    const isCreatorByFlag = Number(match?.is_creator) === 1
+    const isPlayer = match?.players?.some((p: any) => toId(p.user_id) === currentUserId && p.status === 'joined')
+    const isWaitlisted = match?.players?.some((p: any) => toId(p.user_id) === currentUserId && p.status === 'waitlist')
+    const isCreator = isCreatorByFlag || (!!currentUserId && !!creatorId && creatorId === currentUserId)
     const spotsLeft = match ? match.max_players - match.current_players : 0
-    const myPlayer = match?.players?.find((p: any) => p.user_id === user?.id)
+    const myPlayer = match?.players?.find((p: any) => toId(p.user_id) === currentUserId)
     const canJoin = !isPlayer && !isWaitlisted && ['waiting', 'open', 'full'].includes(match?.status)
+    const canCancelMatch = isCreator && !['cancelled', 'completed', 'finished'].includes(match?.status)
 
     const handleJoin = async () => {
         setJoining(true)
@@ -90,7 +99,15 @@ export default function MatchDetail() {
         setLeaving(true)
         try {
             const res = await api.post(`/matches/${id}/leave`)
-            alert(`${res.data.message}\n${res.data.refundMessage || ''}`)
+            const refundAmount = Number(res.data?.refundedAmount || 0)
+            const balanceAfter = res.data?.balanceAfter
+            const detailLines = [res.data.message]
+            if (res.data?.refundMessage) detailLines.push(res.data.refundMessage)
+            if (refundAmount > 0) detailLines.push(`Số tiền hoàn: ${refundAmount.toLocaleString('vi-VN')}đ`)
+            if (balanceAfter !== null && balanceAfter !== undefined) {
+                detailLines.push(`Số dư hiện tại: ${Number(balanceAfter).toLocaleString('vi-VN')}đ`)
+            }
+            alert(detailLines.join('\n'))
             loadMatch()
         } catch (err: any) {
             alert(err.response?.data?.message || 'Không thể rời trận')
@@ -104,7 +121,12 @@ export default function MatchDetail() {
         setCancelling(true)
         try {
             const res = await api.post(`/matches/${id}/cancel`)
-            alert(res.data.message)
+            const refundedCount = Number(res.data?.refundedCount || 0)
+            const refundedAmount = Number(res.data?.refundedAmount || 0)
+            const detailLines = [res.data.message]
+            if (refundedCount > 0) detailLines.push(`Đã hoàn cho ${refundedCount} giao dịch`) 
+            if (refundedAmount > 0) detailLines.push(`Tổng tiền hoàn: ${refundedAmount.toLocaleString('vi-VN')}đ`)
+            alert(detailLines.join('\n'))
             loadMatch()
         } catch (err: any) {
             alert(err.response?.data?.message || 'Không thể hủy trận')
@@ -246,7 +268,7 @@ export default function MatchDetail() {
                     </div>
 
                     {/* Payment instruction for joined but unpaid */}
-                    {isPlayer && myPlayer?.payment_status === 'pending' && (
+                    {isPlayer && myPlayer?.payment_status === 'pending' && match?.status !== 'cancelled' && (
                         <div className={styles.paymentPrompt}>
                             <div style={{ fontWeight: 700, marginBottom: '6px' }}>💳 Thanh toán để xác nhận chỗ</div>
                             <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0 0 12px' }}>
@@ -290,12 +312,12 @@ export default function MatchDetail() {
                             <button className="btn btn-danger btn-lg" style={{ flex: canJoin ? undefined : 1 }}
                                 onClick={handleLeave} disabled={leaving}>
                                 {leaving ? '⏳...' : '🚪 Rời trận'}
-                                                    {isCreator && !['cancelled', 'completed', 'finished'].includes(match?.status) && (
-                                                        <button className="btn btn-danger btn-lg" style={{ flex: 1 }}
-                                                            onClick={handleCancelMatch} disabled={cancelling}>
-                                                            {cancelling ? '⏳...' : '🚫 Hủy trận'}
-                                                        </button>
-                                                    )}
+                            </button>
+                        )}
+                        {canCancelMatch && (
+                            <button className="btn btn-danger btn-lg" style={{ flex: canJoin ? undefined : 1 }}
+                                onClick={handleCancelMatch} disabled={cancelling}>
+                                {cancelling ? '⏳...' : '🚫 Hủy trận'}
                             </button>
                         )}
                     </div>

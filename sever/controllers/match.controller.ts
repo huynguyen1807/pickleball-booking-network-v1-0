@@ -12,6 +12,117 @@ const toMinutes = (t: string): number => {
 
 const FORMAT_PLAYERS: Record<string, number> = { '1v1': 2, '2v2': 4 };
 
+const REFUND_FULL_HOURS = 4;
+const REFUND_NO_REFUND_FROM_HOURS = 2;
+
+const getHoursUntilMatchStart = (matchDate: any, startTime: any): number => {
+    const dateStr = matchDate instanceof Date
+        ? matchDate.toISOString().split('T')[0]
+        : String(matchDate).split('T')[0];
+    const timeStr = String(startTime || '').slice(0, 8);
+    const startAt = new Date(`${dateStr}T${timeStr}`);
+    return (startAt.getTime() - Date.now()) / 3_600_000;
+};
+
+const evaluateRefundPolicyForLeave = (hoursUntil: number) => {
+    if (hoursUntil >= REFUND_FULL_HOURS) {
+        return {
+            status: 'full',
+            shouldRefund: true,
+            message: 'Hoàn tiền 100% vì hủy trước 4 giờ.'
+        };
+    }
+
+    if (hoursUntil >= REFUND_NO_REFUND_FROM_HOURS && hoursUntil < REFUND_FULL_HOURS) {
+        return {
+            status: 'none',
+            shouldRefund: false,
+            message: 'Không hoàn tiền vì hủy trong khoảng 2–4 giờ trước trận.'
+        };
+    }
+
+    return {
+        status: 'none',
+        shouldRefund: false,
+        message: 'Không hoàn tiền vì hủy trong vòng 2 giờ trước trận.'
+    };
+};
+
+const getUserBalance = async (userId: number): Promise<number> => {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .input('id', sql.Int, userId)
+        .query('SELECT ISNULL(balance, 0) AS balance FROM users WHERE id = @id');
+    return Number(result.recordset?.[0]?.balance || 0);
+};
+
+const refundCompletedMatchPaymentsToBalance = async (
+    matchId: number,
+    description: string,
+    targetUserId: number | null = null
+) => {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .input('match_id', sql.Int, matchId)
+        .input('description', sql.NVarChar, description)
+        .input('target_user_id', sql.Int, targetUserId)
+        .query(`
+            SET XACT_ABORT ON;
+
+            BEGIN TRY
+                BEGIN TRAN;
+
+            DECLARE @refunded TABLE (
+                payment_id INT,
+                user_id INT,
+                amount DECIMAL(12,2)
+            );
+
+            UPDATE payments
+            SET status = 'refunded'
+            OUTPUT INSERTED.id, INSERTED.user_id, INSERTED.amount
+            INTO @refunded(payment_id, user_id, amount)
+            WHERE match_id = @match_id
+              AND status = 'completed'
+              AND (@target_user_id IS NULL OR user_id = @target_user_id);
+
+            UPDATE u
+            SET u.balance = ISNULL(u.balance, 0) + x.total_amount
+            FROM users u
+            JOIN (
+                SELECT user_id, SUM(amount) AS total_amount
+                FROM @refunded
+                GROUP BY user_id
+            ) x ON x.user_id = u.id;
+
+            IF OBJECT_ID('wallet_transactions', 'U') IS NOT NULL
+            BEGIN
+                INSERT INTO wallet_transactions (
+                    user_id, payment_id, amount, type, description, reference_type, reference_id, status
+                )
+                SELECT user_id, payment_id, amount, 'refund', @description, 'match', @match_id, 'completed'
+                FROM @refunded;
+            END
+
+                COMMIT TRAN;
+            END TRY
+            BEGIN CATCH
+                IF @@TRANCOUNT > 0 ROLLBACK TRAN;
+                THROW;
+            END CATCH
+
+            SELECT
+                COUNT(1) AS refunded_count,
+                ISNULL(SUM(amount), 0) AS refunded_total
+            FROM @refunded;
+        `);
+
+    return {
+        refundedCount: Number(result.recordset?.[0]?.refunded_count || 0),
+        refundedTotal: Number(result.recordset?.[0]?.refunded_total || 0)
+    };
+};
+
 // ── Create Match ─────────────────────────────────────────────────────────────
 export const createMatch = async (req, res) => {
     try {
@@ -203,9 +314,12 @@ export const getMyMatchHistory = async (req, res) => {
 export const getMatchById = async (req, res) => {
     try {
         const pool = await poolPromise;
-        const result = await pool.request().input('id', sql.Int, req.params.id)
+        const result = await pool.request()
+            .input('id', sql.Int, req.params.id)
+            .input('user_id', sql.Int, req.user.id)
             .query(`SELECT m.*, c.name AS court_name, f.address, u.full_name AS creator_name, u.id AS creator_id,
-                           cr.id AS chat_room_id
+                           cr.id AS chat_room_id,
+                           CASE WHEN m.creator_id = @user_id THEN 1 ELSE 0 END AS is_creator
                     FROM matches m
                     JOIN courts c ON m.court_id = c.id
                     LEFT JOIN facilities f ON c.facility_id = f.id
@@ -311,29 +425,43 @@ export const leaveMatch = async (req, res) => {
         // Refund policy based on time until match
         let refundStatus = 'none';
         let refundMessage = 'Không hoàn tiền.';
+        let refundedAmount = 0;
+        let balanceAfter = null;
+        let shouldResetPaymentStatus = false;
+
         if (player.payment_status === 'paid') {
-            const dateStr = m.match_date instanceof Date
-                ? m.match_date.toISOString().split('T')[0]
-                : String(m.match_date).split('T')[0];
-            const hoursUntil = (new Date(`${dateStr}T${m.start_time}`).getTime() - Date.now()) / 3_600_000;
-            if (hoursUntil >= 4) {
-                refundStatus = 'full';
-                refundMessage = 'Hoàn tiền 100% vì hủy trước 4 giờ.';
-                await pool.request()
-                    .input('match_id', sql.Int, req.params.id).input('user_id', sql.Int, req.user.id)
-                    .query("UPDATE payments SET status = 'refunded' WHERE match_id = @match_id AND user_id = @user_id AND status = 'completed'");
-            } else if (hoursUntil < 2) {
-                refundStatus = 'none';
-                refundMessage = 'Không hoàn tiền vì hủy trong vòng 2 giờ trước trận.';
-            } else {
-                refundStatus = 'partial';
-                refundMessage = 'Không hoàn tiền (hủy trong khoảng 2–4 giờ trước trận).';
+            const hoursUntil = getHoursUntilMatchStart(m.match_date, m.start_time);
+            const policy = evaluateRefundPolicyForLeave(hoursUntil);
+
+            refundStatus = policy.status;
+            refundMessage = policy.message;
+
+            if (policy.shouldRefund) {
+                const refundResult = await refundCompletedMatchPaymentsToBalance(
+                    Number(req.params.id),
+                    'Hoan tien 100% do roi tran truoc 4 gio',
+                    req.user.id
+                );
+                if (refundResult.refundedCount > 0) {
+                    refundedAmount = refundResult.refundedTotal;
+                    shouldResetPaymentStatus = true;
+                    refundMessage = `Hoàn tiền 100% vào số dư tài khoản: ${refundResult.refundedTotal.toLocaleString('vi-VN')}đ.`;
+                    balanceAfter = await getUserBalance(req.user.id);
+                } else {
+                    refundMessage = 'Không tìm thấy giao dịch đã thanh toán để hoàn tiền.';
+                }
             }
         }
 
         await pool.request()
             .input('match_id', sql.Int, req.params.id).input('user_id', sql.Int, req.user.id)
-            .query("UPDATE match_players SET status = 'left' WHERE match_id = @match_id AND user_id = @user_id");
+            .input('reset_payment_status', sql.Bit, shouldResetPaymentStatus ? 1 : 0)
+            .query(`
+                UPDATE match_players
+                SET status = 'left',
+                    payment_status = CASE WHEN @reset_payment_status = 1 THEN 'pending' ELSE payment_status END
+                WHERE match_id = @match_id AND user_id = @user_id
+            `);
 
         if (player.status === 'joined') {
             await pool.request().input('id', sql.Int, req.params.id)
@@ -356,7 +484,7 @@ export const leaveMatch = async (req, res) => {
             }
         }
 
-        res.json({ message: 'Đã rời trận', refundStatus, refundMessage });
+        res.json({ message: 'Đã rời trận', refundStatus, refundMessage, refundedAmount, balanceAfter });
     } catch (err) {
         console.error('[leaveMatch]', err);
         res.status(500).json({ message: 'Lỗi server' });
@@ -463,19 +591,22 @@ export const autoCheckMatches = async () => {
                         AND DATEADD(MINUTE, 30, SYSDATETIMEOFFSET())
         `);
         for (const { id } of toCancel.recordset) {
+            const refundResult = await refundCompletedMatchPaymentsToBalance(
+                Number(id),
+                'Hoan tien 100% do tran bi huy vi thieu nguoi'
+            );
+
             await pool.request().input('id', sql.Int, id)
                 .query("UPDATE matches SET status = 'cancelled' WHERE id = @id");
-            await pool.request().input('match_id', sql.Int, id)
-                .query("UPDATE payments SET status = 'refunded' WHERE match_id = @match_id AND status = 'completed'");
             await pool.request().input('match_id', sql.Int, id)
                 .query("UPDATE match_players SET payment_status = 'pending' WHERE match_id = @match_id AND payment_status = 'paid'");
             try {
                 getIO().to(`match_${id}`).emit('match_auto_cancelled', {
                     matchId: id,
-                    message: 'Trận bị hủy tự động do không đủ người. Tiền sẽ được hoàn lại.'
+                    message: 'Trận bị hủy tự động do không đủ người. Tiền đã được hoàn vào số dư tài khoản.'
                 });
             } catch (_) { /* socket not ready */ }
-            console.log(`[AutoCancel] Match #${id} cancelled — not enough players`);
+            console.log(`[AutoCancel] Match #${id} cancelled — not enough players, refunded=${refundResult.refundedTotal}`);
         }
     } catch (err) {
         console.error('[autoCheckMatches]', err);
@@ -499,9 +630,10 @@ export const cancelMatch = async (req, res) => {
         if (['cancelled', 'completed', 'finished'].includes(m.status))
             return res.status(400).json({ message: 'Trận đã kết thúc hoặc đã bị hủy' });
 
-        await pool.request()
-            .input('match_id', sql.Int, req.params.id)
-            .query("UPDATE payments SET status = 'refunded' WHERE match_id = @match_id AND status = 'completed'");
+        const refundResult = await refundCompletedMatchPaymentsToBalance(
+            Number(req.params.id),
+            'Hoan tien do nguoi tao huy tran'
+        );
 
         await pool.request()
             .input('match_id', sql.Int, req.params.id)
@@ -514,11 +646,15 @@ export const cancelMatch = async (req, res) => {
         try {
             getIO().to(`match_${req.params.id}`).emit('match_cancelled', {
                 matchId: req.params.id,
-                message: 'Trận đã bị hủy bởi người tổ chức. Tiền sẽ được hoàn lại.'
+                message: 'Trận đã bị hủy bởi người tổ chức. Tiền đã được hoàn vào số dư tài khoản.'
             });
         } catch (_) { /* socket not ready */ }
 
-        res.json({ message: 'Đã hủy trận. Tất cả người đã thanh toán sẽ được hoàn tiền.' });
+        res.json({
+            message: 'Đã hủy trận. Tất cả người đã thanh toán đã được hoàn tiền vào số dư tài khoản.',
+            refundedAmount: refundResult.refundedTotal,
+            refundedCount: refundResult.refundedCount
+        });
     } catch (err) {
         console.error('[cancelMatch]', err);
         res.status(500).json({ message: 'Lỗi server' });
