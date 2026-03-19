@@ -19,11 +19,13 @@ CREATE TABLE users (
   phone NVARCHAR(20),
   avatar NVARCHAR(500),
   role NVARCHAR(20) DEFAULT 'user' CHECK (role IN ('user','owner','admin')),
-  status NVARCHAR(20) DEFAULT 'active' CHECK (status IN ('active','pending','rejected')),
+  status NVARCHAR(20) DEFAULT 'active' CHECK (status IN ('active','pending','rejected','banned')),
   business_license_url NVARCHAR(500) NULL,
   is_verified BIT DEFAULT 0,
   latitude DECIMAL(10,7),
   longitude DECIMAL(10,7),
+  failed_login_count INT DEFAULT 0,
+  locked_until DATETIMEOFFSET NULL,
   created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET(),
   updated_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
 );
@@ -350,4 +352,13 @@ GO
 -- MIGRATION: Expand posts.image column to hold base64 images (run once automatically by db.ts on startup)
 IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='posts' AND COLUMN_NAME='image' AND DATA_TYPE='nvarchar' AND CHARACTER_MAXIMUM_LENGTH=500)
     ALTER TABLE posts ALTER COLUMN image NVARCHAR(MAX);
+GO
+
+-- MIGRATION: Add failed login tracking columns to users table
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('users') AND name = 'failed_login_count')
+    ALTER TABLE users ADD failed_login_count INT DEFAULT 0;
+GO
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('users') AND name = 'locked_until')
+    ALTER TABLE users ADD locked_until DATETIMEOFFSET NULL;
 GO

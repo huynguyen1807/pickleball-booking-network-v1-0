@@ -166,7 +166,11 @@ export default function Home() {
 
             {/* Create Post */}
             <div className={styles.createPost}>
-                <div className="avatar">{user?.full_name?.charAt(0) || '?'}</div>
+                <div className="avatar" style={{ overflow: 'hidden' }}>
+                    {user?.avatar ? (
+                        <img src={user.avatar} alt={user.full_name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                    ) : (user?.full_name?.charAt(0) || '?')}
+                </div>
                 <div style={{ flex: 1 }}>
                     <textarea
                         className={styles.createPostInput}

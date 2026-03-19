@@ -20,9 +20,21 @@ export default function Login() {
         try {
             const res = await api.post('/auth/login', { email, password })
             login(res.data.user, res.data.token)
-            navigate('/')
+            if (res.data.user.role === 'admin') navigate('/admin')
+            else navigate('/')
         } catch (err) {
-            setError(err.response?.data?.message || 'Email hoặc mật khẩu không đúng')
+            const status = err.response?.status
+            const data = err.response?.data
+
+            if (status === 423) {
+                // Account locked
+                setError(data?.message || 'Tài khoản đã bị khóa tạm thời')
+            } else if (status === 401 && data?.attemptsLeft !== undefined) {
+                // Wrong password with attempts remaining
+                setError(data?.message || 'Email hoặc mật khẩu không đúng')
+            } else {
+                setError(data?.message || 'Email hoặc mật khẩu không đúng')
+            }
         } finally {
             setLoading(false)
         }
