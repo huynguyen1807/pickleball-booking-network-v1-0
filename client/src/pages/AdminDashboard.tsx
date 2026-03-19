@@ -105,156 +105,162 @@ export default function AdminDashboard() {
 
     return (
         <div className={styles.dashboardPage}>
-            <h1 className="page-title" style={{ marginBottom: '8px' }}>⚡ Admin Dashboard</h1>
-            <p className="page-subtitle" style={{ marginBottom: '28px' }}>Quản trị hệ thống PickleBall Đà Nẵng</p>
+            <div className={styles.dashboardContainer}>
+                <div className={styles.dashboardHeader}>
+                    <h1 className={styles.dashboardTitle}>⚡ Admin Dashboard</h1>
+                    <p className={styles.dashboardSubtitle}>Quản trị hệ thống PickleBall Đà Nẵng</p>
+                </div>
 
-            {/* Stats */}
-            <div className={styles.statsGrid} style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
-                {statCards.map((s, i) => (
-                    <div key={i} className={styles.statCard} style={{ animationDelay: `${i * 0.1}s` }}>
-                        <div className={`${styles.statIcon} ${s.iconClass}`}>{s.icon}</div>
-                        <div className={styles.statValue}>{s.value}</div>
-                        <div className={styles.statLabel}>{s.label}</div>
-                    </div>
-                ))}
-            </div>
+                {/* Stats */}
+                <div className={styles.statsGrid}>
+                    {statCards.map((s, i) => (
+                        <div key={i} className={styles.statCard} style={{ animationDelay: `${i * 0.1}s` }}>
+                            <div className={`${styles.statIcon} ${s.iconClass}`}>{s.icon}</div>
+                            <div className={styles.statValue}>{s.value}</div>
+                            <div className={styles.statLabel}>{s.label}</div>
+                        </div>
+                    ))}
+                </div>
 
-            <div className={styles.contentGrid}>
-                {/* Owner Requests */}
-                <div className={`glass-card ${styles.contentFullWidth}`}>
-                    <h3 className={styles.sectionTitle}>📋 Yêu cầu Owner</h3>
+                <div className={styles.contentGrid}>
+                    {/* Owner Requests */}
+                    <div className={`glass-card ${styles.contentFullWidth}`}>
+                        <h3 className={styles.sectionTitle}>📋 Yêu cầu Owner</h3>
 
-                    <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-                        {[
-                            { key: 'pending', label: `⏳ Chờ duyệt (${requests.filter(r => r.status === 'pending').length})` },
-                            { key: 'approved', label: `✅ Đã duyệt (${requests.filter(r => r.status === 'approved').length})` },
-                            { key: 'rejected', label: `❌ Từ chối (${requests.filter(r => r.status === 'rejected').length})` }
-                        ].map(t => (
-                            <button key={t.key}
-                                className={`btn ${requestTab === t.key ? 'btn-primary' : 'btn-secondary'} btn-sm`}
-                                onClick={() => setRequestTab(t.key)}>
-                                {t.label}
-                            </button>
-                        ))}
-                    </div>
+                        <div className={styles.tabBar} style={{ maxWidth: 760, marginBottom: 16 }}>
+                            {[
+                                { key: 'pending', label: `⏳ Chờ duyệt (${requests.filter(r => r.status === 'pending').length})` },
+                                { key: 'approved', label: `✅ Đã duyệt (${requests.filter(r => r.status === 'approved').length})` },
+                                { key: 'rejected', label: `❌ Từ chối (${requests.filter(r => r.status === 'rejected').length})` }
+                            ].map(t => (
+                                <button
+                                    key={t.key}
+                                    className={`${styles.tabButton} ${requestTab === t.key ? styles.tabButtonActive : ''}`}
+                                    onClick={() => setRequestTab(t.key)}
+                                >
+                                    {t.label}
+                                </button>
+                            ))}
+                        </div>
 
-                    {filteredRequests.length > 0 ? filteredRequests.map(req => (
-                        <div key={req.id} className={styles.requestCard}>
-                            <div className="avatar">{req.full_name?.charAt(0) || '?'}</div>
-                            <div className={styles.requestInfo}>
-                                <div className={styles.requestName}>{req.full_name}</div>
-                                <div className={styles.requestEmail}>
-                                    📧 {req.email}
-                                    {req.phone && <span style={{ marginLeft: '12px' }}>📱 {req.phone}</span>}
+                        {filteredRequests.length > 0 ? filteredRequests.map(req => (
+                            <div key={req.id} className={styles.requestCard}>
+                                <div className="avatar">{req.full_name?.charAt(0) || '?'}</div>
+                                <div className={styles.requestInfo}>
+                                    <div className={styles.requestName}>{req.full_name}</div>
+                                    <div className={styles.requestEmail}>
+                                        📧 {req.email}
+                                        {req.phone && <span style={{ marginLeft: '12px' }}>📱 {req.phone}</span>}
+                                    </div>
+                                    <div className={styles.requestDate}>
+                                        📅 {formatDate(req.created_at)}
+                                    </div>
+                                    {req.reason && (
+                                        <div style={{
+                                            marginTop: '8px',
+                                            padding: '8px 12px',
+                                            background: 'var(--bg-glass)',
+                                            borderRadius: 'var(--radius-sm)',
+                                            fontSize: '0.85rem',
+                                            color: 'var(--text-secondary)',
+                                            lineHeight: '1.4'
+                                        }}>
+                                            <strong style={{ color: 'var(--text-primary)' }}>Lý do:</strong> {req.reason}
+                                        </div>
+                                    )}
+                                    {req.admin_note && requestTab !== 'pending' && (
+                                        <div style={{
+                                            marginTop: '8px',
+                                            padding: '8px 12px',
+                                            background: 'rgba(255, 82, 82, 0.1)',
+                                            borderRadius: 'var(--radius-sm)',
+                                            fontSize: '0.85rem',
+                                            color: 'var(--text-secondary)',
+                                            lineHeight: '1.4'
+                                        }}>
+                                            <strong style={{ color: '#FF5252' }}>Ghi chú Admin:</strong> {req.admin_note}
+                                        </div>
+                                    )}
                                 </div>
-                                <div className={styles.requestDate}>
-                                    📅 {formatDate(req.created_at)}
-                                </div>
-                                {req.reason && (
-                                    <div style={{
-                                        marginTop: '8px',
-                                        padding: '8px 12px',
-                                        background: 'var(--bg-glass)',
-                                        borderRadius: 'var(--radius-sm)',
-                                        fontSize: '0.85rem',
-                                        color: 'var(--text-secondary)',
-                                        lineHeight: '1.4'
-                                    }}>
-                                        <strong style={{ color: 'var(--text-primary)' }}>Lý do:</strong> {req.reason}
+                                {requestTab === 'pending' && (
+                                    <div className={styles.requestActions}>
+                                        {req.has_license === 1 && (
+                                            <button type="button" className="btn btn-secondary btn-sm" onClick={() => openLicenseViewer(req.id, req.full_name)}>
+                                                👁️ Xem giấy phép
+                                            </button>
+                                        )}
+                                        <button type="button" className="btn btn-primary btn-sm" onClick={() => handleApprove(req.id)}>
+                                            ✅ Duyệt
+                                        </button>
+                                        <button type="button" className="btn btn-danger btn-sm" onClick={() => openRejectModal(req.id)}>
+                                            ❌ Từ chối
+                                        </button>
                                     </div>
                                 )}
-                                {req.admin_note && requestTab !== 'pending' && (
-                                    <div style={{
-                                        marginTop: '8px',
-                                        padding: '8px 12px',
-                                        background: 'rgba(255, 82, 82, 0.1)',
-                                        borderRadius: 'var(--radius-sm)',
-                                        fontSize: '0.85rem',
-                                        color: 'var(--text-secondary)',
-                                        lineHeight: '1.4'
-                                    }}>
-                                        <strong style={{ color: '#FF5252' }}>Ghi chú Admin:</strong> {req.admin_note}
+                                {requestTab === 'approved' && (
+                                    <div className={styles.requestActions}>
+                                        {req.has_license === 1 && (
+                                            <button type="button" className="btn btn-secondary btn-sm" onClick={() => openLicenseViewer(req.id, req.full_name)}>
+                                                👁️ Xem giấy phép
+                                            </button>
+                                        )}
+                                        <span className="badge badge-green" style={{ marginRight: '8px' }}>Đã duyệt</span>
+                                        <button type="button" className="btn btn-danger btn-sm" onClick={() => openRejectModal(req.id, true)}>
+                                            🔒 Thu hồi
+                                        </button>
+                                    </div>
+                                )}
+                                {requestTab === 'rejected' && (
+                                    <div className={styles.requestActions}>
+                                        {req.has_license === 1 && (
+                                            <button type="button" className="btn btn-secondary btn-sm" onClick={() => openLicenseViewer(req.id, req.full_name)}>
+                                                👁️ Xem giấy phép
+                                            </button>
+                                        )}
+                                        <span className="badge badge-red" style={{ marginRight: '8px' }}>Đã từ chối</span>
+                                        <button type="button" className="btn btn-primary btn-sm" onClick={() => handleApprove(req.id, true)}>
+                                            ✅ Duyệt lại
+                                        </button>
                                     </div>
                                 )}
                             </div>
-                            {requestTab === 'pending' && (
-                                <div className={styles.requestActions}>
-                                    {req.has_license === 1 && (
-                                        <button type="button" className="btn btn-secondary btn-sm" onClick={() => openLicenseViewer(req.id, req.full_name)}>
-                                            👁️ Xem giấy phép
-                                        </button>
-                                    )}
-                                    <button type="button" className="btn btn-primary btn-sm" onClick={() => handleApprove(req.id)}>
-                                        ✅ Duyệt
-                                    </button>
-                                    <button type="button" className="btn btn-danger btn-sm" onClick={() => openRejectModal(req.id)}>
-                                        ❌ Từ chối
-                                    </button>
-                                </div>
-                            )}
-                            {requestTab === 'approved' && (
-                                <div className={styles.requestActions}>
-                                    {req.has_license === 1 && (
-                                        <button type="button" className="btn btn-secondary btn-sm" onClick={() => openLicenseViewer(req.id, req.full_name)}>
-                                            👁️ Xem giấy phép
-                                        </button>
-                                    )}
-                                    <span className="badge badge-green" style={{ marginRight: '8px' }}>Đã duyệt</span>
-                                    <button type="button" className="btn btn-danger btn-sm" onClick={() => openRejectModal(req.id, true)}>
-                                        🔒 Thu hồi
-                                    </button>
-                                </div>
-                            )}
-                            {requestTab === 'rejected' && (
-                                <div className={styles.requestActions}>
-                                    {req.has_license === 1 && (
-                                        <button type="button" className="btn btn-secondary btn-sm" onClick={() => openLicenseViewer(req.id, req.full_name)}>
-                                            👁️ Xem giấy phép
-                                        </button>
-                                    )}
-                                    <span className="badge badge-red" style={{ marginRight: '8px' }}>Đã từ chối</span>
-                                    <button type="button" className="btn btn-primary btn-sm" onClick={() => handleApprove(req.id, true)}>
-                                        ✅ Duyệt lại
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    )) : (
-                        <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', padding: '20px 0', textAlign: 'center' }}>
-                            Không có yêu cầu nào
-                        </p>
-                    )}
-                </div>
+                        )) : (
+                            <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', padding: '20px 0', textAlign: 'center' }}>
+                                Không có yêu cầu nào
+                            </p>
+                        )}
+                    </div>
 
-                {/* Platform Activity */}
-                <div className="glass-card">
-                    <h3 className={styles.sectionTitle}>📈 Tổng quan hệ thống</h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
-                            <span style={{ color: 'var(--text-secondary)' }}>Booking hôm nay</span>
-                            <span style={{ fontWeight: 700 }}>{stats?.today_bookings || 0}</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
-                            <span style={{ color: 'var(--text-secondary)' }}>Trận ghép hôm nay</span>
-                            <span style={{ fontWeight: 700 }}>{stats?.today_matches || 0}</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
-                            <span style={{ color: 'var(--text-secondary)' }}>Tổng người dùng</span>
-                            <span style={{ fontWeight: 700 }}>{stats?.total_users || 0}</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
-                            <span style={{ color: 'var(--text-secondary)' }}>Tổng hoa hồng</span>
-                            <span style={{ fontWeight: 700, color: 'var(--accent-green)' }}>{formatPrice(stats?.total_revenue || 0)}</span>
+                    {/* Platform Activity */}
+                    <div className="glass-card">
+                        <h3 className={styles.sectionTitle}>📈 Tổng quan hệ thống</h3>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
+                                <span style={{ color: 'var(--text-secondary)' }}>Booking hôm nay</span>
+                                <span style={{ fontWeight: 700 }}>{stats?.today_bookings || 0}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
+                                <span style={{ color: 'var(--text-secondary)' }}>Trận ghép hôm nay</span>
+                                <span style={{ fontWeight: 700 }}>{stats?.today_matches || 0}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
+                                <span style={{ color: 'var(--text-secondary)' }}>Tổng người dùng</span>
+                                <span style={{ fontWeight: 700 }}>{stats?.total_users || 0}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
+                                <span style={{ color: 'var(--text-secondary)' }}>Tổng hoa hồng</span>
+                                <span style={{ fontWeight: 700, color: 'var(--accent-green)' }}>{formatPrice(stats?.total_revenue || 0)}</span>
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                {/* Revenue Chart */}
-                <div className="glass-card">
-                    <h3 className={styles.sectionTitle}>🔥 Thống kê nền tảng</h3>
-                    <div className={styles.chartPlaceholder}>
-                        📊 {stats?.total_users || 0} người dùng • {stats?.total_courts || 0} sân<br />
-                        🎯 {stats?.today_matches || 0} trận hôm nay • 📋 {stats?.today_bookings || 0} booking
+                    {/* Revenue Chart */}
+                    <div className="glass-card">
+                        <h3 className={styles.sectionTitle}>🔥 Thống kê nền tảng</h3>
+                        <div className={styles.chartPlaceholder}>
+                            📊 {stats?.total_users || 0} người dùng • {stats?.total_courts || 0} sân<br />
+                            🎯 {stats?.today_matches || 0} trận hôm nay • 📋 {stats?.today_bookings || 0} booking
+                        </div>
                     </div>
                 </div>
             </div>
