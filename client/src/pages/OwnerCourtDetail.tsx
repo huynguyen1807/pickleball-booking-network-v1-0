@@ -2,9 +2,11 @@ import { useParams } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import api from '../api/axios'
 import SubCourtForm from '../components/SubCourtForm.tsx'
+import { useDialog } from '../context/DialogContext'
 
 export default function OwnerCourtDetail() {
   const { id } = useParams<{ id: string }>()
+  const { showAlert, showConfirm } = useDialog()
   if (!id) return <div>Sân không hợp lệ</div>
 
   const [court, setCourt] = useState(null)
@@ -35,7 +37,7 @@ export default function OwnerCourtDetail() {
       const sub = await api.get(`/courts/${id}/sub-courts`)
       setSubCourts(sub.data)
     } catch {
-      alert('Không tải được dữ liệu')
+      await showAlert('Không tải được dữ liệu')
     } finally {
       setLoading(false)
     }
@@ -48,17 +50,18 @@ export default function OwnerCourtDetail() {
       })
       loadDetail()
     } catch (err) {
-      alert(err.response?.data?.message || 'Lỗi server khi đổi trạng thái')
+      await showAlert(err.response?.data?.message || 'Lỗi server khi đổi trạng thái')
     }
   }
 
   const deleteSubCourt = async (scId) => {
-    if (!window.confirm('Xóa sân con này?')) return
+    const isConfirm = await showConfirm('Xóa sân con này?')
+    if (!isConfirm) return
     try {
       await api.delete(`/courts/${id}/sub-courts/${scId}`)
       setSubCourts(prev => prev.filter(s => s.id !== scId))
     } catch (err) {
-      alert(err.response?.data?.message || 'Lỗi xóa sân con')
+      await showAlert(err.response?.data?.message || 'Lỗi xóa sân con')
     }
   }
 
@@ -69,20 +72,21 @@ export default function OwnerCourtDetail() {
       await api.put(`/courts/${id}`, payload)
       setCourt(prev => ({ ...prev, ...courtForm }))
       setEditingCourt(false)
-      alert('Cập nhập sân thành công')
+      await showAlert('Cập nhập sân thành công')
     } catch (err) {
-      alert(err.response?.data?.message || 'Lỗi cập nhập sân')
+      await showAlert(err.response?.data?.message || 'Lỗi cập nhập sân')
     }
   }
 
   const deleteCourt = async () => {
-    if (!window.confirm('Xóa sân này? Tất cả sân con sẽ bị xóa!')) return
+    const isConfirm = await showConfirm('Xóa sân này? Tất cả sân con sẽ bị xóa!')
+    if (!isConfirm) return
     try {
       await api.delete(`/courts/${id}`)
-      alert('Xóa sân thành công')
+      await showAlert('Xóa sân thành công')
       window.location.href = '/owner-dashboard'
     } catch (err) {
-      alert(err.response?.data?.message || 'Lỗi xóa sân')
+      await showAlert(err.response?.data?.message || 'Lỗi xóa sân')
     }
   }
 
@@ -96,8 +100,8 @@ export default function OwnerCourtDetail() {
         <div className="glass-card" style={{ margin: '20px 200px 50px 200px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
             <h3 style={{ margin: 0 }}>✏️ Cập nhập thông tin sân</h3>
-            <button 
-              className="btn btn-secondary btn-sm" 
+            <button
+              className="btn btn-secondary btn-sm"
               onClick={() => setEditingCourt(false)}
               style={{ padding: '6px 12px', fontSize: '0.875rem' }}
             >
@@ -158,9 +162,7 @@ export default function OwnerCourtDetail() {
               <button className="btn btn-primary btn-sm" onClick={() => setEditingCourt(true)}>
                 ✏️ Chỉnh sửa sân
               </button>
-              {/* <button className="btn btn-danger btn-sm" onClick={deleteCourt}>
-                🗑️ Xóa sân
-              </button> */}
+
             </div>
           </div>
 
@@ -247,15 +249,7 @@ export default function OwnerCourtDetail() {
               </p>
             </div>
 
-            {/* <div style={{ marginTop: '12px', padding: '12px', backgroundColor: 'rgba(59, 130, 246, 0.05)', borderRadius: '6px', fontSize: '0.875rem' }}>
-              <div style={{ color: 'var(--text-muted)', marginBottom: '8px' }}>💰 Cấu hình giá</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                <div><span style={{color:'var(--text-muted)'}}>Giờ vàng:</span> <b>{sc.peak_start_time}-{sc.peak_end_time}</b></div>
-                <div><span style={{color:'var(--text-muted)'}}>Giá giờ vàng:</span> <b>{sc.peak_price_per_hour > 0 ? new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(sc.peak_price_per_hour) : '(không)'}</b></div>
-                <div><span style={{color:'var(--text-muted)'}}>Giá cuối tuần:</span> <b>{sc.weekend_price_per_hour > 0 ? new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(sc.weekend_price_per_hour) : '(không)'}</b></div>
-                <div><span style={{color:'var(--text-muted)'}}>Min/Bước:</span> <b>{sc.min_booking_minutes}/{sc.slot_step_minutes} phút</b></div>
-              </div>
-            </div> */}
+
 
             <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
               <button
@@ -272,12 +266,6 @@ export default function OwnerCourtDetail() {
                 ✏️ Sửa
               </button>
 
-              {/* <button
-                className="btn btn-danger btn-sm"
-                onClick={() => deleteSubCourt(sc.id)}
-              >
-                🗑️ Xóa
-              </button> */}
             </div>
           </div>
         ))

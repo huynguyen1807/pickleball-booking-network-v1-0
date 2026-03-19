@@ -7,19 +7,19 @@ import { useAuth } from '../context/AuthContext'
 type ActiveTab = 'bookings' | 'payments'
 
 const BOOKING_STATUS: Record<string, { label: string; color: string }> = {
-    pending:   { label: 'Chờ xác nhận', color: '#f59e0b' },
-    confirmed: { label: 'Đã xác nhận',  color: '#10b981' },
-    completed: { label: 'Hoàn thành',   color: '#3b82f6' },
-    cancelled: { label: 'Đã hủy',       color: '#ef4444' },
+    pending: { label: 'Chờ xác nhận', color: '#f59e0b' },
+    confirmed: { label: 'Đã xác nhận', color: '#10b981' },
+    completed: { label: 'Hoàn thành', color: '#3b82f6' },
+    cancelled: { label: 'Đã hủy', color: '#ef4444' },
 }
 
 const PAYMENT_STATUS: Record<string, { label: string; bg: string; color: string }> = {
-    pending:   { label: 'Chờ thanh toán', bg: 'rgba(245,158,11,0.15)',  color: '#f59e0b' },
-    completed: { label: 'Thành công',     bg: 'rgba(16,185,129,0.15)',  color: '#10b981' },
-    failed:    { label: 'Thất bại',       bg: 'rgba(239,68,68,0.15)',   color: '#ef4444' },
-    cancelled: { label: 'Đã hủy',         bg: 'rgba(107,114,128,0.15)', color: '#9ca3af' },
-    expired:   { label: 'Hết hạn',        bg: 'rgba(249,115,22,0.15)',  color: '#f97316' },
-    refunded:  { label: 'Hoàn tiền',      bg: 'rgba(139,92,246,0.15)',  color: '#8b5cf6' },
+    pending: { label: 'Chờ thanh toán', bg: 'rgba(245,158,11,0.15)', color: '#f59e0b' },
+    completed: { label: 'Thành công', bg: 'rgba(16,185,129,0.15)', color: '#10b981' },
+    failed: { label: 'Thất bại', bg: 'rgba(239,68,68,0.15)', color: '#ef4444' },
+    cancelled: { label: 'Đã hủy', bg: 'rgba(107,114,128,0.15)', color: '#9ca3af' },
+    expired: { label: 'Hết hạn', bg: 'rgba(249,115,22,0.15)', color: '#f97316' },
+    refunded: { label: 'Hoàn tiền', bg: 'rgba(139,92,246,0.15)', color: '#8b5cf6' },
 }
 
 const METHOD_ICON: Record<string, string> = { payos: '💳', mock: '🧪', cash: '💵' }
@@ -85,10 +85,10 @@ export default function UserDashboard() {
     const completedPayments = visiblePaymentHistory.filter(p => p.status === 'completed').length
 
     const statCards = [
-        { icon: '🏟️', color: '#3b82f6', bg: 'rgba(59,130,246,0.12)',  value: confirmedBookings.length,                 label: 'Lần đặt sân' },
-        { icon: '🏓', color: '#10b981', bg: 'rgba(16,185,129,0.12)',  value: stats?.matches_count ?? '—',              label: 'Trận tham gia' },
-        { icon: '💰', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)',  value: fmt(stats?.total_spent ?? 0),             label: 'Tổng chi tiêu' },
-        { icon: '✅', color: '#8b5cf6', bg: 'rgba(139,92,246,0.12)',  value: completedPayments,                        label: 'GD thành công' },
+        { icon: '🏟️', color: '#3b82f6', bg: 'rgba(59,130,246,0.12)', value: confirmedBookings.length, label: 'Lần đặt sân' },
+        { icon: '🏓', color: '#10b981', bg: 'rgba(16,185,129,0.12)', value: stats?.matches_count ?? '—', label: 'Trận tham gia' },
+        { icon: '💰', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)', value: fmt(stats?.total_spent ?? 0), label: 'Tổng chi tiêu' },
+        { icon: '✅', color: '#8b5cf6', bg: 'rgba(139,92,246,0.12)', value: completedPayments, label: 'GD thành công' },
     ]
 
     const visibleBookings = showAllBookings ? confirmedBookings : confirmedBookings.slice(0, PAGE_SIZE)
@@ -237,7 +237,7 @@ export default function UserDashboard() {
                                                     : 'Thanh toán'
                                             const amountColor = p.status === 'completed' ? '#10b981'
                                                 : p.status === 'pending' ? '#f59e0b'
-                                                : 'var(--text-muted)'
+                                                    : 'var(--text-muted)'
                                             return (
                                                 <tr key={p.id}>
                                                     <td style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{i + 1}</td>

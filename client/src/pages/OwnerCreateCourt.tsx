@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import api from '../api/axios'
+import { useDialog } from '../context/DialogContext'
 import styles from '../styles/Dashboard.module.css'
 
 export default function OwnerCreateCourt() {
     const navigate = useNavigate()
     const { facilityId } = useParams()
+    const { showAlert } = useDialog()
     const [submitting, setSubmitting] = useState(false)
     const [form, setForm] = useState({
         name: '',
@@ -23,8 +25,19 @@ export default function OwnerCreateCourt() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!form.name || !form.price_per_hour) {
-            alert('Vui lòng điền tên sân và đơn giá mặc định')
+            await showAlert('Vui lòng điền tên sân và đơn giá mặc định')
             return
+        }
+
+        if (form.peak_start_time || form.peak_end_time || form.peak_price) {
+            if (!form.peak_start_time || !form.peak_end_time || !form.peak_price) {
+                await showAlert('Vui lòng điền đầy đủ Giờ bắt đầu, Giờ kết thúc và Giá cho Khung giờ vàng')
+                return
+            }
+            if (form.peak_start_time >= form.peak_end_time) {
+                await showAlert('Giờ bắt đầu khung giờ vàng phải trước Giờ kết thúc')
+                return
+            }
         }
 
         setSubmitting(true)
@@ -37,10 +50,10 @@ export default function OwnerCreateCourt() {
                 peak_price: form.peak_price ? parseFloat(form.peak_price) : null,
                 slot_step_minutes: parseInt(form.slot_step_minutes)
             })
-            alert('Tạo sân thành công!')
+            await showAlert('Tạo sân thành công!')
             navigate('/owner/courts') // Go back to management page
         } catch (err: any) {
-            alert(err.response?.data?.message || 'Lỗi khi tạo sân')
+            await showAlert(err.response?.data?.message || 'Lỗi khi tạo sân')
         } finally {
             setSubmitting(false)
         }

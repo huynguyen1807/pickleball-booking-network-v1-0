@@ -15,7 +15,10 @@ export const createMatch = async (req, res) => {
             const result = await pool.request()
                 .input('id', sql.Int, sub_court_id)
                 .input('court_id', sql.Int, court_id)
-                .query(`SELECT price_per_hour, peak_start_time, peak_end_time, peak_price_per_hour,
+                .query(`SELECT price_per_hour, 
+                               CONVERT(NVARCHAR(5), peak_start_time, 108) AS peak_start_time, 
+                               CONVERT(NVARCHAR(5), peak_end_time, 108) AS peak_end_time, 
+                               peak_price_per_hour,
                                weekend_price_per_hour, min_booking_minutes, slot_step_minutes
                         FROM sub_courts WHERE id = @id AND court_id = @court_id`);
             if (result.recordset.length === 0) return res.status(404).json({ message: 'Sân con không tồn tại' });

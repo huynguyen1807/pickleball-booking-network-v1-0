@@ -40,7 +40,10 @@ export const getAllCourts = async (req, res) => {
     try {
         const pool = await poolPromise;
         const result = await pool.request().query(`
-      SELECT c.*, f.name AS facility_name, f.owner_id, u.full_name AS owner_name,
+      SELECT c.*, 
+             CONVERT(VARCHAR(5), c.peak_start_time, 108) AS peak_start_time_str,
+             CONVERT(VARCHAR(5), c.peak_end_time, 108) AS peak_end_time_str,
+             f.name AS facility_name, f.owner_id, u.full_name AS owner_name,
         (SELECT AVG(CAST(rating AS FLOAT)) FROM reviews WHERE court_id = c.id) AS avg_rating,
         (SELECT COUNT(*) FROM bookings WHERE court_id = c.id) AS booking_count
       FROM courts c 
@@ -48,7 +51,11 @@ export const getAllCourts = async (req, res) => {
       JOIN users u ON f.owner_id = u.id
       WHERE c.is_active = 1 ORDER BY c.created_at DESC
     `);
-        res.json(result.recordset);
+        res.json(result.recordset.map(c => ({
+            ...c,
+            peak_start_time: c.peak_start_time_str,
+            peak_end_time: c.peak_end_time_str
+        })));
     } catch (err) {
         res.status(500).json({ message: 'Lỗi server' });
     }
@@ -61,7 +68,10 @@ export const getCourtById = async (req, res) => {
         const result = await pool.request()
             .input('id', sql.Int, req.params.id)
             .query(`
-        SELECT c.*, f.name AS facility_name, f.owner_id, u.full_name AS owner_name, f.address,
+        SELECT c.*, 
+               CONVERT(VARCHAR(5), c.peak_start_time, 108) AS peak_start_time_str,
+               CONVERT(VARCHAR(5), c.peak_end_time, 108) AS peak_end_time_str,
+               f.name AS facility_name, f.owner_id, u.full_name AS owner_name, f.address,
           (SELECT AVG(CAST(rating AS FLOAT)) FROM reviews WHERE court_id = c.id) AS avg_rating,
           (SELECT COUNT(*) FROM bookings WHERE court_id = c.id) AS booking_count
         FROM courts c 
@@ -75,7 +85,12 @@ export const getCourtById = async (req, res) => {
             .input('court_id', sql.Int, req.params.id)
             .query('SELECT TOP 10 r.*, u.full_name FROM reviews r JOIN users u ON r.user_id = u.id WHERE r.court_id = @court_id ORDER BY r.created_at DESC');
 
-        res.json({ ...result.recordset[0], reviews: reviews.recordset });
+        const courtData = {
+            ...result.recordset[0],
+            peak_start_time: result.recordset[0].peak_start_time_str,
+            peak_end_time: result.recordset[0].peak_end_time_str
+        };
+        res.json({ ...courtData, reviews: reviews.recordset });
     } catch (err) {
         res.status(500).json({ message: 'Lỗi server' });
     }
@@ -150,14 +165,121 @@ export const getMyCourts = async (req, res) => {
         const pool = await poolPromise;
         const result = await pool.request()
             .input('owner_id', sql.Int, req.user.id)
-            .query(`SELECT c.*, f.name as facility_name, 
+            .query(`SELECT c.*, 
+               CONVERT(VARCHAR(5), c.peak_start_time, 108) AS peak_start_time_str,
+               CONVERT(VARCHAR(5), c.peak_end_time, 108) AS peak_end_time_str,
+               f.name as facility_name, 
         (SELECT AVG(CAST(rating AS FLOAT)) FROM reviews WHERE court_id = c.id) AS avg_rating,
         (SELECT COUNT(*) FROM bookings WHERE court_id = c.id) AS booking_count
         FROM courts c 
         JOIN facilities f ON c.facility_id = f.id
         WHERE f.owner_id = @owner_id ORDER BY c.created_at DESC`);
-        res.json(result.recordset);
+        res.json(result.recordset.map(c => ({
+            ...c,
+            peak_start_time: c.peak_start_time_str,
+            peak_end_time: c.peak_end_time_str
+        })));
     } catch (err) {
+        res.status(500).json({ message: 'Lỗi server' });
+    }
+};
+
+// Get court slots for a specific date (Sinh slot động)
+export const getCourtSlots = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { date } = req.query;
+
+        if (!date) return res.status(400).json({ message: 'Thiếu tham số date' });
+
+        const pool = await poolPromise;
+
+        // Lấy thông tin sân (giờ mở/đóng cửa)
+        const courtInfo = await pool.request()
+            .input('id', sql.Int, id)
+            .query(`
+                SELECT 
+                    CONVERT(NVARCHAR(5), f.open_time, 108) AS open_time, 
+                    CONVERT(NVARCHAR(5), f.close_time, 108) AS close_time
+                FROM courts c
+                JOIN facilities f ON c.facility_id = f.id
+                WHERE c.id = @id AND c.is_active = 1
+            `);
+
+        if (courtInfo.recordset.length === 0)
+            return res.status(404).json({ message: 'Không tìm thấy sân' });
+
+        const openTime  = courtInfo.recordset[0].open_time  || '06:00';
+        const closeTime = courtInfo.recordset[0].close_time || '22:00';
+
+        // Lấy danh sách booking đã có
+        const bookingsResult = await pool.request()
+            .input('court_id',     sql.Int,  id)
+            .input('booking_date', sql.Date, date as string)
+            .query(`
+                SELECT
+                    CONVERT(NVARCHAR(5), start_time, 108) AS start_time,
+                    CONVERT(NVARCHAR(5), end_time,   108) AS end_time
+                FROM bookings
+                WHERE court_id     = @court_id
+                  AND booking_date = @booking_date
+                  AND status IN ('confirmed', 'pending')
+            `);
+            
+        const bookedRanges = bookingsResult.recordset;
+
+        // Chuẩn bị các biến thời gian hiện tại để ẩn slot quá khứ
+        const queryDateStr = String(date).split('T')[0]; // Format: YYYY-MM-DD
+        const now = new Date();
+        // Cần convert now sang múi giờ hiện tại (Việt Nam +7) hoặc lấy chuỗi YYYY-MM-DD local
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const todayStr = `${year}-${month}-${day}`;
+        
+        const currentHour = now.getHours();
+        const currentMinute = now.getMinutes();
+        const currentTimeString = `${String(currentHour).padStart(2, '0')}:${String(currentMinute).padStart(2, '0')}`;
+
+        const isToday = queryDateStr === todayStr;
+        const isPastDate = queryDateStr < todayStr;
+
+        // Sinh slot 30 phút từ open_time đến close_time
+        const slots: any[] = [];
+        const [oh, om] = openTime.split(':').map(Number);
+        const [ch, cm] = closeTime.split(':').map(Number);
+        let curMin = oh * 60 + om;
+        const endMin = ch * 60 + cm;
+
+        while (curMin + 30 <= endMin) {
+            const st = `${String(Math.floor(curMin / 60)).padStart(2, '0')}:${String(curMin % 60).padStart(2, '0')}`;
+            const et = `${String(Math.floor((curMin + 30) / 60)).padStart(2, '0')}:${String((curMin + 30) % 60).padStart(2, '0')}`;
+            
+            // Xung đột với booking
+            const isBooked = bookedRanges.some(b => st < b.end_time && et > b.start_time);
+            
+            // Nếu là ngày quá khứ, tất cả slot đều hết hạn
+            // Nếu là ngày hôm nay, chỉ những slot có start_time > currentTimeString mới được đặt
+            let isPastSlot = false;
+            
+            if (isPastDate) {
+                 isPastSlot = true;
+            } else if (isToday) {
+                 isPastSlot = st <= currentTimeString;
+            }
+
+            slots.push({ 
+                start_time: st, 
+                end_time: et, 
+                is_available: !isBooked && !isPastSlot 
+            });
+            curMin += 30;
+        }
+        
+        res.json(slots);
+        
+    } catch (err) {
+        console.error('Lỗi lấy court slots:', err);
         res.status(500).json({ message: 'Lỗi server' });
     }
 };

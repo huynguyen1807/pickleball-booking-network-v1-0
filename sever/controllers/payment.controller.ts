@@ -621,9 +621,31 @@ export const payosCancelReturn = async (req: any, res: any) => {
                 await updatePaymentStatus(paymentId, 'cancelled');
 
                 if (bookingId) {
+                    // Lấy thông tin booking để trả slot
+                    const bk = await pool.request()
+                        .input('id', sql.Int, bookingId)
+                        .query('SELECT court_id, booking_date, start_time, end_time FROM bookings WHERE id = @id AND status = \'pending\'');
+
                     await pool.request()
                         .input('id', sql.Int, bookingId)
                         .query(`UPDATE bookings SET status = 'cancelled' WHERE id = @id AND status = 'pending'`);
+
+                    // Trả court_slots về trạng thái trống
+                    if (bk.recordset.length > 0) {
+                        const { court_id, booking_date, start_time, end_time } = bk.recordset[0];
+                        await pool.request()
+                            .input('court_id', sql.Int, court_id)
+                            .input('slot_date', sql.Date, booking_date)
+                            .input('start_time', sql.NVarChar, start_time)
+                            .input('end_time', sql.NVarChar, end_time)
+                            .query(`
+                                UPDATE court_slots SET is_available = 1
+                                WHERE court_id  = @court_id
+                                  AND slot_date = @slot_date
+                                  AND start_time >= CAST(@start_time AS TIME)
+                                  AND end_time   <= CAST(@end_time   AS TIME)
+                            `);
+                    }
                 }
 
                 console.log(`PayOS Cancel Return: Payment ${orderCode} cancelled`);
@@ -672,9 +694,31 @@ export const payosCancelByOrderCode = async (req: any, res: any) => {
 
         // Booking always goes to 'cancelled' regardless of payment expiry/cancel
         if (record.booking_id) {
+            // Lấy thông tin booking để trả slot
+            const bk = await pool.request()
+                .input('id', sql.Int, record.booking_id)
+                .query('SELECT court_id, booking_date, start_time, end_time FROM bookings WHERE id = @id AND status = \'pending\'');
+
             await pool.request()
                 .input('id', sql.Int, record.booking_id)
                 .query(`UPDATE bookings SET status = 'cancelled' WHERE id = @id AND status = 'pending'`);
+
+            // Trả court_slots về trạng thái trống
+            if (bk.recordset.length > 0) {
+                const { court_id, booking_date, start_time, end_time } = bk.recordset[0];
+                await pool.request()
+                    .input('court_id', sql.Int, court_id)
+                    .input('slot_date', sql.Date, booking_date)
+                    .input('start_time', sql.NVarChar, start_time)
+                    .input('end_time', sql.NVarChar, end_time)
+                    .query(`
+                        UPDATE court_slots SET is_available = 1
+                        WHERE court_id  = @court_id
+                          AND slot_date = @slot_date
+                          AND start_time >= CAST(@start_time AS TIME)
+                          AND end_time   <= CAST(@end_time   AS TIME)
+                    `);
+            }
         }
 
         return successResponse(res, { status: targetStatus }, `Đã cập nhật giao dịch: ${targetStatus}`);
@@ -695,6 +739,22 @@ export const cancelExpiredPayments = async (): Promise<void> => {
         await pool.request().query(`
             UPDATE b SET b.status = 'cancelled'
             FROM bookings b
+            INNER JOIN payments p ON p.booking_id = b.id
+            WHERE p.status = 'pending'
+              AND p.transaction_id LIKE 'payos_%'
+              AND p.created_at < DATEADD(MINUTE, -15, GETDATE())
+              AND b.status = 'pending'
+        `);
+
+        // Trả court_slots về trạng thái trống cho các booking hết hạn
+        await pool.request().query(`
+            UPDATE cs SET cs.is_available = 1
+            FROM court_slots cs
+            INNER JOIN bookings b
+                ON  cs.court_id  = b.court_id
+                AND cs.slot_date = b.booking_date
+                AND cs.start_time >= b.start_time
+                AND cs.end_time   <= b.end_time
             INNER JOIN payments p ON p.booking_id = b.id
             WHERE p.status = 'pending'
               AND p.transaction_id LIKE 'payos_%'

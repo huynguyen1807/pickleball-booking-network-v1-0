@@ -5,18 +5,7 @@ import { useState, useEffect } from 'react'
 
 export default function CourtCard({ court }) {
     const navigate = useNavigate()
-    const data = court || {
-        id: 1,
-        name: 'Sân Pickleball Hòa Xuân',
-        address: '123 Nguyễn Phước Lan, Hòa Xuân, Cẩm Lệ',
-        price_per_hour: 150000,
-        image: null,
-        rating: 4.5,
-        total_bookings: 128,
-        is_active: true,
-        distance: 2.3,
-        sub_courts_count: 0
-    }
+    const data = court;
 
     const formatPrice = (price) => {
         return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price)
@@ -26,7 +15,6 @@ export default function CourtCard({ court }) {
         <div className={styles.courtCard} onClick={() => navigate(`/courts/${data.id}`)}>
             <div className={styles.courtImage}>
                 <div className={styles.courtImagePlaceholder}>🏟️</div>
-                <div className={styles.courtPrice}>{data.sub_courts_count ?? 0} sân</div>
                 {data.distance && <div className={styles.courtDistance}>📍 {data.distance} km</div>}
             </div>
 
