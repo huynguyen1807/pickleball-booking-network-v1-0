@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import api from '../api/axios';
 import styles from '../styles/Payment.module.css';
 
 interface PayOSPaymentProps {
   checkoutUrl: string;
-  qrCode: string;
   orderCode: number;
   paymentLinkId: string;
   amount: number;
@@ -14,7 +13,6 @@ interface PayOSPaymentProps {
 
 export function PayOSPayment({
   checkoutUrl,
-  qrCode,
   orderCode,
   paymentLinkId,
   amount,
@@ -26,7 +24,8 @@ export function PayOSPayment({
   >('pending');
   const [timeLeft, setTimeLeft] = useState(900); // 15 minutes
   const [polling, setPolling] = useState(true);
-  const [pollingCount, setPollingCount] = useState(0);
+  const payosWindow = useRef<Window | null>(null);
+  const hasOpenedWindow = useRef(false);
 
   // Countdown timer
   useEffect(() => {
@@ -44,13 +43,21 @@ export function PayOSPayment({
     return () => clearInterval(timer);
   }, []);
 
-  // Auto-open checkout URL in new tab
+  // Auto-open checkout URL in new tab (only once on mount)
   useEffect(() => {
-    if (checkoutUrl && status === 'pending') {
-      // Mở tab PayOS tự động khi component mount
-      window.open(checkoutUrl, '_blank');
+    if (checkoutUrl && !hasOpenedWindow.current) {
+      const newWindow = window.open(checkoutUrl, '_blank');
+      payosWindow.current = newWindow;
+      hasOpenedWindow.current = true;
     }
-  }, [checkoutUrl, status]);
+  }, [checkoutUrl]);
+
+  // When timer expires, mark payment as 'expired' in DB immediately
+  useEffect(() => {
+    if (status !== 'expired') return;
+    api.patch(`/payments/cancel-by-order?orderCode=${orderCode}&newStatus=expired`)
+      .catch(() => { /* best-effort — backend job will catch it if this fails */ });
+  }, [status, orderCode]);
 
   // Poll payment status
   useEffect(() => {
@@ -62,22 +69,33 @@ export function PayOSPayment({
         const res = await api.get(
           `/payments/payos-status/${orderCode}`
         );
+        const currentStatus = res.data?.status ?? res.data?.data?.status;
 
-        setPollingCount(prev => prev + 1);
-        console.log(`[PayOS Poll #${pollingCount + 1}]`, res.data);
-
-        if (res.data.status === 'completed') {
+        if (currentStatus === 'completed') {
           setStatus('completed');
           setPolling(false);
+          
+          // Đóng tab PayOS sau khi thanh toán thành công
+          setTimeout(() => {
+            if (payosWindow.current && !payosWindow.current.closed) {
+              payosWindow.current.close();
+            }
+            // Focus về tab gốc
+            window.focus();
+          }, 100);
+          
           // Delay thêm 2s để ensure webhook processed
           setTimeout(() => {
             onSuccess();
           }, 2000);
-        } else if (res.data.status === 'failed') {
+        } else if (currentStatus === 'failed') {
           setStatus('failed');
           setPolling(false);
-        } else if (res.data.status === 'cancelled') {
+        } else if (currentStatus === 'cancelled') {
           setStatus('cancelled');
+          setPolling(false);
+        } else if (currentStatus === 'expired') {
+          setStatus('expired');
           setPolling(false);
         }
       } catch (err) {
@@ -87,7 +105,7 @@ export function PayOSPayment({
     }, 5000); // Poll every 5 seconds
 
     return () => clearInterval(pollInterval);
-  }, [orderCode, polling, status, onSuccess, pollingCount]);
+  }, [orderCode, polling, onSuccess]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -96,57 +114,25 @@ export function PayOSPayment({
   };
 
   const handleRedirectToPayOS = () => {
-    window.open(checkoutUrl, '_blank');
-  };
-
-  const handleCopyQRCode = () => {
-    // Copy QR code image to clipboard
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext('2d');
-      ctx?.drawImage(img, 0, 0);
-      
-      canvas.toBlob((blob) => {
-        if (blob) {
-          navigator.clipboard.write([
-            new ClipboardItem({ [blob.type]: blob })
-          ]).then(() => {
-            alert('Mã QR đã copy vào clipboard');
-          });
-        }
-      });
-    };
-    img.src = qrCode;
+    if (!payosWindow.current || payosWindow.current.closed) {
+      const newWindow = window.open(checkoutUrl, '_blank');
+      payosWindow.current = newWindow;
+    } else {
+      // Nếu tab đã mở, focus vào tab đó
+      payosWindow.current.focus();
+    }
   };
 
   return (
     <div className={styles.payosPaymentContainer}>
       {status === 'pending' && (
         <div className={styles.paymentPending}>
-          <h2>PayOS - Quét mã QR để thanh toán</h2>
-
-          {/* QR Code Display */}
-          <div className={styles.qrSection}>
-            <img
-              src={qrCode}
-              alt="QR Code PayOS"
-              className={styles.qrCode}
-            />
-            <button 
-              onClick={handleCopyQRCode}
-              className={styles.btnCopyQR}
-            >
-              📋 Copy QR Code
-            </button>
-          </div>
+          <h2>💳 Thanh toán qua PayOS</h2>
 
           {/* Amount Display */}
           <div className={styles.amountSection}>
             <p>Số tiền thanh toán</p>
-            <h3>{amount.toLocaleString('vi-VN')} VND</h3>
+            <h3>{amount.toLocaleString('vi-VN')} VNĐ</h3>
             <p className={styles.orderInfo}>
               Mã đơn: <strong>{orderCode}</strong>
             </p>
@@ -154,43 +140,32 @@ export function PayOSPayment({
 
           {/* Timer */}
           <div className={styles.timerSection}>
-            <p>Mã QR hết hạn trong:</p>
+            <p>Hết hạn trong:</p>
             <span className={styles.timer}>{formatTime(timeLeft)}</span>
             {timeLeft < 60 && (
               <p className={styles.warning}>
-                ⚠️ Mã QR sắp hết hạn, vui lòng thanh toán ngay
+                ⚠️ Sắp hết hạn, vui lòng thanh toán ngay
               </p>
             )}
           </div>
 
-          {/* Instructions */}
-          <div className={styles.instructions}>
-            <h4>📱 Hướng dẫn thanh toán:</h4>
-            <ol>
-              <li>Mở ứng dụng ngân hàng của bạn</li>
-              <li>Chọn "Quét QR" hoặc "Chuyển tiền"</li>
-              <li>Quét mã QR trên màn hình này</li>
-              <li>Nhập mã PIN/OTP xác nhận</li>
-              <li>Thanh toán thành công</li>
-            </ol>
-          </div>
-
-          {/* Alternative: Redirect Button */}
-          <button 
+          {/* Redirect Button */}
+          <button
             onClick={handleRedirectToPayOS}
             className={styles.btnPayosCheckout}
           >
-            💳 Thanh toán trực tiếp (mở tab mới)
+          Thanh toán ngay
           </button>
 
           {/* Status Indicator */}
           <div className={styles.statusIndicator}>
             <div className={styles.spinnerSmall}></div>
-            <span>Đang chờ thanh toán...</span>
-            {pollingCount > 0 && (
-              <span className={styles.pollCount}>(poll #{pollingCount})</span>
-            )}
+            <span>Đang chờ xác nhận thanh toán...</span>
           </div>
+
+          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '8px' }}>
+            Sau khi thanh toán xong, trang này sẽ tự động cập nhật.
+          </p>
         </div>
       )}
 
@@ -258,13 +233,13 @@ export function PayOSPayment({
       {status === 'expired' && (
         <div className={styles.paymentExpired}>
           <div className={styles.warningIcon}>⏳</div>
-          <h2>⏰ Mã QR hết hạn</h2>
-          <p>Mã QR của bạn đã hết hạn. Vui lòng tạo mã mới để tiếp tục thanh toán.</p>
+          <h2>⏰ Giao dịch đã hết hạn</h2>
+          <p>Thời gian thanh toán đã hết (15 phút). Đơn đặt sân sẽ được hủy tự động.</p>
           <button 
-            onClick={() => window.location.reload()}
+            onClick={onCancel}
             className={styles.btnNewQR}
           >
-            🔄 Tạo mã QR mới
+            Quay lại
           </button>
         </div>
       )}

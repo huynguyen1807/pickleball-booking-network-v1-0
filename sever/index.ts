@@ -16,6 +16,8 @@ import adminRoutes from './routes/admin.routes';
 import statsRoutes from './routes/stats.routes';
 import facilityRoutes from './routes/facility.routes';
 import initSocket from './socket/index';
+import { cancelExpiredPayments } from './controllers/payment.controller';
+import { autoCheckMatches } from './controllers/match.controller';
 
 dotenv.config();
 
@@ -29,6 +31,9 @@ const io = new Server(server, {
 app.use(cors());
 app.use(express.json({ limit: '15mb' }));
 app.use(express.urlencoded({ limit: '15mb', extended: true }));
+
+// serve uploaded files
+app.use('/uploads', express.static('uploads'));
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -52,10 +57,20 @@ app.get('/api/health', (req: Request, res: Response) => {
 // Socket.IO
 initSocket(io);
 
+// Auto-cancel expired pending payments every 60 seconds
+setInterval(cancelExpiredPayments, 60 * 1000);
+// Also run once on startup to clear any payments that expired during downtime
+setTimeout(cancelExpiredPayments, 5000);
+
+// Auto-cancel matches with insufficient players 30 min before start (every 10 min)
+setInterval(autoCheckMatches, 10 * 60 * 1000);
+setTimeout(autoCheckMatches, 15 * 1000);
+
 // Start server
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
     console.log(`\n🏓 Pickleball API Server running on port ${PORT}`);
     console.log(`📡 Socket.IO ready`);
     console.log(`🔗 http://localhost:${PORT}/api/health\n`);
+    console.log(`⏰ Auto-cancel expired payments job started (every 60s)`);
 });

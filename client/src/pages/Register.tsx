@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import api from '../api/axios'
 import styles from '../styles/Register.module.css'
 
+
 export default function Register() {
     const navigate = useNavigate()
     const [form, setForm] = useState({
@@ -12,6 +13,8 @@ export default function Register() {
     const [step, setStep] = useState(1) // 1: form đăng ký, 2: xác nhận OTP
     const [success, setSuccess] = useState('')
     const [loading, setLoading] = useState(false)
+    const [licenseFile, setLicenseFile] = useState<File | null>(null)
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null)
     const [otp, setOtp] = useState(['', '', '', '', '', ''])
     const [countdown, setCountdown] = useState(0)
     const [isSubmitting, setIsSubmitting] = useState(false)
@@ -46,8 +49,13 @@ export default function Register() {
         const normalizedEmail = form.email.trim().toLowerCase()
 
         // Validate reason for owner
-        if (form.role === 'owner' && !form.reason?.trim()) {
-            return setError('Vui lòng nhập lý do muốn trở thành chủ sân')
+        if (form.role === 'owner') {
+            if (!form.reason?.trim()) {
+                return setError('Vui lòng nhập lý do muốn trở thành chủ sân')
+            }
+            if (!licenseFile) {
+                return setError('Vui lòng tải lên giấy phép kinh doanh trước khi tiếp tục')
+            }
         }
 
         if (form.password !== form.confirmPassword) {
@@ -91,20 +99,36 @@ export default function Register() {
         setIsSubmitting(true)
         setLoading(true)
         
-        const registerData = {
-            full_name: form.full_name,
-            email: form.email,
-            phone: form.phone,
-            password: form.password,
-            role: form.role,
-            reason: form.reason || '',
-            code: code
+        let registerData: any;
+        if (licenseFile) {
+            registerData = new FormData();
+            registerData.append('full_name', form.full_name);
+            registerData.append('email', form.email);
+            registerData.append('phone', form.phone);
+            registerData.append('password', form.password);
+            registerData.append('role', form.role);
+            registerData.append('reason', form.reason || '');
+            registerData.append('code', code);
+            registerData.append('business_license', licenseFile);
+        } else {
+            registerData = {
+                full_name: form.full_name,
+                email: form.email,
+                phone: form.phone,
+                password: form.password,
+                role: form.role,
+                reason: form.reason || '',
+                code: code
+            };
         }
         
         console.log('Registering with data:', { ...registerData, password: '***' })
         
         try {
-            const response = await api.post('/auth/register', registerData)
+            const config = licenseFile
+                ? { headers: { 'Content-Type': 'multipart/form-data' } }
+                : undefined;
+            const response = await api.post('/auth/register', registerData, config)
             console.log('Registration response:', response.data)
 
             // Clear OTP to prevent re-submission
@@ -237,6 +261,7 @@ export default function Register() {
                             )}
 
                             {form.role === 'owner' && (
+                                <>
                                 <div className="input-group">
                                     <label>Lý do muốn trở thành chủ sân *</label>
                                     <textarea
@@ -259,6 +284,40 @@ export default function Register() {
                                         }}
                                     />
                                 </div>
+                                <div className="input-group">
+                                    <label>Giấy phép kinh doanh (.pdf, .jpg, .png, &le;5MB) *</label>
+                                    <input
+                                        type="file"
+                                        accept=".pdf,.jpg,.jpeg,.png"
+                                        onChange={e => {
+                                            const file = e.target.files?.[0] || null;
+                                            if (file) {
+                                                if (file.size > 5 * 1024 * 1024) {
+                                                    setError('File phải nhỏ hơn 5MB');
+                                                    setLicenseFile(null);
+                                                    setPreviewUrl(null);
+                                                    return;
+                                                }
+                                                setLicenseFile(file);
+                                                if (file.type.startsWith('image/')) {
+                                                    setPreviewUrl(URL.createObjectURL(file));
+                                                } else {
+                                                    setPreviewUrl(null);
+                                                }
+                                            } else {
+                                                setLicenseFile(null);
+                                                setPreviewUrl(null);
+                                            }
+                                        }}
+                                        required
+                                    />
+                                    {previewUrl && (
+                                        <div style={{ marginTop: '8px' }}>
+                                            <img src={previewUrl} alt="preview" style={{ maxWidth: '100%', maxHeight: '200px' }} />
+                                        </div>
+                                    )}
+                                </div>
+                                </>
                             )}
 
                             <div className={styles.formRow}>

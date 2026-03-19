@@ -3,6 +3,8 @@ import jwt from 'jsonwebtoken';
 import nodemailer from 'nodemailer';
 import { sql, poolPromise } from '../config/db';
 import dotenv from 'dotenv';
+import path from 'path';
+import fs from 'fs';
 import type { StringValue } from 'ms';
 dotenv.config();
 
@@ -137,6 +139,26 @@ export const register = async (req, res) => {
             return res.status(400).json({ message: 'Vui lòng nhập lý do muốn trở thành chủ sân' })
         }
 
+        // if owner make sure file was uploaded by multer
+        let businessLicenseUrl = null;
+        if (role === 'owner') {
+            if (!req.file) {
+                return res.status(400).json({ message: 'Vui lòng tải lên giấy phép kinh doanh' });
+            }
+            // save file to disk with email in filename
+            const uploadDir = path.join(__dirname, '../uploads/business_licenses');
+            if (!fs.existsSync(uploadDir)) {
+                fs.mkdirSync(uploadDir, { recursive: true });
+            }
+            const ext = path.extname(req.file.originalname);
+            const base = path.basename(req.file.originalname, ext).replace(/[^a-zA-Z0-9-_\\.]/g, '_');
+            const filename = `${trimmedEmail}_${Date.now()}_${base}${ext}`;
+            const filepath = path.join(uploadDir, filename);
+            fs.writeFileSync(filepath, req.file.buffer);
+            console.log(`[REGISTER] Saved business license file: ${filename}`);
+            businessLicenseUrl = `/uploads/business_licenses/${filename}`;
+        }
+
         const pool = await poolPromise
 
         const hash = await bcrypt.hash(password, 10)
@@ -165,9 +187,10 @@ export const register = async (req, res) => {
             await pool.request()
                 .input('user_id', sql.Int, userId)
                 .input('reason', sql.NVarChar, reason)
+                .input('business_license_url', sql.NVarChar(sql.MAX), businessLicenseUrl)
                 .query(`
-                    INSERT INTO upgrade_requests (user_id, reason, status)
-                    VALUES (@user_id, @reason, 'pending')
+                    INSERT INTO upgrade_requests (user_id, reason, status, business_license_url)
+                    VALUES (@user_id, @reason, 'pending', @business_license_url)
                 `)
         }
 
@@ -186,7 +209,10 @@ export const register = async (req, res) => {
         res.status(500).json({ message: 'Lỗi server' })
     }
 }
-// Login
+// Login — with account lockout after 5 failed attempts
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOCK_DURATION_MINUTES = 15;
+
 export const login = async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -204,6 +230,20 @@ export const login = async (req, res) => {
         }
 
         const user = result.recordset[0];
+
+        // Check if account is locked
+        if (user.locked_until && new Date(user.locked_until) > new Date()) {
+            const remainingMs = new Date(user.locked_until).getTime() - Date.now();
+            const remainingMin = Math.ceil(remainingMs / 60000);
+            return res.status(423).json({
+                message: `Tài khoản đã bị khóa do nhập sai quá ${MAX_LOGIN_ATTEMPTS} lần. Vui lòng thử lại sau ${remainingMin} phút.`,
+                lockedUntil: user.locked_until
+            });
+        }
+
+        if (user.status === 'banned') {
+            return res.status(403).json({ message: 'Tài khoản của bạn đã bị khóa bởi Admin. Vui lòng liên hệ hỗ trợ.' });
+        }
         if (user.status === 'pending') {
             return res.status(403).json({ message: 'Tài khoản đang chờ Admin duyệt' });
         }
@@ -213,7 +253,44 @@ export const login = async (req, res) => {
 
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
-            return res.status(401).json({ message: 'Email hoặc mật khẩu không đúng' });
+            // Increment failed login count
+            const newCount = (user.failed_login_count || 0) + 1;
+            const attemptsLeft = MAX_LOGIN_ATTEMPTS - newCount;
+
+            if (newCount >= MAX_LOGIN_ATTEMPTS) {
+                // Lock account
+                const lockUntil = new Date(Date.now() + LOCK_DURATION_MINUTES * 60 * 1000);
+                await pool.request()
+                    .input('email', sql.NVarChar, email)
+                    .input('count', sql.Int, newCount)
+                    .input('locked_until', sql.DateTimeOffset, lockUntil)
+                    .query('UPDATE users SET failed_login_count = @count, locked_until = @locked_until WHERE email = @email');
+
+                console.log(`[LOGIN] Account locked: ${email} after ${newCount} failed attempts`);
+                return res.status(423).json({
+                    message: `Tài khoản đã bị khóa do nhập sai ${MAX_LOGIN_ATTEMPTS} lần. Vui lòng thử lại sau ${LOCK_DURATION_MINUTES} phút.`,
+                    lockedUntil: lockUntil
+                });
+            } else {
+                // Just increment counter
+                await pool.request()
+                    .input('email', sql.NVarChar, email)
+                    .input('count', sql.Int, newCount)
+                    .query('UPDATE users SET failed_login_count = @count WHERE email = @email');
+
+                console.log(`[LOGIN] Failed attempt ${newCount}/${MAX_LOGIN_ATTEMPTS} for: ${email}`);
+                return res.status(401).json({
+                    message: `Email hoặc mật khẩu không đúng. Còn ${attemptsLeft} lần thử.`,
+                    attemptsLeft
+                });
+            }
+        }
+
+        // Login success → reset failed login count
+        if (user.failed_login_count > 0 || user.locked_until) {
+            await pool.request()
+                .input('email', sql.NVarChar, email)
+                .query('UPDATE users SET failed_login_count = 0, locked_until = NULL WHERE email = @email');
         }
 
         const token = jwt.sign(
@@ -222,7 +299,7 @@ export const login = async (req, res) => {
             { expiresIn: (process.env.JWT_EXPIRES_IN || '7d') as StringValue }
         );
 
-        const { password: _, ...userData } = user;
+        const { password: _, failed_login_count: __, locked_until: ___, ...userData } = user;
         res.json({ message: 'Đăng nhập thành công', token, user: userData });
     } catch (err) {
         console.error('Login error:', err);

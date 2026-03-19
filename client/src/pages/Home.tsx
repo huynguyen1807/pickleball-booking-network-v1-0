@@ -5,6 +5,7 @@ import api from '../api/axios'
 import PostCard from '../components/PostCard'
 import CameraModal from '../components/CameraModal'
 import styles from '../styles/Home.module.css'
+import { formatDateVN, formatTimeHHmm } from '../utils/dateTime'
 
 export default function Home() {
     const { user } = useAuth()
@@ -29,7 +30,7 @@ export default function Home() {
         loadData()
     }, [])
 
-    const loadData = async () => {
+   const loadData = async () => {
         try {
             const [postsRes, matchesRes, facilitiesRes] = await Promise.all([
                 api.get('/posts'),
@@ -165,7 +166,11 @@ export default function Home() {
 
             {/* Create Post */}
             <div className={styles.createPost}>
-                <div className="avatar">{user?.full_name?.charAt(0) || '?'}</div>
+                <div className="avatar" style={{ overflow: 'hidden' }}>
+                    {user?.avatar ? (
+                        <img src={user.avatar} alt={user.full_name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                    ) : (user?.full_name?.charAt(0) || '?')}
+                </div>
                 <div style={{ flex: 1 }}>
                     <textarea
                         className={styles.createPostInput}
@@ -270,7 +275,7 @@ export default function Home() {
                             <div key={m.id} className={styles.matchItem} onClick={() => navigate(`/matches/${m.id}`)} style={{ cursor: 'pointer' }}>
                                 <div className={styles.matchItemInfo}>
                                     <div className={styles.matchItemName}>{m.court_name}</div>
-                                    <div className={styles.matchItemTime}>{m.match_date?.split('T')[0]} {m.start_time}</div>
+                                    <div className={styles.matchItemTime}>{formatDateVN(m.match_date)} {formatTimeHHmm(m.start_time)}</div>
                                 </div>
                                 <div className={styles.matchItemSpots}>{m.max_players - m.current_players} chỗ trống</div>
                             </div>

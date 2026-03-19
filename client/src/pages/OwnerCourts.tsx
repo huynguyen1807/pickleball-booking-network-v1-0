@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api/axios'
+import { useDialog } from '../context/DialogContext'
 import styles from '../styles/Dashboard.module.css'
+import { formatTimeHHmm } from '../utils/dateTime'
 
 export default function OwnerCourts() {
     const navigate = useNavigate()
+    const { showAlert, showConfirm } = useDialog()
     const [facilities, setFacilities] = useState([])
     const [courtsByFacility, setCourtsByFacility] = useState<Record<number, any[]>>({})
     const [loading, setLoading] = useState(true)
@@ -60,7 +63,7 @@ export default function OwnerCourts() {
             })
             loadData()
         } catch (err: any) {
-            alert(err.response?.data?.message || 'Lỗi cập nhật cơ sở')
+            await showAlert('Lỗi cập nhật cơ sở', err.response?.data?.message || 'Lỗi cập nhật cơ sở')
         }
     }
 
@@ -72,17 +75,18 @@ export default function OwnerCourts() {
             })
             loadData()
         } catch (err: any) {
-            alert(err.response?.data?.message || 'Lỗi cập nhật sân')
+            await showAlert('Lỗi cập nhật sân', err.response?.data?.message || 'Lỗi cập nhật sân')
         }
     }
 
     const handleDeleteCourt = async (court: any) => {
-        if (!confirm(`Bạn chắc chắn muốn xóa sân "${court.name}"?`)) return
+        const isConfirm = await showConfirm('Xác nhận xóa sân', `Bạn chắc chắn muốn xóa sân "${court.name}"?`)
+        if (!isConfirm) return
         try {
             await api.delete(`/courts/${court.id}`)
             loadData()
         } catch (err: any) {
-            alert(err.response?.data?.message || 'Lỗi xóa sân')
+            await showAlert('Lỗi xóa sân', err.response?.data?.message || 'Lỗi xóa sân')
         }
     }
 
@@ -115,8 +119,19 @@ export default function OwnerCourts() {
     const handleSaveEdit = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!editForm.name || !editForm.price_per_hour) {
-            alert('Vui lòng điền tên sân và đơn giá mặc định')
+            await showAlert('Cảnh báo', 'Vui lòng điền tên sân và đơn giá mặc định')
             return
+        }
+
+        if (editForm.peak_start_time || editForm.peak_end_time || editForm.peak_price) {
+            if (!editForm.peak_start_time || !editForm.peak_end_time || !editForm.peak_price) {
+                await showAlert('Cảnh báo', 'Vui lòng điền đầy đủ Giờ bắt đầu, Giờ kết thúc và Giá cho Khung giờ vàng')
+                return
+            }
+            if (editForm.peak_start_time >= editForm.peak_end_time) {
+                await showAlert('Cảnh báo', 'Giờ bắt đầu khung giờ vàng phải trước Giờ kết thúc')
+                return
+            }
         }
 
         setSubmitting(true)
@@ -128,11 +143,11 @@ export default function OwnerCourts() {
                 peak_price: editForm.peak_price ? parseFloat(editForm.peak_price) : null,
                 slot_step_minutes: parseInt(editForm.slot_step_minutes)
             })
-            alert('Cập nhật sân thành công!')
+            await showAlert('Thành công', 'Cập nhật sân thành công!')
             setEditCourt(null)
             loadData()
         } catch (err: any) {
-            alert(err.response?.data?.message || 'Lỗi khi cập nhật sân')
+            await showAlert('Lỗi', err.response?.data?.message || 'Lỗi khi cập nhật sân')
         } finally {
             setSubmitting(false)
         }
@@ -190,7 +205,7 @@ export default function OwnerCourts() {
                                             <span>🏓 {court.court_type === 'indoor' ? 'Trong nhà' : court.court_type === 'roofed' ? 'Có mái che' : 'Ngoài trời'}</span>
                                             <span>🏷️ {court.surface_type === 'carpet' ? 'Sân thảm' : 'Sân cứng'}</span>
                                             <span>💰 {formatPrice(court.price_per_hour)}/h</span>
-                                            {court.peak_price && <span>🔥 Giờ vàng: {formatPrice(court.peak_price)}/h ({court.peak_start_time?.slice(0, 5)} - {court.peak_end_time?.slice(0, 5)})</span>}
+                                            {court.peak_price && <span>🔥 Giờ vàng: {formatPrice(court.peak_price)}/h ({formatTimeHHmm(court.peak_start_time)} - {formatTimeHHmm(court.peak_end_time)})</span>}
                                         </div>
                                     </div>
                                     <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>

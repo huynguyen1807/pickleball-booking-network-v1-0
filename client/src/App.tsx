@@ -2,6 +2,7 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import Navbar from './components/Navbar'
 import ProtectedRoute from './components/ProtectedRoute'
+import AdminLayout from './components/AdminLayout'
 
 // Pages
 import Login from './pages/Login'
@@ -22,24 +23,29 @@ import OwnerCourts from './pages/OwnerCourts'
 import OwnerCreateFacility from './pages/OwnerCreateFacility'
 import OwnerCreateCourt from './pages/OwnerCreateCourt'
 import AdminDashboard from './pages/AdminDashboard'
+import AdminUsers from './pages/AdminUsers'
+import AdminStats from './pages/AdminStats'
+import AdminReports from './pages/AdminReports'
+import AdminChat from './pages/AdminChat'
+import AdminNotifications from './pages/AdminNotifications'
 import PostPhoto from './pages/PostPhoto'
+import PaymentCancel from './pages/PaymentCancel'
+import UserProfile from './pages/UserProfile'
 
 export default function App() {
     const { user } = useAuth()
     const location = useLocation()
-
-    // If navigated from PostCard (has background state), render the background page + modal overlay
-    const background = (location.state as any)?.background
+    const isAdminPage = location.pathname.startsWith('/admin')
 
     return (
         <>
-            {user && <Navbar />}
-            <Routes location={background || location}>
+            {user && !isAdminPage && <Navbar />}
+            <Routes>
                 {/* Public */}
                 <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
                 <Route path="/register" element={user ? <Navigate to="/" /> : <Register />} />
                 <Route path="/forgot-password" element={user ? <Navigate to="/" /> : <ForgotPassword />} />
-                {/* Photo permalink — accessible without login (when opened directly, no background) */}
+                {/* Photo permalink — accessible without login */}
                 <Route path="/post/:id/photo" element={<PostPhoto />} />
 
                 {/* Protected - All authenticated users */}
@@ -67,6 +73,9 @@ export default function App() {
                 <Route path="/chat" element={
                     <ProtectedRoute><Chat /></ProtectedRoute>
                 } />
+                <Route path="/profile/:id" element={
+                    <ProtectedRoute><UserProfile /></ProtectedRoute>
+                } />
                 <Route path="/settings" element={
                     <ProtectedRoute><Settings /></ProtectedRoute>
                 } />
@@ -88,21 +97,26 @@ export default function App() {
                     <ProtectedRoute roles={['owner']}><OwnerCreateCourt /></ProtectedRoute>
                 } />
 
-                {/* Admin routes */}
+                {/* Admin routes — wrapped in AdminLayout with sidebar */}
                 <Route path="/admin" element={
-                    <ProtectedRoute roles={['admin']}><AdminDashboard /></ProtectedRoute>
-                } />
+                    <ProtectedRoute roles={['admin']}><AdminLayout /></ProtectedRoute>
+                }>
+                    <Route index element={<AdminDashboard />} />
+                    <Route path="users" element={<AdminUsers />} />
+                    <Route path="stats" element={<AdminStats />} />
+                    <Route path="reports" element={<AdminReports />} />
+                    <Route path="notifications" element={<AdminNotifications />} />
+                    <Route path="chat" element={<AdminChat />} />
+                    <Route path="profile/:id" element={<UserProfile />} />
+                    <Route path="settings" element={<Settings />} />
+                </Route>
+
+                {/* Payment result pages */}
+                <Route path="/payment/cancel" element={<PaymentCancel />} />
 
                 {/* Fallback */}
                 <Route path="*" element={<Navigate to="/" />} />
             </Routes>
-
-            {/* Modal overlay: only rendered when navigated FROM the feed (has background state) */}
-            {background && (
-                <Routes>
-                    <Route path="/post/:id/photo" element={<PostPhoto />} />
-                </Routes>
-            )}
         </>
     )
 }

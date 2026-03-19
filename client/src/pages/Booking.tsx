@@ -3,15 +3,19 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../api/axios'
 import PaymentModal from '../components/PaymentModal'
 import { PayOSPayment } from '../components/PayOSPayment'
+import { useDialog } from '../context/DialogContext'
 import styles from '../styles/Booking.module.css'
+import { formatDateVN, getTodayYMD } from '../utils/dateTime'
 
 export default function Booking() {
     const { id } = useParams()
     const [searchParams] = useSearchParams()
     const navigate = useNavigate()
+    const { showAlert } = useDialog()
     const [step, setStep] = useState(1)
     const [payment, setPayment] = useState('')
     const [court, setCourt] = useState(null)
+    const [subCourt, setSubCourt] = useState(null)
     const [loading, setLoading] = useState(true)
     const [submitting, setSubmitting] = useState(false)
     const [bookingResult, setBookingResult] = useState(null)
@@ -19,15 +23,24 @@ export default function Booking() {
     const [showPaymentModal, setShowPaymentModal] = useState(false)
     const [paymentData, setPaymentData] = useState(null)
 
-    const bookingDate = searchParams.get('date') || new Date().toISOString().split('T')[0]
+    const bookingDate = searchParams.get('date') || getTodayYMD()
     const startTime = searchParams.get('start') || '18:00'
     const endTime = searchParams.get('end') || '20:00'
+    const subCourtId = searchParams.get('subCourt')
 
     useEffect(() => {
         const loadCourt = async () => {
             try {
                 const res = await api.get(`/courts/${id}`)
                 setCourt(res.data)
+                if (subCourtId) {
+                    try {
+                        const subRes = await api.get(`/courts/${id}/sub-courts/${subCourtId}`)
+                        setSubCourt(subRes.data)
+                    } catch (e) {
+                        console.warn('Cannot load sub-court:', e)
+                    }
+                }
             } catch (err) {
                 console.error('Failed to load court:', err)
             } finally {
@@ -35,7 +48,7 @@ export default function Booking() {
             }
         }
         loadCourt()
-    }, [id])
+    }, [id, subCourtId])
 
     const extractTimeH = (timeStr: string) => {
         if (!timeStr) return null;
@@ -72,20 +85,17 @@ export default function Booking() {
         courtPrice = regularPrice + peakPriceTotal;
     }
 
-    const commission = courtPrice * 0.05
-    const total = courtPrice + commission
+    const total = courtPrice
 
     const formatPrice = (p) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(p)
-    const formatDate = (d) => {
-        const date = new Date(d)
-        return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
-    }
+    const formatDate = (d) => formatDateVN(d)
 
     const handleConfirmBooking = async () => {
         setSubmitting(true)
         try {
             const res = await api.post('/bookings', {
                 court_id: parseInt(id),
+                sub_court_id: subCourtId ? parseInt(subCourtId) : null,
                 booking_date: bookingDate,
                 start_time: startTime,
                 end_time: endTime,
@@ -95,7 +105,9 @@ export default function Booking() {
             setBookingResult(res.data)
             setStep(2)
         } catch (err) {
-            alert(err.response?.data?.error || err.response?.data?.message || 'Đặt sân thất bại')
+            const errData = err.response?.data
+            const msg = errData?.message || errData?.error || 'Đặt sân thất bại'
+            await showAlert('Lỗi đặt sân', msg)
         } finally {
             setSubmitting(false)
         }
@@ -149,7 +161,6 @@ export default function Booking() {
                         {peakHours > 0 && (
                             <div className={styles.summaryRow} style={{ color: 'var(--accent-orange)' }}><span>🔥 Giờ vàng ({peakHours.toFixed(1)}h)</span><span>{formatPrice(peakPriceTotal)}</span></div>
                         )}
-                        <div className={styles.summaryRow}><span>Phí dịch vụ (5%)</span><span>{formatPrice(commission)}</span></div>
                         <div className={`${styles.summaryRow} ${styles.summaryTotal}`}><span>Tổng cộng</span><span>{formatPrice(total)}</span></div>
                     </div>
                     <button className="btn btn-primary btn-lg" style={{ width: '100%' }} disabled={submitting} onClick={handleConfirmBooking}>
@@ -250,7 +261,6 @@ export default function Booking() {
                         </button>
                         <PayOSPayment
                             checkoutUrl={paymentData.checkoutUrl}
-                            qrCode={paymentData.qrCode}
                             orderCode={paymentData.orderCode}
                             paymentLinkId={paymentData.paymentLinkId}
                             amount={paymentData.amount}

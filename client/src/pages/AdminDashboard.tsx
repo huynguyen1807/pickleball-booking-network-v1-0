@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import api from '../api/axios'
+import { useDialog } from '../context/DialogContext'
 import styles from '../styles/Dashboard.module.css'
 
 export default function AdminDashboard() {
+    const { showAlert, showConfirm } = useDialog()
     const [requestTab, setRequestTab] = useState('pending')
     const [stats, setStats] = useState(null)
     const [requests, setRequests] = useState([])
@@ -10,6 +12,8 @@ export default function AdminDashboard() {
     const [showRejectModal, setShowRejectModal] = useState(false)
     const [rejectData, setRejectData] = useState({ reqId: null, isRevoke: false, userInfo: null })
     const [rejectReason, setRejectReason] = useState('')
+    const [showLicenseModal, setShowLicenseModal] = useState(false)
+    const [selectedLicense, setSelectedLicense] = useState<{ url: string; name: string } | null>(null)
 
     useEffect(() => {
         loadData()
@@ -31,16 +35,17 @@ export default function AdminDashboard() {
     }
 
     const handleApprove = async (reqId, isReApproval = false) => {
-        const confirmMsg = isReApproval 
+        const confirmMsg = isReApproval
             ? 'Xác nhận DUYỆT LẠI yêu cầu Owner đã từ chối?'
             : 'Xác nhận duyệt yêu cầu nâng cấp Owner?'
-        if (!confirm(confirmMsg)) return
+        const isConfirm = await showConfirm('Xác nhận', confirmMsg)
+        if (!isConfirm) return
         try {
             await api.put(`/admin/upgrade-requests/${reqId}/approve`)
-            alert('✅ Đã duyệt thành công!')
+            await showAlert('Thành công', '✅ Đã duyệt thành công!')
             loadData()
-        } catch (err) {
-            alert(err.response?.data?.message || 'Lỗi duyệt')
+        } catch (err: any) {
+            await showAlert('Lỗi', err.response?.data?.message || 'Lỗi duyệt')
         }
     }
 
@@ -51,17 +56,35 @@ export default function AdminDashboard() {
         setShowRejectModal(true)
     }
 
+    const openLicenseViewer = async (reqId: number, ownerName: string) => {
+        try {
+            setSelectedLicense(null); // Reset
+            setShowLicenseModal(true);
+
+            // Xử lý loading và fetch Base64 từ API
+            const res = await api.get(`/admin/upgrade-requests/${reqId}/license`);
+
+            // Hiển thị modal với Base64 Image
+            setSelectedLicense({ url: res.data.dataUrl, name: ownerName });
+            console.log(res.data.dataUrl);
+        } catch (error) {
+            console.error("Lỗi khi tải file:", error);
+            await showAlert('Lỗi', "Không thể tải file giấy phép từ server (File không tồn tại hoặc lỗi server).");
+            setShowLicenseModal(false);
+        }
+    }
+
     const handleReject = async () => {
         try {
-            await api.put(`/admin/upgrade-requests/${rejectData.reqId}/reject`, { 
-                admin_note: rejectReason.trim() || null 
+            await api.put(`/admin/upgrade-requests/${rejectData.reqId}/reject`, {
+                admin_note: rejectReason.trim() || null
             })
-            alert(rejectData.isRevoke ? '✅ Đã thu hồi quyền Owner!' : '✅ Đã từ chối yêu cầu!')
+            await showAlert('Thành công', rejectData.isRevoke ? '✅ Đã thu hồi quyền Owner!' : '✅ Đã từ chối yêu cầu!')
             setShowRejectModal(false)
             setRejectReason('')
             loadData()
-        } catch (err) {
-            alert(err.response?.data?.message || 'Lỗi từ chối')
+        } catch (err: any) {
+            await showAlert('Lỗi', err.response?.data?.message || 'Lỗi từ chối')
         }
     }
 
@@ -81,8 +104,8 @@ export default function AdminDashboard() {
     const filteredRequests = requests.filter(r => r.status === requestTab)
 
     return (
-        <div className={styles.dashboardPage}>
-            <h1 className="page-title" style={{ marginBottom: '8px' }}>⚡ Admin Dashboard</h1>
+        <div>
+            <h2 className="page-title" style={{ marginBottom: '8px' }}>⚡ Tổng quan</h2>
             <p className="page-subtitle" style={{ marginBottom: '28px' }}>Quản trị hệ thống PickleBall Đà Nẵng</p>
 
             {/* Stats */}
@@ -128,10 +151,10 @@ export default function AdminDashboard() {
                                     📅 {formatDate(req.created_at)}
                                 </div>
                                 {req.reason && (
-                                    <div style={{ 
-                                        marginTop: '8px', 
-                                        padding: '8px 12px', 
-                                        background: 'var(--bg-glass)', 
+                                    <div style={{
+                                        marginTop: '8px',
+                                        padding: '8px 12px',
+                                        background: 'var(--bg-glass)',
                                         borderRadius: 'var(--radius-sm)',
                                         fontSize: '0.85rem',
                                         color: 'var(--text-secondary)',
@@ -141,10 +164,10 @@ export default function AdminDashboard() {
                                     </div>
                                 )}
                                 {req.admin_note && requestTab !== 'pending' && (
-                                    <div style={{ 
-                                        marginTop: '8px', 
-                                        padding: '8px 12px', 
-                                        background: 'rgba(255, 82, 82, 0.1)', 
+                                    <div style={{
+                                        marginTop: '8px',
+                                        padding: '8px 12px',
+                                        background: 'rgba(255, 82, 82, 0.1)',
                                         borderRadius: 'var(--radius-sm)',
                                         fontSize: '0.85rem',
                                         color: 'var(--text-secondary)',
@@ -156,26 +179,41 @@ export default function AdminDashboard() {
                             </div>
                             {requestTab === 'pending' && (
                                 <div className={styles.requestActions}>
-                                    <button className="btn btn-primary btn-sm" onClick={() => handleApprove(req.id)}>
+                                    {req.has_license === 1 && (
+                                        <button type="button" className="btn btn-secondary btn-sm" onClick={() => openLicenseViewer(req.id, req.full_name)}>
+                                            👁️ Xem giấy phép
+                                        </button>
+                                    )}
+                                    <button type="button" className="btn btn-primary btn-sm" onClick={() => handleApprove(req.id)}>
                                         ✅ Duyệt
                                     </button>
-                                    <button className="btn btn-danger btn-sm" onClick={() => openRejectModal(req.id)}>
+                                    <button type="button" className="btn btn-danger btn-sm" onClick={() => openRejectModal(req.id)}>
                                         ❌ Từ chối
                                     </button>
                                 </div>
                             )}
                             {requestTab === 'approved' && (
                                 <div className={styles.requestActions}>
+                                    {req.has_license === 1 && (
+                                        <button type="button" className="btn btn-secondary btn-sm" onClick={() => openLicenseViewer(req.id, req.full_name)}>
+                                            👁️ Xem giấy phép
+                                        </button>
+                                    )}
                                     <span className="badge badge-green" style={{ marginRight: '8px' }}>Đã duyệt</span>
-                                    <button className="btn btn-danger btn-sm" onClick={() => openRejectModal(req.id, true)}>
+                                    <button type="button" className="btn btn-danger btn-sm" onClick={() => openRejectModal(req.id, true)}>
                                         🔒 Thu hồi
                                     </button>
                                 </div>
                             )}
                             {requestTab === 'rejected' && (
                                 <div className={styles.requestActions}>
+                                    {req.has_license === 1 && (
+                                        <button type="button" className="btn btn-secondary btn-sm" onClick={() => openLicenseViewer(req.id, req.full_name)}>
+                                            👁️ Xem giấy phép
+                                        </button>
+                                    )}
                                     <span className="badge badge-red" style={{ marginRight: '8px' }}>Đã từ chối</span>
-                                    <button className="btn btn-primary btn-sm" onClick={() => handleApprove(req.id, true)}>
+                                    <button type="button" className="btn btn-primary btn-sm" onClick={() => handleApprove(req.id, true)}>
                                         ✅ Duyệt lại
                                     </button>
                                 </div>
@@ -243,9 +281,9 @@ export default function AdminDashboard() {
                         position: 'relative',
                         animation: 'slideUp 0.3s ease'
                     }}>
-                        <h3 style={{ 
-                            fontSize: '1.25rem', 
-                            fontWeight: 700, 
+                        <h3 style={{
+                            fontSize: '1.25rem',
+                            fontWeight: 700,
                             marginBottom: '8px',
                             display: 'flex',
                             alignItems: 'center',
@@ -254,7 +292,7 @@ export default function AdminDashboard() {
                             {rejectData.isRevoke ? '🔒 Thu hồi quyền Owner' : '❌ Từ chối yêu cầu'}
                         </h3>
                         <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '20px' }}>
-                            {rejectData.isRevoke 
+                            {rejectData.isRevoke
                                 ? `Thu hồi quyền Owner của ${rejectData.userInfo?.full_name}?`
                                 : `Từ chối yêu cầu nâng cấp Owner của ${rejectData.userInfo?.full_name}?`
                             }
@@ -290,8 +328,8 @@ export default function AdminDashboard() {
                             <textarea
                                 value={rejectReason}
                                 onChange={(e) => setRejectReason(e.target.value)}
-                                placeholder={rejectData.isRevoke 
-                                    ? "VD: Vi phạm chính sách nền tảng, không hoạt động..." 
+                                placeholder={rejectData.isRevoke
+                                    ? "VD: Vi phạm chính sách nền tảng, không hoạt động..."
                                     : "VD: Thiếu giấy tờ hợp lệ, thông tin chưa rõ ràng..."}
                                 rows={4}
                                 style={{
@@ -313,7 +351,7 @@ export default function AdminDashboard() {
                         </div>
 
                         <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-                            <button 
+                            <button
                                 className="btn btn-secondary"
                                 onClick={() => {
                                     setShowRejectModal(false)
@@ -323,7 +361,7 @@ export default function AdminDashboard() {
                             >
                                 Hủy
                             </button>
-                            <button 
+                            <button
                                 className="btn btn-danger"
                                 onClick={handleReject}
                                 style={{ minWidth: '100px' }}
@@ -332,6 +370,122 @@ export default function AdminDashboard() {
                             </button>
                         </div>
                     </div>
+                </div>
+            )}
+
+            {/* License Viewer Modal */}
+            {showLicenseModal && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0, 0, 0, 0.8)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 1001,
+                    backdropFilter: 'blur(4px)'
+                }}>
+                    {!selectedLicense ? (
+                        <div style={{ color: 'white', textAlign: 'center' }}>
+                            <div className="spinner" style={{
+                                width: '40px', height: '40px', border: '4px solid rgba(255,255,255,0.3)',
+                                borderTop: '4px solid white', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 16px'
+                            }}></div>
+                            <p>Đang tải tệp tin...</p>
+                            <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+                        </div>
+                    ) : (
+                        <div style={{
+                            maxWidth: '800px',
+                            width: '90%',
+                            maxHeight: '85vh',
+                            background: 'var(--bg-primary)',
+                            borderRadius: 'var(--radius-lg)',
+                            overflow: 'auto',
+                            position: 'relative',
+                            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+                            animation: 'slideUp 0.3s ease'
+                        }}>
+                            {/* Header */}
+                            <div style={{
+                                padding: '20px 24px',
+                                borderBottom: '1px solid var(--border-glass)',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                position: 'sticky',
+                                top: 0,
+                                background: 'var(--bg-primary)',
+                                zIndex: 10
+                            }}>
+                                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>
+                                    📄 Giấy phép kinh doanh - {selectedLicense.name}
+                                </h3>
+                                <button
+                                    onClick={() => setShowLicenseModal(false)}
+                                    style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        fontSize: '1.5rem',
+                                        color: 'var(--text-secondary)',
+                                        cursor: 'pointer',
+                                        padding: '0',
+                                        lineHeight: 1
+                                    }}
+                                >
+                                    ×
+                                </button>
+                            </div>
+
+                            {/* Content */}
+                            <div style={{ padding: '24px' }}>
+                                {selectedLicense.url.startsWith('data:application/pdf') ? (
+                                    <iframe
+                                        src={selectedLicense.url}
+                                        style={{
+                                            width: '100%',
+                                            height: '600px',
+                                            border: '1px solid var(--border-glass)',
+                                            borderRadius: 'var(--radius-md)'
+                                        }}
+                                        title="Business License"
+                                    />
+                                ) : (
+                                    <img
+                                        src={selectedLicense.url}
+                                        alt="Business License"
+                                        style={{
+                                            maxWidth: '100%',
+                                            maxHeight: '70vh',
+                                            display: 'block',
+                                            margin: '0 auto',
+                                            borderRadius: 'var(--radius-md)',
+                                            border: '1px solid var(--border-glass)'
+                                        }}
+                                    />
+                                )}
+
+                                {/* Download hint */}
+                                <div style={{
+                                    marginTop: '16px',
+                                    padding: '12px 16px',
+                                    background: 'var(--bg-glass)',
+                                    borderRadius: 'var(--radius-md)',
+                                    fontSize: '0.85rem',
+                                    color: 'var(--text-secondary)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px'
+                                }}>
+                                    <span>🔗</span>
+                                    <span>Bạn có thể <a download={`license-${selectedLicense.name}`} href={selectedLicense.url} style={{ color: 'var(--accent-green)', textDecoration: 'none', fontWeight: 600 }}>tải xuống</a> để xem chi tiết hơn.</span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
         </div>

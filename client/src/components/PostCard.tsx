@@ -1,8 +1,10 @@
 import React, { useState, useEffect, FormEvent } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import api from '../api/axios'
 import { io as socketIO } from 'socket.io-client'
+import UserProfileCard from './UserProfileCard'
+import { useDialog } from '../context/DialogContext'
 import styles from '../styles/Cards.module.css'
 
 type PostType = any
@@ -18,7 +20,7 @@ interface PostCardProps {
 export default function PostCard({ post, isHidden = false, onDeleted, onHide }: PostCardProps) {
     const { user } = useAuth()
     const navigate = useNavigate()
-    const location = useLocation()
+    const { showAlert, showConfirm } = useDialog()
     // normalize post object: prefer `user_name`, fallback to `full_name`
     const normalizedPost = post ? { ...post, user_name: post.user_name || post.full_name } : null
     const data = normalizedPost || {
@@ -112,7 +114,7 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
     const typeInfo = (typeLabels[(data.post_type as string) || 'share'] || typeLabels.share)
 
     const handleLike = async () => {
-        if (!user) return alert('Vui lòng đăng nhập để tương tác')
+        if (!user) return await showAlert('Thông báo', 'Vui lòng đăng nhập để tương tác')
         try {
             if (!liked) {
                 const res = await api.post(`/posts/${data.id}/like`)
@@ -125,7 +127,7 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
             }
         } catch (err: any) {
             console.error('Like error', err)
-            alert(err?.response?.data?.message || 'Lỗi khi tương tác')
+            await showAlert('Lỗi', err?.response?.data?.message || 'Lỗi khi tương tác')
         }
     }
 
@@ -145,16 +147,16 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
         if (user) api.post(`/posts/${data.id}/share`).then(r => setShareCount(r.data.shares)).catch(() => { })
     }
 
-    const handleCopyLink = () => {
+    const handleCopyLink = async () => {
         navigator.clipboard.writeText(window.location.origin + `/post/${data.id}`)
         setShowShare(false)
-        alert('Đã sao chép link!')
+        await showAlert('Thành công', 'Đã sao chép link!')
         if (user) api.post(`/posts/${data.id}/share`).then(r => setShareCount(r.data.shares)).catch(() => { })
     }
 
     const handleAddComment = async (e: FormEvent) => {
         e.preventDefault()
-        if (!user) return alert('Vui lòng đăng nhập để bình luận')
+        if (!user) return await showAlert('Thông báo', 'Vui lòng đăng nhập để bình luận')
         if (!commentText.trim()) return
         try {
             const res = await api.post(`/posts/${data.id}/comments`, { content: commentText })
@@ -165,7 +167,7 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
         } catch (err) {
             const eErr: any = err
             console.error('Comment error', eErr)
-            alert(eErr?.response?.data?.message || 'Lỗi khi gửi bình luận')
+            await showAlert('Lỗi', eErr?.response?.data?.message || 'Lỗi khi gửi bình luận')
         }
     }
 
@@ -180,13 +182,14 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
     }
 
     const handleActionDelete = async () => {
-        if (!window.confirm('Bạn có chắc muốn xóa bài viết này?')) return
+        const isConfirm = await showConfirm('Xác nhận', 'Bạn có chắc muốn xóa bài viết này?')
+        if (!isConfirm) return
         try {
             await api.delete(`/posts/${data.id}`)
             onDeleted && onDeleted(data.id)
-        } catch (err) {
+        } catch (err: any) {
             console.error('Delete error', err)
-            alert(err.response?.data?.message || 'Lỗi khi xóa bài viết')
+            await showAlert('Lỗi', err.response?.data?.message || 'Lỗi khi xóa bài viết')
         }
         setShowMenu(false)
     }
@@ -234,7 +237,21 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
             </div>
 
             <div className={styles.postHeader}>
-                <div className="avatar">{getInitials(data.user_name)}</div>
+                {data.user_id ? (
+                    <UserProfileCard userId={data.user_id}>
+                        <div className="avatar" style={{ cursor: 'pointer', overflow: 'hidden' }}>
+                            {data.avatar ? (
+                                <img src={data.avatar} alt={data.user_name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                            ) : getInitials(data.user_name)}
+                        </div>
+                    </UserProfileCard>
+                ) : (
+                    <div className="avatar" style={{ overflow: 'hidden' }}>
+                        {data.avatar ? (
+                            <img src={data.avatar} alt={data.user_name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                        ) : getInitials(data.user_name)}
+                    </div>
+                )}
                 <div className={styles.postMeta}>
                     <div className={styles.postAuthor}>
                         {data.user_name}
@@ -250,7 +267,7 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
             {data.image && (
                 <>
                     <button
-                        onClick={() => navigate(`/post/${data.id}/photo`, { state: { background: location } })}
+                        onClick={() => navigate(`/post/${data.id}/photo`)}
                         style={{ display: 'block', width: '100%', padding: 0, border: 'none', background: 'none', cursor: 'zoom-in' }}
                         title="Click để xem ảnh phóng to"
                     >
@@ -338,7 +355,21 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
                                 const commenterName = c.user_name || c.full_name || 'Người dùng'
                                 return (
                                     <div key={c.id} className={styles.commentItem}>
-                                        <div className={`avatar avatar-sm ${styles.commentAvatar}`}>{getInitials(commenterName)}</div>
+                                        {c.user_id ? (
+                                            <UserProfileCard userId={c.user_id}>
+                                                <div className={`avatar avatar-sm ${styles.commentAvatar}`} style={{ cursor: 'pointer', overflow: 'hidden' }}>
+                                                    {c.avatar ? (
+                                                        <img src={c.avatar} alt={commenterName} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                                                    ) : getInitials(commenterName)}
+                                                </div>
+                                            </UserProfileCard>
+                                        ) : (
+                                            <div className={`avatar avatar-sm ${styles.commentAvatar}`} style={{ overflow: 'hidden' }}>
+                                                {c.avatar ? (
+                                                    <img src={c.avatar} alt={commenterName} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                                                ) : getInitials(commenterName)}
+                                            </div>
+                                        )}
                                         <div className={styles.commentBubble}>
                                             <span className={styles.commentUser}>{commenterName}</span>
                                             <span className={styles.commentText}>{c.content}</span>
@@ -352,7 +383,11 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
 
                     {/* Comment input */}
                     <form className={styles.commentForm} onSubmit={handleAddComment}>
-                        <div className={`avatar avatar-sm`}>{getInitials(user?.full_name)}</div>
+                        <div className={`avatar avatar-sm`} style={{ overflow: 'hidden' }}>
+                            {user?.avatar ? (
+                                <img src={user.avatar} alt={user.full_name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                            ) : getInitials(user?.full_name)}
+                        </div>
                         <input
                             type="text"
                             className={styles.commentInput}
