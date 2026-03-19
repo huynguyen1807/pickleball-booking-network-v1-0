@@ -7,6 +7,9 @@
     min-height: 100vh;
     max-width: 1200px;
     margin: 0 auto;
+    width: 100%;
+    box-sizing: border-box;
+    overflow-x: clip;
 }
 
 .header {
@@ -17,20 +20,45 @@
     animation: fadeInUp 0.5s ease;
 }
 
+.filterBar {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 24px;
+    width: 100%;
+    box-sizing: border-box;
+    min-width: 0;
+}
+
 .tabs {
     display: flex;
+    align-items: center;
     gap: 4px;
     background: var(--bg-glass);
     border: 1px solid var(--border-glass);
     border-radius: var(--radius-full);
     padding: 4px;
-    margin-bottom: 24px;
+    margin-bottom: 0;
     animation: fadeInUp 0.5s ease 0.1s both;
     width: fit-content;
+    min-height: 52px;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    box-sizing: border-box;
+    min-width: 0;
+}
+
+.tabs::-webkit-scrollbar {
+    display: none;
 }
 
 .tab {
-    padding: 10px 20px;
+    padding: 0 20px;
+    height: 44px;
+    min-height: 44px;
     background: none;
     border: none;
     border-radius: var(--radius-full);
@@ -39,6 +67,10 @@
     font-weight: 500;
     cursor: pointer;
     transition: all var(--transition-fast);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
 }
 
 .tab:hover {
@@ -51,10 +83,55 @@
     font-weight: 600;
 }
 
+.skillFilter {
+    min-width: 190px;
+    height: 52px;
+    padding: 0 38px 0 14px;
+    background: var(--bg-glass);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-full);
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    font-weight: 500;
+    outline: none;
+    transition: all var(--transition-fast);
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: linear-gradient(45deg, transparent 50%, var(--text-secondary) 50%), linear-gradient(135deg, var(--text-secondary) 50%, transparent 50%);
+    background-position: calc(100% - 18px) calc(50% - 3px), calc(100% - 12px) calc(50% - 3px);
+    background-size: 6px 6px, 6px 6px;
+    background-repeat: no-repeat;
+    box-sizing: border-box;
+    max-width: 100%;
+}
+
+.skillFilter:hover {
+    border-color: var(--border-glass-hover);
+    color: var(--text-primary);
+}
+
+.skillFilter:focus {
+    border-color: var(--accent-green);
+    box-shadow: 0 0 0 3px var(--accent-green-dim);
+}
+
+.skillFilter option {
+    color: #111827;
+    background: #ffffff;
+}
+
 .matchGrid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
     gap: 16px;
+    width: 100%;
+    min-width: 0;
+}
+
+.matchGrid > * {
+    min-width: 0;
 }
 
 /* Create Match Modal */
@@ -124,6 +201,21 @@
     display: flex;
     flex-direction: column;
     gap: 18px;
+}
+
+.timeRangeGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.timeSelect {
+    color-scheme: dark;
+}
+
+.timeSelect option {
+    color: #000000b1;
+    background: #ffffff;
 }
 
 .playerCount {
@@ -245,6 +337,7 @@
 @media (max-width: 768px) {
     .matchPage {
         padding: 80px 16px 32px;
+        overflow-x: hidden;
     }
 
     .matchGrid {
@@ -255,6 +348,21 @@
         flex-direction: column;
         gap: 12px;
         align-items: flex-start;
+    }
+
+    .filterBar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+
+    .tabs {
+        width: 100%;
+    }
+
+    .skillFilter {
+        min-width: 0;
+        width: 100%;
     }
 
     .createModal {
@@ -284,6 +392,11 @@
 
     .playerBtn {
         padding: 10px 8px;
+    }
+
+    .timeRangeGrid {
+        grid-template-columns: 1fr;
+        gap: 10px;
     }
 }
 

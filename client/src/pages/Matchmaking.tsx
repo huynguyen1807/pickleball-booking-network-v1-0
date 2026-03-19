@@ -184,7 +184,7 @@ export default function Matchmaking() {
             </div>
 
             {/* Tabs + Skill filter */}
-            <div style={{ display: 'flex', justifyContent: 'space-between',  flexWrap: 'wrap', gap: '12px', marginBottom: '24px' }}>
+            <div className={styles.filterBar}>
                 <div className={styles.tabs}>
                     {[
                         { key: 'all', label: 'Tất cả' },
@@ -199,7 +199,7 @@ export default function Matchmaking() {
                         </button>
                     ))}
                 </div>
-                <select className={styles.tabs}
+                <select className={styles.skillFilter}
                     value={filterSkill} onChange={e => setFilterSkill(e.target.value)}>
                     {SKILL_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
@@ -269,10 +269,10 @@ export default function Matchmaking() {
                                     </div>
 
                                     {/* Time range */}
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                    <div className={styles.timeRangeGrid}>
                                         <div className="input-group">
                                             <label>Giờ bắt đầu</label>
-                                            <select className="input-field" value={createForm.start_time}
+                                            <select className={`input-field ${styles.timeSelect}`} value={createForm.start_time}
                                                 onChange={e => setCreateForm(p => ({ ...p, start_time: e.target.value }))}>
                                                 <option value="">-- Chọn giờ --</option>
                                                 {Array.from({ length: 36 }, (_, i) => {
@@ -285,14 +285,24 @@ export default function Matchmaking() {
                                         </div>
                                         <div className="input-group">
                                             <label>Giờ kết thúc</label>
-                                            <select className="input-field" value={createForm.end_time}
+                                            <select className={`input-field ${styles.timeSelect}`} value={createForm.end_time}
                                                 onChange={e => setCreateForm(p => ({ ...p, end_time: e.target.value }))}>
                                                 <option value="">-- Chọn giờ --</option>
                                                 {Array.from({ length: 36 }, (_, i) => {
                                                     const h = Math.floor(i / 2) + 5
                                                     const m = i % 2 === 0 ? '00' : '30'
                                                     const val = `${String(h).padStart(2, '0')}:${m}`
-                                                    return <option key={val} value={val} disabled={!!createForm.start_time && val <= createForm.start_time}>{val}</option>
+                                                    const isDisabled = !!createForm.start_time && val <= createForm.start_time
+                                                    return (
+                                                        <option
+                                                            key={val}
+                                                            value={val}
+                                                            disabled={isDisabled}
+                                                            style={{ color: isDisabled ? '#9ca3af' : '#000000b1' }}
+                                                        >
+                                                            {val}
+                                                        </option>
+                                                    )
                                                 })}
                                             </select>
                                         </div>
