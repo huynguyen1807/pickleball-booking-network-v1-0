@@ -104,8 +104,8 @@ export default function AdminDashboard() {
     const filteredRequests = requests.filter(r => r.status === requestTab)
 
     return (
-        <div className={styles.dashboardPage}>
-            <h1 className="page-title" style={{ marginBottom: '8px' }}>⚡ Admin Dashboard</h1>
+        <div>
+            <h2 className="page-title" style={{ marginBottom: '8px' }}>⚡ Tổng quan</h2>
             <p className="page-subtitle" style={{ marginBottom: '28px' }}>Quản trị hệ thống PickleBall Đà Nẵng</p>
 
             {/* Stats */}
