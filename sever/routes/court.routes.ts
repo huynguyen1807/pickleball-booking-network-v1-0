@@ -2,7 +2,7 @@ import { Router } from 'express';
 const router = Router();
 import auth from '../middleware/auth';
 import role from '../middleware/role';
-import { createCourt, getAllCourts, getCourtById, updateCourt, deleteCourt, getMyCourts, addReview, getAvailableCourts } from '../controllers/court.controller';
+import { createCourt, getAllCourts, getCourtById, updateCourt, deleteCourt, getMyCourts, addReview, getAvailableCourts, getCourtSlots } from '../controllers/court.controller';
 
 router.get('/available', auth, getAvailableCourts);
 router.get('/', getAllCourts);

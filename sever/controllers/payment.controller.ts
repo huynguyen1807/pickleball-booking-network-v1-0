@@ -709,6 +709,14 @@ export const payosCancelReturn = async (req: any, res: any) => {
                 await updatePaymentStatus(record.id, 'cancelled');
 
                 if (record.booking_id) {
+                    const bk = await pool.request()
+                        .input('id', sql.Int, record.booking_id)
+                        .query(`
+                            SELECT court_id, booking_date, start_time, end_time
+                            FROM bookings
+                            WHERE id = @id AND status = 'pending'
+                        `);
+
                     await pool.request()
                         .input('id', sql.Int, record.booking_id)
                         .query(`UPDATE bookings SET status = 'cancelled' WHERE id = @id AND status = 'pending'`);

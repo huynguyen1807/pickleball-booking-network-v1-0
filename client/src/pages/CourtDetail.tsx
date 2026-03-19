@@ -36,13 +36,12 @@ export default function CourtDetail() {
     const [court, setCourt] = useState<any>(null)
     const [loading, setLoading] = useState(true)
     const [selectedDate, setSelectedDate] = useState(getTodayYMD())
-    const [startTime, setStartTime] = useState('')
-    const [endTime, setEndTime] = useState('')
-    const [bookedSlots, setBookedSlots] = useState([])
+    const [slots, setSlots] = useState<Slot[]>([])
+    const [selectedSlots, setSelectedSlots] = useState<Slot[]>([])
+    const [slotsLoading, setSlotsLoading] = useState(false)
+    const [bookedSlots, setBookedSlots] = useState<Slot[]>([])
     const [reviewForm, setReviewForm] = useState({ rating: 5, comment: '' })
     const [submittingReview, setSubmittingReview] = useState(false)
-
-    const todayStr = new Date().toISOString().split('T')[0]
 
     useEffect(() => { loadCourt() }, [id])
     useEffect(() => { if (id && selectedDate) loadSlots() }, [id, selectedDate])
@@ -76,8 +75,10 @@ export default function CourtDetail() {
                     is_available: slot.is_available && toMinutes(slot.start_time) >= bufferMinutes,
                 }))
                 setSlots(filtered)
+                setBookedSlots(filtered.filter(slot => !slot.is_available))
             } else {
                 setSlots(raw)
+                setBookedSlots(raw.filter(slot => !slot.is_available))
             }
         } catch (err) {
             console.error('Failed to load slots:', err)
