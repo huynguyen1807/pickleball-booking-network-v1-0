@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import api from '../api/axios';
 import styles from '../styles/Payment.module.css';
 
@@ -24,7 +24,8 @@ export function PayOSPayment({
   >('pending');
   const [timeLeft, setTimeLeft] = useState(900); // 15 minutes
   const [polling, setPolling] = useState(true);
-  const [pollingCount, setPollingCount] = useState(0);
+  const payosWindow = useRef<Window | null>(null);
+  const hasOpenedWindow = useRef(false);
 
   // Countdown timer
   useEffect(() => {
@@ -42,13 +43,14 @@ export function PayOSPayment({
     return () => clearInterval(timer);
   }, []);
 
-  // Auto-open checkout URL in new tab
+  // Auto-open checkout URL in new tab (only once on mount)
   useEffect(() => {
-    if (checkoutUrl && status === 'pending') {
-      // Mở tab PayOS tự động khi component mount
-      window.open(checkoutUrl, '_blank');
+    if (checkoutUrl && !hasOpenedWindow.current) {
+      const newWindow = window.open(checkoutUrl, '_blank');
+      payosWindow.current = newWindow;
+      hasOpenedWindow.current = true;
     }
-  }, [checkoutUrl, status]);
+  }, [checkoutUrl]);
 
   // When timer expires, mark payment as 'expired' in DB immediately
   useEffect(() => {
@@ -69,12 +71,19 @@ export function PayOSPayment({
         );
         const currentStatus = res.data?.status ?? res.data?.data?.status;
 
-        setPollingCount(prev => prev + 1);
-        console.log(`[PayOS Poll #${pollingCount + 1}]`, res.data);
-
         if (currentStatus === 'completed') {
           setStatus('completed');
           setPolling(false);
+          
+          // Đóng tab PayOS sau khi thanh toán thành công
+          setTimeout(() => {
+            if (payosWindow.current && !payosWindow.current.closed) {
+              payosWindow.current.close();
+            }
+            // Focus về tab gốc
+            window.focus();
+          }, 100);
+          
           // Delay thêm 2s để ensure webhook processed
           setTimeout(() => {
             onSuccess();
@@ -96,7 +105,7 @@ export function PayOSPayment({
     }, 5000); // Poll every 5 seconds
 
     return () => clearInterval(pollInterval);
-  }, [orderCode, polling, status, onSuccess, pollingCount]);
+  }, [orderCode, polling, onSuccess]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -105,7 +114,13 @@ export function PayOSPayment({
   };
 
   const handleRedirectToPayOS = () => {
-    window.open(checkoutUrl, '_blank');
+    if (!payosWindow.current || payosWindow.current.closed) {
+      const newWindow = window.open(checkoutUrl, '_blank');
+      payosWindow.current = newWindow;
+    } else {
+      // Nếu tab đã mở, focus vào tab đó
+      payosWindow.current.focus();
+    }
   };
 
   return (
@@ -139,7 +154,7 @@ export function PayOSPayment({
             onClick={handleRedirectToPayOS}
             className={styles.btnPayosCheckout}
           >
-            💳 Thanh toán ngay (mở tab mới)
+          Thanh toán ngay
           </button>
 
           {/* Status Indicator */}

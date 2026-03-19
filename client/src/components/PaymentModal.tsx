@@ -24,27 +24,13 @@ export default function PaymentModal({
     setLoading(true);
     setError(null);
     try {
-      console.log('[PaymentModal] Starting payment init with:', { bookingId, amount });
-      
       // Call backend để init PayOS
       const response = await api.post('/payments/payos-init', {
         booking_id: bookingId
       });
 
-      console.log('[PaymentModal] Response from backend:', response);
-      console.log('[PaymentModal] Response data:', response.data);
-      console.log('[PaymentModal] Response code:', response.data.code);
-
       if (response.data.code === 0 || response.data.code === '00' || response.data.code === '0') {
-        console.log('[PaymentModal] Payment init success');
         const { checkoutUrl, qrCode, orderCode, paymentLinkId } = response.data.data;
-
-        console.log('[PaymentModal] Extracted data:', { 
-          checkoutUrl: checkoutUrl?.substring(0, 50) + '...', 
-          qrCode: qrCode?.substring(0, 50) + '...', 
-          orderCode, 
-          paymentLinkId 
-        });
 
         // Truyền dữ liệu tới parent component
         onSuccess({
@@ -55,8 +41,6 @@ export default function PaymentModal({
           paymentLinkId,
           amount
         });
-
-        console.log('[PaymentModal] onSuccess called');
         onClose();
       } else {
         console.error('[PaymentModal] Error code from backend:', response.data.code, response.data.desc);

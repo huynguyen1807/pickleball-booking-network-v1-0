@@ -5,6 +5,7 @@ import PaymentModal from '../components/PaymentModal'
 import { PayOSPayment } from '../components/PayOSPayment'
 import { useDialog } from '../context/DialogContext'
 import styles from '../styles/Booking.module.css'
+import { formatDateVN, getTodayYMD } from '../utils/dateTime'
 
 export default function Booking() {
     const { id } = useParams()
@@ -22,7 +23,7 @@ export default function Booking() {
     const [showPaymentModal, setShowPaymentModal] = useState(false)
     const [paymentData, setPaymentData] = useState(null)
 
-    const bookingDate = searchParams.get('date') || new Date().toISOString().split('T')[0]
+    const bookingDate = searchParams.get('date') || getTodayYMD()
     const startTime = searchParams.get('start') || '18:00'
     const endTime = searchParams.get('end') || '20:00'
     const subCourtId = searchParams.get('subCourt')
@@ -87,10 +88,7 @@ export default function Booking() {
     const total = courtPrice
 
     const formatPrice = (p) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(p)
-    const formatDate = (d) => {
-        const date = new Date(d)
-        return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
-    }
+    const formatDate = (d) => formatDateVN(d)
 
     const handleConfirmBooking = async () => {
         setSubmitting(true)

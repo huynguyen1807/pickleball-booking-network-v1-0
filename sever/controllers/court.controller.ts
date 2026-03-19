@@ -1,5 +1,49 @@
 import { sql, poolPromise } from '../config/db';
 
+// Get available courts for a given date + time range (used by match creation)
+export const getAvailableCourts = async (req, res) => {
+    try {
+        const { date, start_time, end_time } = req.query;
+        if (!date || !start_time || !end_time)
+            return res.status(400).json({ message: 'Cần truyền date, start_time, end_time' });
+
+        const pool = await poolPromise;
+        // Courts that are active and have no conflicting booking or match in the slot
+        const result = await pool.request()
+            .input('date', sql.Date, date)
+            .input('start', sql.NVarChar, start_time)
+            .input('end', sql.NVarChar, end_time)
+            .query(`
+                SELECT c.*, f.name AS facility_name, f.address, f.owner_id, u.full_name AS owner_name,
+                       (SELECT AVG(CAST(rating AS FLOAT)) FROM reviews WHERE court_id = c.id) AS avg_rating,
+                       (SELECT COUNT(*) FROM bookings WHERE court_id = c.id) AS booking_count
+                FROM courts c
+                JOIN facilities f ON c.facility_id = f.id
+                JOIN users u ON f.owner_id = u.id
+                WHERE c.is_active = 1
+                  AND NOT EXISTS (
+                      SELECT 1 FROM bookings b
+                      WHERE b.court_id = c.id
+                        AND b.booking_date = @date
+                        AND b.status IN ('confirmed','pending')
+                        AND b.start_time < @end AND b.end_time > @start
+                  )
+                  AND NOT EXISTS (
+                      SELECT 1 FROM matches m
+                      WHERE m.court_id = c.id
+                        AND m.match_date = @date
+                        AND m.status NOT IN ('cancelled','completed','finished')
+                        AND m.start_time < @end AND m.end_time > @start
+                  )
+                ORDER BY c.price_per_hour ASC
+            `);
+        res.json(result.recordset);
+    } catch (err) {
+        console.error('[getAvailableCourts]', err);
+        res.status(500).json({ message: 'Lỗi server' });
+    }
+};
+
 // Create court (owner)
 export const createCourt = async (req, res) => {
     try {

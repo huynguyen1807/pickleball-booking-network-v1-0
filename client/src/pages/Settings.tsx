@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
 import styles from '../styles/Dashboard.module.css'
+import settingStyles from '../styles/Settings.module.css'
 
 export default function Settings() {
     const { user, updateUser } = useAuth()
@@ -93,20 +94,23 @@ export default function Settings() {
 
     return (
         <div className={styles.dashboardPage}>
-            <div style={{ maxWidth: '700px', margin: '0 auto' }}>
-                <h1 className="page-title" style={{ marginBottom: '8px' }}>⚙️ Cài đặt</h1>
-                <p className="page-subtitle" style={{ marginBottom: '28px' }}>Quản lý tài khoản của bạn</p>
+            <div className={styles.dashboardContainer}>
+                <div className={settingStyles.settingsContainer}>
+                    <div className={settingStyles.pageHeader}>
+                        <h1 className={`page-title ${settingStyles.pageTitle}`}>⚙️ Cài đặt</h1>
+                        <p className="page-subtitle">Quản lý tài khoản của bạn</p>
+                    </div>
 
-                {/* Profile */}
-                <div className="glass-card" style={{ marginBottom: '16px' }}>
-                    <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '18px' }}>👤 Thông tin cá nhân</h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    {/* Profile */}
+                    <div className={`glass-card ${settingStyles.sectionCard}`}>
+                        <h3 className={settingStyles.sectionTitle}>👤 Thông tin cá nhân</h3>
+                        <div className={settingStyles.formStack}>
                         <div className="input-group">
                             <label>Họ và tên</label>
                             <input className="input-field" value={form.full_name}
                                 onChange={e => setForm(p => ({ ...p, full_name: e.target.value }))} />
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                        <div className={settingStyles.twoCol}>
                             <div className="input-group">
                                 <label>Email</label>
                                 <input className="input-field" type="email" value={form.email} disabled
@@ -118,7 +122,7 @@ export default function Settings() {
                                     onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} />
                             </div>
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                        <div className={settingStyles.twoCol}>
                             <div className="input-group">
                                 <label>Vĩ độ (Latitude)</label>
                                 <input className="input-field" value={form.latitude}
@@ -130,56 +134,57 @@ export default function Settings() {
                                     onChange={e => setForm(p => ({ ...p, longitude: e.target.value }))} />
                             </div>
                         </div>
-                        <button className="btn btn-primary" style={{ alignSelf: 'flex-end' }}
-                            onClick={handleSaveProfile} disabled={saving}>
-                            {saving ? '⏳...' : '💾 Lưu thay đổi'}
-                        </button>
+                        <div className={settingStyles.actionRow}>
+                            <button className="btn btn-primary"
+                                onClick={handleSaveProfile} disabled={saving}>
+                                {saving ? '⏳...' : '💾 Lưu thay đổi'}
+                            </button>
+                        </div>
                     </div>
-                </div>
-
-                {/* Upgrade to Owner */}
-                {user?.role === 'user' && (
-                    <div className="glass-card" style={{ marginBottom: '16px', borderColor: 'rgba(255, 214, 0, 0.2)' }}>
-                        <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '8px' }}>🏟️ Nâng cấp lên Owner</h3>
-                        <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-                            Bạn muốn đăng ký sân và cho thuê? Gửi yêu cầu nâng cấp để trở thành chủ sân.
-                        </p>
-                        {upgradeSubmitted ? (
-                            <div style={{
-                                background: 'var(--accent-green-dim)', color: 'var(--accent-green)',
-                                padding: '14px 16px', borderRadius: 'var(--radius-md)', fontSize: '0.875rem'
-                            }}>
-                                ✅ Yêu cầu đã được gửi! Vui lòng chờ Admin phê duyệt.
-                            </div>
-                        ) : (
-                            <>
-                                <div className="input-group" style={{ marginBottom: '14px' }}>
-                                    <label>Lý do muốn trở thành Owner <span style={{ color: 'red' }}>*</span></label>
-                                    <textarea className="input-field" rows={3}
-                                        placeholder="VD: Tôi có 2 sân pickleball tại Hòa Xuân và muốn cho thuê qua nền tảng..."
-                                        value={upgradeReason}
-                                        onChange={e => setUpgradeReason(e.target.value)}
-                                        style={{ resize: 'vertical' }} />
-                                </div>
-                                <div className="input-group" style={{ marginBottom: '14px' }}>
-                                    <label>Giấy phép kinh doanh (Hình ảnh / PDF) <span style={{ color: 'red' }}>*</span></label>
-                                    <input type="file" className="input-field"
-                                        accept="image/jpeg, image/png, image/webp, application/pdf"
-                                        onChange={e => setLicenseFile(e.target.files ? e.target.files[0] : null)} />
-                                </div>
-                                <button className="btn btn-primary" disabled={!upgradeReason.trim() || !licenseFile || submittingUpgrade}
-                                    onClick={handleUpgradeRequest}>
-                                    {submittingUpgrade ? '⏳...' : '📤 Gửi yêu cầu nâng cấp'}
-                                </button>
-                            </>
-                        )}
                     </div>
-                )}
 
-                {/* Change Password */}
-                <div className="glass-card" style={{ marginBottom: '16px' }}>
-                    <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '18px' }}>🔒 Đổi mật khẩu</h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    {/* Upgrade to Owner */}
+                    {user?.role === 'user' && (
+                        <div className={`glass-card ${settingStyles.sectionCard}`} style={{ borderColor: 'rgba(255, 214, 0, 0.2)' }}>
+                            <h3 className={settingStyles.sectionTitle} style={{ marginBottom: 8 }}>🏟️ Nâng cấp lên Owner</h3>
+                            <p className={settingStyles.upgradeHint}>
+                                Bạn muốn đăng ký sân và cho thuê? Gửi yêu cầu nâng cấp để trở thành chủ sân.
+                            </p>
+                            {upgradeSubmitted ? (
+                                <div className={settingStyles.successBox}>
+                                    ✅ Yêu cầu đã được gửi! Vui lòng chờ Admin phê duyệt.
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="input-group" style={{ marginBottom: '14px' }}>
+                                        <label>Lý do muốn trở thành Owner <span style={{ color: 'red' }}>*</span></label>
+                                        <textarea className="input-field" rows={3}
+                                            placeholder="VD: Tôi có 2 sân pickleball tại Hòa Xuân và muốn cho thuê qua nền tảng..."
+                                            value={upgradeReason}
+                                            onChange={e => setUpgradeReason(e.target.value)}
+                                            style={{ resize: 'vertical' }} />
+                                    </div>
+                                    <div className="input-group" style={{ marginBottom: '14px' }}>
+                                        <label>Giấy phép kinh doanh (Hình ảnh / PDF) <span style={{ color: 'red' }}>*</span></label>
+                                        <input type="file" className="input-field"
+                                            accept="image/jpeg, image/png, image/webp, application/pdf"
+                                            onChange={e => setLicenseFile(e.target.files ? e.target.files[0] : null)} />
+                                    </div>
+                                    <div className={settingStyles.actionRow}>
+                                        <button className="btn btn-primary" disabled={!upgradeReason.trim() || !licenseFile || submittingUpgrade}
+                                            onClick={handleUpgradeRequest}>
+                                            {submittingUpgrade ? '⏳...' : '📤 Gửi yêu cầu nâng cấp'}
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Change Password */}
+                    <div className={`glass-card ${settingStyles.sectionCard}`}>
+                        <h3 className={settingStyles.sectionTitle}>🔒 Đổi mật khẩu</h3>
+                        <div className={settingStyles.formStack}>
                         <div className="input-group">
                             <label>Mật khẩu hiện tại</label>
                             <input className="input-field" type="password" placeholder="••••••••"
@@ -198,26 +203,29 @@ export default function Settings() {
                                 value={passwordForm.confirm_password}
                                 onChange={e => setPasswordForm(p => ({ ...p, confirm_password: e.target.value }))} />
                         </div>
-                        <button className="btn btn-secondary" style={{ alignSelf: 'flex-end' }}
-                            onClick={handleChangePassword} disabled={changingPassword}>
-                            {changingPassword ? '⏳...' : 'Đổi mật khẩu'}
-                        </button>
-                    </div>
-                </div>
-
-                {/* Account Info */}
-                <div className="glass-card">
-                    <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '12px' }}>📋 Thông tin tài khoản</h3>
-                    <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <span>Vai trò</span>
-                            <span className={`badge ${user?.role === 'owner' ? 'badge-yellow' : user?.role === 'admin' ? 'badge-red' : 'badge-green'}`}>
-                                {user?.role === 'owner' ? 'Chủ sân' : user?.role === 'admin' ? 'Admin' : 'Người chơi'}
-                            </span>
+                        <div className={settingStyles.actionRow}>
+                            <button className="btn btn-secondary"
+                                onClick={handleChangePassword} disabled={changingPassword}>
+                                {changingPassword ? '⏳...' : 'Đổi mật khẩu'}
+                            </button>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <span>Trạng thái</span>
-                            <span className="badge badge-green">Hoạt động</span>
+                    </div>
+                    </div>
+
+                    {/* Account Info */}
+                    <div className="glass-card">
+                        <h3 className={settingStyles.sectionTitle} style={{ marginBottom: 12 }}>📋 Thông tin tài khoản</h3>
+                        <div className={settingStyles.accountInfo}>
+                            <div className={settingStyles.accountRow}>
+                                <span>Vai trò</span>
+                                <span className={`badge ${user?.role === 'owner' ? 'badge-yellow' : user?.role === 'admin' ? 'badge-red' : 'badge-green'}`}>
+                                    {user?.role === 'owner' ? 'Chủ sân' : user?.role === 'admin' ? 'Admin' : 'Người chơi'}
+                                </span>
+                            </div>
+                            <div className={settingStyles.accountRow}>
+                                <span>Trạng thái</span>
+                                <span className="badge badge-green">Hoạt động</span>
+                            </div>
                         </div>
                     </div>
                 </div>

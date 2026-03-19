@@ -2,8 +2,9 @@ import { Router } from 'express';
 const router = Router();
 import auth from '../middleware/auth';
 import role from '../middleware/role';
-import { createCourt, getAllCourts, getCourtById, updateCourt, deleteCourt, getMyCourts, addReview, getCourtSlots } from '../controllers/court.controller';
+import { createCourt, getAllCourts, getCourtById, updateCourt, deleteCourt, getMyCourts, addReview, getAvailableCourts } from '../controllers/court.controller';
 
+router.get('/available', auth, getAvailableCourts);
 router.get('/', getAllCourts);
 router.get('/my', auth, role('owner'), getMyCourts);
 router.get('/:id/slots', getCourtSlots);

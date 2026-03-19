@@ -38,6 +38,51 @@ export const getUserBrief = async (req, res) => {
     }
 };
 
+// Get current user's balance (wallet)
+export const getMyBalance = async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request()
+            .input('id', sql.Int, req.user.id)
+            .query('SELECT ISNULL(balance, 0) AS balance FROM users WHERE id = @id');
+
+        if (result.recordset.length === 0) {
+            return res.status(404).json({ message: 'Không tìm thấy người dùng' });
+        }
+
+        res.json({ balance: Number(result.recordset[0].balance || 0) });
+    } catch (err) {
+        res.status(500).json({ message: 'Lỗi server' });
+    }
+};
+
+// Get current user's wallet transactions (refund history)
+export const getMyWalletTransactions = async (req, res) => {
+    try {
+        const pool = await poolPromise;
+
+        const tableCheck = await pool.request()
+            .query("SELECT OBJECT_ID('wallet_transactions', 'U') AS wallet_table_id");
+
+        if (!tableCheck.recordset?.[0]?.wallet_table_id) {
+            return res.json([]);
+        }
+
+        const result = await pool.request()
+            .input('user_id', sql.Int, req.user.id)
+            .query(`
+                SELECT id, user_id, payment_id, amount, type, description, reference_type, reference_id, status, created_at
+                FROM wallet_transactions
+                WHERE user_id = @user_id
+                ORDER BY created_at DESC
+            `);
+
+        res.json(result.recordset);
+    } catch (err) {
+        res.status(500).json({ message: 'Lỗi server' });
+    }
+};
+
 // Update profile
 export const updateProfile = async (req, res) => {
     try {

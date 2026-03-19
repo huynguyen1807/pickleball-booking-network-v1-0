@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import api from '../api/axios'
 import { useDialog } from '../context/DialogContext'
 import styles from '../styles/Dashboard.module.css'
+import { formatTimeHHmm } from '../utils/dateTime'
 
 export default function OwnerCourts() {
     const navigate = useNavigate()
@@ -204,7 +205,7 @@ export default function OwnerCourts() {
                                             <span>🏓 {court.court_type === 'indoor' ? 'Trong nhà' : court.court_type === 'roofed' ? 'Có mái che' : 'Ngoài trời'}</span>
                                             <span>🏷️ {court.surface_type === 'carpet' ? 'Sân thảm' : 'Sân cứng'}</span>
                                             <span>💰 {formatPrice(court.price_per_hour)}/h</span>
-                                            {court.peak_price && <span>🔥 Giờ vàng: {formatPrice(court.peak_price)}/h ({court.peak_start_time?.slice(0, 5)} - {court.peak_end_time?.slice(0, 5)})</span>}
+                                            {court.peak_price && <span>🔥 Giờ vàng: {formatPrice(court.peak_price)}/h ({formatTimeHHmm(court.peak_start_time)} - {formatTimeHHmm(court.peak_end_time)})</span>}
                                         </div>
                                     </div>
                                     <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>

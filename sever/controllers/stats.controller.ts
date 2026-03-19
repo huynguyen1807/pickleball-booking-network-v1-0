@@ -4,7 +4,18 @@ export const getUserStats = async (req, res) => {
     try {
         const pool = await poolPromise;
         const uid = req.user.id;
-        const r1 = await pool.request().input('uid', sql.Int, uid).query('SELECT COUNT(*) AS matches_count FROM match_players WHERE user_id = @uid');
+        const r1 = await pool.request().input('uid', sql.Int, uid).query(`
+            SELECT COUNT(DISTINCT m.id) AS matches_count
+            FROM matches m
+            WHERE m.creator_id = @uid
+               OR EXISTS (
+                    SELECT 1
+                    FROM match_players mp
+                    WHERE mp.match_id = m.id
+                      AND mp.user_id = @uid
+                      AND mp.status IN ('joined', 'waitlist')
+               )
+        `);
         const r2 = await pool.request().input('uid', sql.Int, uid).query('SELECT COUNT(*) AS bookings_count FROM bookings WHERE user_id = @uid');
         const r3 = await pool.request().input('uid', sql.Int, uid).query("SELECT ISNULL(SUM(amount),0) AS total_spent FROM payments WHERE user_id = @uid AND status='completed'");
         const r4 = await pool.request().input('uid', sql.Int, uid).query('SELECT ISNULL(AVG(CAST(rating AS FLOAT)),0) AS avg_rating FROM reviews WHERE user_id = @uid');

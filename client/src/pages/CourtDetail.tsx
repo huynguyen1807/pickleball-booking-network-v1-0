@@ -5,6 +5,7 @@ import api from '../api/axios'
 import UserProfileCard from '../components/UserProfileCard'
 import { useDialog } from '../context/DialogContext'
 import styles from '../styles/Booking.module.css'
+import { getTodayYMD } from '../utils/dateTime'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -34,10 +35,10 @@ export default function CourtDetail() {
 
     const [court, setCourt] = useState<any>(null)
     const [loading, setLoading] = useState(true)
-    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
-    const [slots, setSlots] = useState<Slot[]>([])
-    const [slotsLoading, setSlotsLoading] = useState(false)
-    const [selectedSlots, setSelectedSlots] = useState<Slot[]>([])
+    const [selectedDate, setSelectedDate] = useState(getTodayYMD())
+    const [startTime, setStartTime] = useState('')
+    const [endTime, setEndTime] = useState('')
+    const [bookedSlots, setBookedSlots] = useState([])
     const [reviewForm, setReviewForm] = useState({ rating: 5, comment: '' })
     const [submittingReview, setSubmittingReview] = useState(false)
 
@@ -193,7 +194,98 @@ export default function CourtDetail() {
     // ─── Render ────────────────────────────────────────────────────────────────
 
     if (loading) return <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-secondary)' }}>⏳ Đang tải...</div>
-    if (!court)  return <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-secondary)' }}>Không tìm thấy sân</div>
+    if (!court) return <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-secondary)' }}>Không tìm thấy sân</div>
+
+    // Sinh các mốc thời gian cách nhau 30 phút từ 05:00 đến 23:00
+    const generateTimeOptions = () => {
+        const options = []
+        for (let h = 5; h <= 23; h++) {
+            for (let m = 0; m < 60; m += 30) {
+                if (h === 23 && m === 30) continue; // Dừng ở 23:00
+                options.push(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`)
+            }
+        }
+        return options
+    }
+
+    const allTimeOptions = generateTimeOptions()
+
+    // Kiểm tra xem một khoảng thời gian cụ thể có bị trùng với giờ đã book không
+    const isSlotBooked = (start, end) => {
+        return bookedSlots.some(slot => {
+            return (start < slot.end_time && end > slot.start_time)
+        })
+    }
+
+    const todayStr = getTodayYMD()
+    const now = new Date()
+    const currentH = now.getHours()
+    const currentM = now.getMinutes()
+    const minTimeValue = currentH + (currentM + 30) / 60
+
+    // Các option giờ bắt đầu hợp lệ
+    const availableStartTimes = allTimeOptions.filter(time => {
+        // Kiểm tra quá khứ / tối thiểu 30p trước
+        if (selectedDate === todayStr) {
+            const [h, m] = time.split(':').map(Number)
+            if (h + m / 60 < minTimeValue) return false
+        }
+        // Kiểm tra xem thời điểm này bắt đầu có lập tức đụng slot bị book không
+        const [th, tm] = time.split(':').map(Number)
+        let endM = tm + 30
+        let endH = th
+        if (endM >= 60) { endM -= 60; endH += 1; }
+        const nextTime = `${endH.toString().padStart(2, '0')}:${endM.toString().padStart(2, '0')}`
+        if (nextTime > "23:00" || isSlotBooked(time, nextTime)) return false
+
+        return true
+    })
+
+    // Các option giờ kết thúc hợp lệ dựa vào startTime đã chọn
+    const availableEndTimes = startTime ? allTimeOptions.filter(time => {
+        if (time <= startTime) return false
+        // Kiểm tra từ startTime đến time có bị vướng booked slot không
+        if (isSlotBooked(startTime, time)) return false
+        return true
+    }) : []
+
+    const extractTimeH = (timeStr: string) => {
+        if (!timeStr) return null;
+        const match = timeStr.match(/\d{2}:\d{2}/);
+        if (!match) return null;
+        const [h, m] = match[0].split(':').map(Number);
+        return h + m / 60;
+    }
+
+    let regularHours = 0;
+    let peakHours = 0;
+    let totalPrice = 0;
+    let regularPrice = 0;
+    let peakPriceTotal = 0;
+
+    if (startTime && endTime) {
+        const startH = parseFloat(startTime.split(':')[0]) + parseFloat(startTime.split(':')[1]) / 60
+        const endH = parseFloat(endTime.split(':')[0]) + parseFloat(endTime.split(':')[1]) / 60
+
+        const peakStartH = extractTimeH(court.peak_start_time);
+        const peakEndH = extractTimeH(court.peak_end_time);
+
+        if (court.peak_price && peakStartH !== null && peakEndH !== null) {
+            // Find overlap between booking [startH, endH] and peak time [peakStartH, peakEndH]
+            const overlapStart = Math.max(startH, peakStartH);
+            const overlapEnd = Math.min(endH, peakEndH);
+
+            if (overlapStart < overlapEnd) {
+                peakHours = overlapEnd - overlapStart;
+            }
+        }
+
+        regularHours = (endH - startH) - peakHours;
+
+        regularPrice = regularHours * court.price_per_hour;
+        peakPriceTotal = peakHours * (court.peak_price || court.price_per_hour);
+        totalPrice = regularPrice + peakPriceTotal;
+    }
 
     return (
         <div className={styles.detailPage}>
