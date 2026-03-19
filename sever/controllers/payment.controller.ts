@@ -712,6 +712,23 @@ export const payosCancelReturn = async (req: any, res: any) => {
                     await pool.request()
                         .input('id', sql.Int, record.booking_id)
                         .query(`UPDATE bookings SET status = 'cancelled' WHERE id = @id AND status = 'pending'`);
+
+                    // Trả court_slots về trạng thái trống
+                    if (bk.recordset.length > 0) {
+                        const { court_id, booking_date, start_time, end_time } = bk.recordset[0];
+                        await pool.request()
+                            .input('court_id', sql.Int, court_id)
+                            .input('slot_date', sql.Date, booking_date)
+                            .input('start_time', sql.NVarChar, start_time)
+                            .input('end_time', sql.NVarChar, end_time)
+                            .query(`
+                                UPDATE court_slots SET is_available = 1
+                                WHERE court_id  = @court_id
+                                  AND slot_date = @slot_date
+                                  AND start_time >= CAST(@start_time AS TIME)
+                                  AND end_time   <= CAST(@end_time   AS TIME)
+                            `);
+                    }
                 }
 
                 await syncMatchPaymentState(record, 'cancelled');
@@ -764,9 +781,31 @@ export const payosCancelByOrderCode = async (req: any, res: any) => {
         await updatePaymentStatus(record.id, targetStatus);
 
         if (record.booking_id) {
+            // Lấy thông tin booking để trả slot
+            const bk = await pool.request()
+                .input('id', sql.Int, record.booking_id)
+                .query('SELECT court_id, booking_date, start_time, end_time FROM bookings WHERE id = @id AND status = \'pending\'');
+
             await pool.request()
                 .input('id', sql.Int, record.booking_id)
                 .query(`UPDATE bookings SET status = 'cancelled' WHERE id = @id AND status = 'pending'`);
+
+            // Trả court_slots về trạng thái trống
+            if (bk.recordset.length > 0) {
+                const { court_id, booking_date, start_time, end_time } = bk.recordset[0];
+                await pool.request()
+                    .input('court_id', sql.Int, court_id)
+                    .input('slot_date', sql.Date, booking_date)
+                    .input('start_time', sql.NVarChar, start_time)
+                    .input('end_time', sql.NVarChar, end_time)
+                    .query(`
+                        UPDATE court_slots SET is_available = 1
+                        WHERE court_id  = @court_id
+                          AND slot_date = @slot_date
+                          AND start_time >= CAST(@start_time AS TIME)
+                          AND end_time   <= CAST(@end_time   AS TIME)
+                    `);
+            }
         }
 
         await syncMatchPaymentState(record, targetStatus);

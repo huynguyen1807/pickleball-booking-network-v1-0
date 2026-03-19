@@ -26,7 +26,16 @@ export default function SubCourtForm({ courtId, subCourt, onClose, onSuccess }: 
   const [error, setError] = useState('')
 
   const submit = async () => {
-    if (!form.name) return alert('Nhập tên sân')
+    if (!form.name) return setError('Nhập tên sân')
+
+    if (form.peak_start_time || form.peak_end_time || form.peak_price_per_hour) {
+        if (!form.peak_start_time || !form.peak_end_time || !form.peak_price_per_hour) {
+            return setError('Vui lòng điền đầy đủ Giờ bắt đầu, Giờ kết thúc và Giá cho Khung giờ vàng')
+        }
+        if (form.peak_start_time >= form.peak_end_time) {
+            return setError('Giờ bắt đầu khung giờ vàng phải trước Giờ kết thúc')
+        }
+    }
     
     setLoading(true)
     setError('')

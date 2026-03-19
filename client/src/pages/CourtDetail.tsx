@@ -3,18 +3,37 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
 import UserProfileCard from '../components/UserProfileCard'
+import { useDialog } from '../context/DialogContext'
 import styles from '../styles/Booking.module.css'
 import { getTodayYMD } from '../utils/dateTime'
 
+// ─── Types ────────────────────────────────────────────────────────────────────
 
+interface Slot {
+    start_time: string
+    end_time: string
+    is_available: boolean
+}
+
+// ─── Helper ───────────────────────────────────────────────────────────────────
+
+const toMinutes = (t: string) => {
+    const [h, m] = t.split(':').map(Number)
+    return h * 60 + m
+}
+
+const formatPrice = (p: number) =>
+    new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(p)
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function CourtDetail() {
     const { id } = useParams()
     const navigate = useNavigate()
     const { user } = useAuth()
-    const [court, setCourt] = useState(null)
-    const [subCourts, setSubCourts] = useState<any[]>([])
-    const [selectedSubCourt, setSelectedSubCourt] = useState<any>(null)
+    const { showAlert } = useDialog()
+
+    const [court, setCourt] = useState<any>(null)
     const [loading, setLoading] = useState(true)
     const [selectedDate, setSelectedDate] = useState(getTodayYMD())
     const [startTime, setStartTime] = useState('')
@@ -23,45 +42,140 @@ export default function CourtDetail() {
     const [reviewForm, setReviewForm] = useState({ rating: 5, comment: '' })
     const [submittingReview, setSubmittingReview] = useState(false)
 
-    useEffect(() => {
-        loadCourt()
-    }, [id])
+    const todayStr = new Date().toISOString().split('T')[0]
 
-    useEffect(() => {
-        if (id && selectedDate) {
-            loadBookedSlots()
-        }
-    }, [id, selectedDate])
-
-    const loadBookedSlots = async () => {
-        try {
-            const res = await api.get(`/bookings/booked-slots/${id}/${selectedDate}`)
-            setBookedSlots(res.data)
-            setStartTime('')
-            setEndTime('')
-        } catch (err) {
-            console.error('Failed to load booked slots:', err)
-        }
-    }
+    useEffect(() => { loadCourt() }, [id])
+    useEffect(() => { if (id && selectedDate) loadSlots() }, [id, selectedDate])
 
     const loadCourt = async () => {
         try {
             const res = await api.get(`/courts/${id}`)
             setCourt(res.data)
-            // load sub-courts for this court
-            try {
-                const sub = await api.get(`/courts/${id}/sub-courts`)
-                setSubCourts(sub.data || [])
-                setSelectedSubCourt(sub.data && sub.data.length ? sub.data[0] : null)
-            } catch (e) {
-                console.warn('Không tải được sân con', e)
-            }
         } catch (err) {
             console.error('Failed to load court:', err)
         } finally {
             setLoading(false)
         }
     }
+
+    const loadSlots = async () => {
+        setSlotsLoading(true)
+        setSelectedSlots([])
+        try {
+            const res = await api.get(`/courts/${id}/slots?date=${selectedDate}`)
+            const raw: Slot[] = res.data
+
+            // Nếu chọn ngày hôm nay → disable các slot đã qua hoặc còn < 30 phút
+            const todayLocal = new Date().toLocaleDateString('en-CA') // YYYY-MM-DD theo local time
+            if (selectedDate === todayLocal) {
+                const now = new Date()
+                // Thêm buffer 30 phút
+                const bufferMinutes = now.getHours() * 60 + now.getMinutes() + 30
+                const filtered = raw.map(slot => ({
+                    ...slot,
+                    is_available: slot.is_available && toMinutes(slot.start_time) >= bufferMinutes,
+                }))
+                setSlots(filtered)
+            } else {
+                setSlots(raw)
+            }
+        } catch (err) {
+            console.error('Failed to load slots:', err)
+            setSlots([])
+        } finally {
+            setSlotsLoading(false)
+        }
+    }
+
+    // ─── Slot selection logic ──────────────────────────────────────────────────
+
+    const handleSlotClick = (slot: Slot) => {
+        if (!slot.is_available) return
+
+        setSelectedSlots(prev => {
+            if (prev.length === 0) return [slot]
+
+            const firstMin  = toMinutes(prev[0].start_time)
+            const lastMin   = toMinutes(prev[prev.length - 1].end_time)
+            const clickMin  = toMinutes(slot.start_time)
+            const clickEndM = toMinutes(slot.end_time)
+
+            // Deselect nếu click vào slot đang chọn
+            const alreadySelected = prev.some(s => s.start_time === slot.start_time)
+            if (alreadySelected) {
+                // Chỉ cho deselect từ đầu hoặc cuối
+                if (slot.start_time === prev[0].start_time)
+                    return prev.slice(1)
+                if (slot.end_time === prev[prev.length - 1].end_time)
+                    return prev.slice(0, -1)
+                return prev
+            }
+
+            // Mở rộng selection nếu liền kề
+            if (clickMin === lastMin) {
+                // Check slot giữa không bị booked
+                return [...prev, slot]
+            }
+            if (clickEndM === firstMin) {
+                return [slot, ...prev]
+            }
+
+            // Không liền kề → reset và bắt đầu từ slot mới
+            return [slot]
+        })
+    }
+
+    const isSlotSelected = (slot: Slot) =>
+        selectedSlots.some(s => s.start_time === slot.start_time)
+
+    // Kiểm tra có slot nào bị booked giữa start và end không
+    const hasConflictBetween = (start: string, end: string) =>
+        slots.some(s => !s.is_available && s.start_time >= start && s.end_time <= end)
+
+    // ─── Price calculation ─────────────────────────────────────────────────────
+
+    const calcPrice = () => {
+        if (!court || selectedSlots.length === 0) return { total: 0, regular: 0, peak: 0, regularH: 0, peakH: 0 }
+
+        const startH = toMinutes(selectedSlots[0].start_time) / 60
+        const endH   = toMinutes(selectedSlots[selectedSlots.length - 1].end_time) / 60
+
+        const extractH = (timeStr: any): number | null => {
+            if (!timeStr) return null
+            const str = timeStr instanceof Date ? timeStr.toISOString() : String(timeStr)
+            const match = str.match(/\d{2}:\d{2}/)
+            if (!match) return null
+            const [h, m] = match[0].split(':').map(Number)
+            return h + m / 60
+        }
+
+        const peakStartH = extractH(court.peak_start_time)
+        const peakEndH   = extractH(court.peak_end_time)
+
+        let peakH = 0
+        if (court.peak_price && peakStartH !== null && peakEndH !== null) {
+            const ovStart = Math.max(startH, peakStartH)
+            const ovEnd   = Math.min(endH, peakEndH)
+            if (ovStart < ovEnd) peakH = ovEnd - ovStart
+        }
+
+        const regularH     = (endH - startH) - peakH
+        const regularPrice = regularH * court.price_per_hour
+        const peakPrice    = peakH * (court.peak_price || court.price_per_hour)
+        return {
+            total: Math.round(regularPrice + peakPrice),
+            regular: Math.round(regularPrice),
+            peak: Math.round(peakPrice),
+            regularH,
+            peakH,
+        }
+    }
+
+    const priceInfo = calcPrice()
+    const startTime = selectedSlots.length > 0 ? selectedSlots[0].start_time : ''
+    const endTime   = selectedSlots.length > 0 ? selectedSlots[selectedSlots.length - 1].end_time : ''
+
+    // ─── Review ────────────────────────────────────────────────────────────────
 
     const handleSubmitReview = async () => {
         if (!reviewForm.comment.trim()) return
@@ -70,19 +184,14 @@ export default function CourtDetail() {
             await api.post(`/courts/${id}/review`, reviewForm)
             setReviewForm({ rating: 5, comment: '' })
             loadCourt()
-        } catch (err) {
-            alert(err.response?.data?.message || 'Lỗi khi đánh giá')
+        } catch (err: any) {
+            await showAlert('Lỗi', err.response?.data?.message || 'Lỗi khi đánh giá')
         } finally {
             setSubmittingReview(false)
         }
     }
 
-    const formatPrice = (p) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(p)
-
-    const toMinutes = t => {
-        const [h, m] = t.split(':').map(Number)
-        return h * 60 + m
-    }
+    // ─── Render ────────────────────────────────────────────────────────────────
 
     if (loading) return <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-secondary)' }}>⏳ Đang tải...</div>
     if (!court) return <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-secondary)' }}>Không tìm thấy sân</div>
@@ -181,7 +290,7 @@ export default function CourtDetail() {
     return (
         <div className={styles.detailPage}>
             <div className={styles.detailContainer}>
-                {/* Hero Image */}
+                {/* Hero */}
                 <div className={styles.courtHero}>
                     <div className={styles.courtHeroPlaceholder}>🏟️</div>
                     <div className={styles.courtHeroOverlay}>
@@ -194,7 +303,7 @@ export default function CourtDetail() {
                 </div>
 
                 <div className={styles.detailGrid}>
-                    {/* Left: Info */}
+                    {/* Left: Info + Reviews */}
                     <div className={styles.detailLeft}>
                         {/* Stats */}
                         <div className="glass-card">
@@ -208,8 +317,8 @@ export default function CourtDetail() {
                                     <div className={styles.statLabel}>Lượt đặt</div>
                                 </div>
                                 <div className={styles.stat}>
-                                    <div className={styles.statValue}>{subCourts.length || 0}</div>
-                                    <div className={styles.statLabel}> Sân</div>
+                                    <div className={styles.statValue}>{formatPrice(court.price_per_hour)}/h</div>
+                                    <div className={styles.statLabel}>Giá</div>
                                 </div>
                             </div>
                         </div>
@@ -223,7 +332,7 @@ export default function CourtDetail() {
                         {/* Reviews */}
                         <div className="glass-card">
                             <h3 className={styles.sectionTitle}>Đánh giá ({court.reviews?.length || 0})</h3>
-                            {court.reviews && court.reviews.length > 0 ? court.reviews.map((r, i) => (
+                            {court.reviews && court.reviews.length > 0 ? court.reviews.map((r: any, i: number) => (
                                 <div key={i} className={styles.review}>
                                     <div className={styles.reviewHeader}>
                                         {r.user_id ? (
@@ -245,7 +354,6 @@ export default function CourtDetail() {
                                 <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>Chưa có đánh giá nào</p>
                             )}
 
-                            {/* Review Form */}
                             {user && (
                                 <div style={{ marginTop: '16px', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
                                     <h4 style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: '8px' }}>Viết đánh giá</h4>
@@ -274,6 +382,7 @@ export default function CourtDetail() {
                         <div className={`glass-card ${styles.bookingCard}`}>
                             <h3 className={styles.sectionTitle}>🗓️ Đặt sân</h3>
 
+                            {/* Date picker */}
                             <div className="input-group" style={{ marginBottom: '16px' }}>
                                 <label>Chọn ngày</label>
                                 <input type="date" className="input-field" value={selectedDate}
@@ -281,53 +390,142 @@ export default function CourtDetail() {
                                     onChange={e => setSelectedDate(e.target.value)} />
                             </div>
 
-                            <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
-                                <div className="input-group" style={{ flex: 1 }}>
-                                    <label>Giờ bắt đầu</label>
-                                    <select className="input-field" value={startTime} onChange={e => { setStartTime(e.target.value); setEndTime(''); }}>
-                                        <option value="">Chọn giờ</option>
-                                        {availableStartTimes.map(t => (
-                                            <option key={t} value={t}>{t}</option>
-                                        ))}
-                                    </select>
+                            {/* Slot Grid */}
+                            <div style={{ marginBottom: '16px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                    <label style={{ fontSize: '0.875rem', fontWeight: 600 }}>Chọn khung giờ</label>
+                                    {selectedSlots.length > 0 && (
+                                        <button onClick={() => setSelectedSlots([])}
+                                            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                            ✕ Bỏ chọn
+                                        </button>
+                                    )}
                                 </div>
-                                <div className="input-group" style={{ flex: 1 }}>
-                                    <label>Giờ kết thúc</label>
-                                    <select className="input-field" value={endTime} onChange={e => setEndTime(e.target.value)} disabled={!startTime}>
-                                        <option value="">Chọn giờ</option>
-                                        {availableEndTimes.map(t => (
-                                            <option key={t} value={t}>{t}</option>
-                                        ))}
-                                    </select>
+
+                                {/* Legend */}
+                                <div style={{ display: 'flex', gap: '12px', marginBottom: '10px', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                        <span style={{ width: 12, height: 12, borderRadius: 3, background: 'var(--bg-glass)', border: '1px solid var(--border-glass)', display: 'inline-block' }}></span>
+                                        Trống
+                                    </span>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                        <span style={{ width: 12, height: 12, borderRadius: 3, background: 'var(--accent-green, #10b981)', opacity: 0.8, display: 'inline-block' }}></span>
+                                        Đang chọn
+                                    </span>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                        <span style={{ width: 12, height: 12, borderRadius: 3, background: 'rgba(239,68,68,0.2)', border: '1px solid rgba(239,68,68,0.4)', display: 'inline-block' }}></span>
+                                        Đã đặt
+                                    </span>
                                 </div>
+
+                                {slotsLoading ? (
+                                    <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>⏳ Đang tải lịch...</div>
+                                ) : slots.length === 0 ? (
+                                    <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                                        Không có slot cho ngày này
+                                    </div>
+                                ) : (
+                                    <div style={{
+                                        display: 'grid',
+                                        gridTemplateColumns: 'repeat(4, 1fr)',
+                                        gap: '6px',
+                                        maxHeight: '280px',
+                                        overflowY: 'auto',
+                                        paddingRight: '4px',
+                                    }}>
+                                        {slots.map((slot) => {
+                                            const selected = isSlotSelected(slot)
+                                            const booked   = !slot.is_available
+                                            return (
+                                                <button
+                                                    key={slot.start_time}
+                                                    onClick={() => handleSlotClick(slot)}
+                                                    disabled={booked}
+                                                    title={booked ? 'Đã được đặt' : slot.start_time}
+                                                    style={{
+                                                        padding: '6px 4px',
+                                                        borderRadius: '8px',
+                                                        fontSize: '0.72rem',
+                                                        fontWeight: 600,
+                                                        cursor: booked ? 'not-allowed' : 'pointer',
+                                                        border: selected
+                                                            ? '2px solid #10b981'
+                                                            : booked
+                                                                ? '1px solid rgba(239,68,68,0.3)'
+                                                                : '1px solid var(--border-glass)',
+                                                        background: selected
+                                                            ? 'rgba(16,185,129,0.2)'
+                                                            : booked
+                                                                ? 'rgba(239,68,68,0.1)'
+                                                                : 'var(--bg-glass)',
+                                                        color: selected
+                                                            ? '#10b981'
+                                                            : booked
+                                                                ? 'rgba(239,68,68,0.6)'
+                                                                : 'var(--text-secondary)',
+                                                        transition: 'all 0.15s',
+                                                        textDecoration: booked ? 'line-through' : 'none',
+                                                    }}
+                                                >
+                                                    {slot.start_time}
+                                                </button>
+                                            )
+                                        })}
+                                    </div>
+                                )}
                             </div>
 
-                            {startTime && endTime && (
-                                <div className={styles.bookingSummary}>
-                                    {regularHours > 0 && (
+                            {/* Selection summary */}
+                            {selectedSlots.length > 0 && (
+                                <div style={{
+                                    background: 'rgba(16,185,129,0.08)',
+                                    border: '1px solid rgba(16,185,129,0.3)',
+                                    borderRadius: '10px',
+                                    padding: '12px',
+                                    marginBottom: '12px',
+                                    fontSize: '0.85rem',
+                                }}>
+                                    <div style={{ fontWeight: 700, marginBottom: '6px', color: '#10b981' }}>
+                                        ✅ {startTime} → {endTime}
+                                        <span style={{ marginLeft: 8, fontWeight: 400, color: 'var(--text-muted)' }}>
+                                            ({selectedSlots.length * 30} phút)
+                                        </span>
+                                    </div>
+
+                                    {priceInfo.regularH > 0 && (
                                         <div className={styles.summaryRow}>
-                                            <span>Giá thường ({regularHours.toFixed(1)}h)</span>
-                                            <span>{formatPrice(regularPrice)}</span>
+                                            <span>Giá thường ({priceInfo.regularH.toFixed(1)}h)</span>
+                                            <span>{formatPrice(priceInfo.regular)}</span>
                                         </div>
                                     )}
-                                    {peakHours > 0 && (
+                                    {priceInfo.peakH > 0 && (
                                         <div className={styles.summaryRow} style={{ color: 'var(--accent-orange)' }}>
-                                            <span>🔥 Giờ vàng ({peakHours.toFixed(1)}h)</span>
-                                            <span>{formatPrice(peakPriceTotal)}</span>
+                                            <span>🔥 Giờ vàng ({priceInfo.peakH.toFixed(1)}h)</span>
+                                            <span>{formatPrice(priceInfo.peak)}</span>
                                         </div>
                                     )}
                                     <div className={`${styles.summaryRow} ${styles.summaryTotal}`}>
                                         <span>Tổng cộng</span>
-                                        <span>{formatPrice(totalPrice)}</span>
+                                        <span>{formatPrice(priceInfo.total)}</span>
                                     </div>
                                 </div>
                             )}
 
-                            <button className="btn btn-primary btn-lg" style={{ width: '100%' }}
-                                disabled={!startTime || !endTime}
-                                onClick={() => navigate(`/booking/${court.id}?date=${selectedDate}&start=${startTime}&end=${endTime}`)}>
-                                {(startTime && endTime) ? '💳 Đặt sân & Thanh toán' : 'Chọn khung giờ'}
+                            <button
+                                className="btn btn-primary btn-lg"
+                                style={{ width: '100%' }}
+                                disabled={selectedSlots.length === 0}
+                                onClick={() => navigate(`/booking/${court.id}?date=${selectedDate}&start=${startTime}&end=${endTime}`)}
+                            >
+                                {selectedSlots.length > 0 ? '💳 Đặt sân & Thanh toán' : 'Chọn khung giờ để đặt'}
                             </button>
+
+                            {/* Peak info */}
+                            {court.peak_price && court.peak_start_time && (
+                                <div style={{ marginTop: '10px', fontSize: '0.72rem', color: 'var(--text-muted)', textAlign: 'center' }}>
+                                    🔥 Giờ vàng: {String(court.peak_start_time).slice(0, 5)} – {String(court.peak_end_time).slice(0, 5)} → {formatPrice(court.peak_price)}/h
+                                </div>
+                            )}
 
                             {/* Owner info */}
                             <div className={styles.ownerInfo}>

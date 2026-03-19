@@ -3,6 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../api/axios'
 import PaymentModal from '../components/PaymentModal'
 import { PayOSPayment } from '../components/PayOSPayment'
+import { useDialog } from '../context/DialogContext'
 import styles from '../styles/Booking.module.css'
 import { formatDateVN, getTodayYMD } from '../utils/dateTime'
 
@@ -10,6 +11,7 @@ export default function Booking() {
     const { id } = useParams()
     const [searchParams] = useSearchParams()
     const navigate = useNavigate()
+    const { showAlert } = useDialog()
     const [step, setStep] = useState(1)
     const [payment, setPayment] = useState('')
     const [court, setCourt] = useState(null)
@@ -103,7 +105,9 @@ export default function Booking() {
             setBookingResult(res.data)
             setStep(2)
         } catch (err) {
-            alert(err.response?.data?.error || err.response?.data?.message || 'Đặt sân thất bại')
+            const errData = err.response?.data
+            const msg = errData?.message || errData?.error || 'Đặt sân thất bại'
+            await showAlert('Lỗi đặt sân', msg)
         } finally {
             setSubmitting(false)
         }

@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api/axios'
+import { useDialog } from '../context/DialogContext'
 import styles from '../styles/Dashboard.module.css'
 
 export default function OwnerCreateFacility() {
     const navigate = useNavigate()
+    const { showAlert } = useDialog()
     const [submitting, setSubmitting] = useState(false)
     const [form, setForm] = useState({
         name: '',
@@ -30,7 +32,7 @@ export default function OwnerCreateFacility() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!form.name || !form.address) {
-            alert('Vui lòng điền tên và địa chỉ cơ sở')
+            await showAlert('Vui lòng điền tên và địa chỉ cơ sở')
             return
         }
 
@@ -43,10 +45,10 @@ export default function OwnerCreateFacility() {
                 ...form,
                 amenities: activeAmenities
             })
-            alert('Tạo cơ sở thành công!')
+            await showAlert('Tạo cơ sở thành công!')
             navigate('/owner/courts') // Go back to management page
         } catch (err: any) {
-            alert(err.response?.data?.message || 'Lỗi khi tạo cơ sở')
+            await showAlert(err.response?.data?.message || 'Lỗi khi tạo cơ sở')
         } finally {
             setSubmitting(false)
         }
