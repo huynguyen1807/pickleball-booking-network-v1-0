@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
 import styles from '../styles/NotificationDropdown.module.css'
@@ -17,6 +18,7 @@ interface Notification {
 }
 
 export default function NotificationDropdown() {
+    const navigate = useNavigate()
     const { user } = useAuth()
     const [notifications, setNotifications] = useState<Notification[]>([])
     const [unreadCount, setUnreadCount] = useState(0)
@@ -108,6 +110,40 @@ export default function NotificationDropdown() {
         setNotifications(prev => prev.filter(n => n.id !== id))
     }
 
+    const handleNotificationClick = async (notification: Notification) => {
+        // Mark as read
+        if (!notification.is_read) {
+            await markAsRead(notification.id)
+        }
+
+        // Close dropdown
+        setIsOpen(false)
+
+        // Navigate based on notification type
+        const { type, reference_id } = notification
+        
+        switch (type) {
+            case 'like':
+            case 'comment':
+            case 'share':
+                // Posts are shown on home feed
+                navigate("/")
+                break
+            case 'match_join':
+            case 'match_created':
+            case 'match_payment_confirmed':
+            case 'match_payment_owner':
+                navigate(`/matches/${reference_id}`)
+                break
+            case 'booking_confirmed':
+            case 'booking_payment':
+                navigate(`/booking/${reference_id}`)
+                break
+            default:
+                break
+        }
+    }
+
     const getNotificationIcon = (type: string) => {
         const iconMap: Record<string, string> = {
             'like': '❤️',
@@ -117,7 +153,10 @@ export default function NotificationDropdown() {
             'match_payment_confirmed': '💰',
             'booking_confirmed': '🎫',
             'match_full': '🏆',
-            'match_cancelled': '❌'
+            'match_cancelled': '❌',
+            'match_created': '🎯',
+            'booking_payment': '💵',
+            'match_payment_owner': '💰'
         }
         return iconMap[type] || '🔔'
     }
@@ -176,7 +215,8 @@ export default function NotificationDropdown() {
                                 <div
                                     key={notif.id}
                                     className={`${styles.notificationItem} ${!notif.is_read ? styles.unread : ''}`}
-                                    onClick={() => !notif.is_read && markAsRead(notif.id)}
+                                    onClick={() => handleNotificationClick(notif)}
+                                    style={{ cursor: 'pointer' }}
                                 >
                                     <div className={styles.iconContainer}>
                                         <span className={styles.icon}>

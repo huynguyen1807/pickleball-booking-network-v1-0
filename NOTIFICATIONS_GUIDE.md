@@ -191,8 +191,10 @@
 ```typescript
 - Load notifications khi mount: api.get('/notifications')
 - Subscribe tới Socket.io 'new_notification' event
-- Thiếu: Unread count update when new notification comes
-- Hiển thị dropdown với danh sách notifications
+- **[NEW]** Click notification → handleNotificationClick()
+  - Mark as read (if not read)
+  - Close dropdown
+  - Navigate to appropriate page based on type
 - markAsRead(), markAllAsRead(), deleteNotification()
 ```
 
@@ -200,10 +202,28 @@
 ```typescript
 - Tương tự dropdown nhưng full-page + filter by unread
 - Hiển thị 50 notifications (pagination có thể add sau)
+- **[NEW]** Click notification → handleNotificationClick()
+  - Mark as read
+  - Navigate to appropriate page
 - Responsive design cho mobile
 ```
 
-#### 3. **Socket.io Connection**
+#### 3. **Navigation Logic** (NEW)
+```typescript
+// When user clicks notification:
+switch (type) {
+  case 'like' | 'comment' | 'share':
+    navigate("/") // Posts shown on home feed
+    
+  case 'match_join' | 'match_created' | 'match_payment_confirmed' | 'match_payment_owner':
+    navigate(`/matches/${reference_id}`) // Go to match detail
+    
+  case 'booking_confirmed' | 'booking_payment':
+    navigate(`/booking/${reference_id}`) // Go to booking detail
+}
+```
+
+#### 4. **Socket.io Connection**
 ```typescript
 // NotificationDropdown.tsx
 socket.on('connect', () => {
@@ -235,6 +255,13 @@ socket.on('new_notification', () => {
 - **Quick**: Click biểu tượng chuông ở navbar → Dropdown
 - **Full**: Click "Xem tất cả thông báo" hoặc vào `/notifications`
 - **Lọc**: Tabs "Tất cả" | "Chưa đọc" trên trang `/notifications`
+
+### ✨ Nhấp Vào Thông Báo (NEW!)
+- **Tự động điều hướng**: Nhấp bất kỳ thông báo nào sẽ đưa bạn đến nơi xuất hiện thông báo:
+  - ❤️/💬/🔗 **Like/Comment/Share** → Đi tới trang chủ (Home) xem bài viết
+  - ✅/🎯/💰 **Match notifications** → Đi tới chi tiết trận (Match Detail)  
+  - 🎫/💵 **Booking notifications** → Đi tới chi tiết booking (Booking Detail)
+- **Tự động đánh dấu**: Thông báo chưa đọc sẽ tự động được đánh dấu đã đọc khi bạn nhấp vào
 
 ### ✓ Quản Lý Thông Báo
 - **Đánh dấu đã đọc**: Click thông báo hoặc button ✓
