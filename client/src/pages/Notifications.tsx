@@ -75,8 +75,8 @@ export default function NotificationsPage() {
             case 'like':
             case 'comment':
             case 'share':
-                // Navigate to home with postId to scroll to that post
-                navigate(`/?postId=${reference_id}`)
+                // Navigate directly to post detail page
+                navigate(`/post/${reference_id}`)
                 break
             case 'match_join':
             case 'match_created':

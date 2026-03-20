@@ -29,6 +29,7 @@ import AdminReports from './pages/AdminReports'
 import AdminChat from './pages/AdminChat'
 import AdminNotifications from './pages/AdminNotifications'
 import PostPhoto from './pages/PostPhoto'
+import PostDetail from './pages/PostDetail'
 import PaymentCancel from './pages/PaymentCancel'
 import UserProfile from './pages/UserProfile'
 import Notifications from './pages/Notifications'
@@ -48,6 +49,10 @@ export default function App() {
                 <Route path="/forgot-password" element={user ? <Navigate to="/" /> : <ForgotPassword />} />
                 {/* Photo permalink — accessible without login */}
                 <Route path="/post/:id/photo" element={<PostPhoto />} />
+                {/* Post detail — show in modal */}
+                <Route path="/post/:id" element={
+                    <ProtectedRoute><PostDetail /></ProtectedRoute>
+                } />
 
                 {/* Protected - All authenticated users */}
                 <Route path="/" element={
