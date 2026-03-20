@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
 import PostCard from '../components/PostCard'
@@ -10,6 +10,7 @@ import { formatDateVN, formatTimeHHmm } from '../utils/dateTime'
 export default function Home() {
     const { user } = useAuth()
     const navigate = useNavigate()
+    const location = useLocation()
     const [filter, setFilter] = useState('latest')
     const [posts, setPosts] = useState([])
     const [hiddenPosts, setHiddenPosts] = useState(() => {
@@ -25,10 +26,22 @@ export default function Home() {
     const [postImage, setPostImage] = useState<string | null>(null)
     const [showCamera, setShowCamera] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
+    const postRefs = useRef<{ [key: number]: HTMLDivElement | null }>({})
 
     useEffect(() => {
         loadData()
     }, [])
+
+    // Scroll to post when postId query param is present
+    useEffect(() => {
+        const params = new URLSearchParams(location.search)
+        const postId = params.get('postId')
+        if (postId && postRefs.current[parseInt(postId)]) {
+            setTimeout(() => {
+                postRefs.current[parseInt(postId)]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            }, 100)
+        }
+    }, [location.search, posts])
 
    const loadData = async () => {
         try {
@@ -257,9 +270,25 @@ export default function Home() {
             <div className={styles.mainLayout}>
                 {/* Feed */}
                 <div className={styles.feed}>
-                    {filteredPosts.length > 0 ? filteredPosts.map(post => (
-                        <PostCard key={post.id} post={post} isHidden={post.isHidden} onHide={handleHide} onDeleted={handleDelete} />
-                    )) : (
+                    {filteredPosts.length > 0 ? filteredPosts.map(post => {
+                        const params = new URLSearchParams(location.search)
+                        const targetPostId = params.get('postId')
+                        const isHighlighted = targetPostId && parseInt(targetPostId) === post.id
+                        
+                        return (
+                            <div 
+                                key={post.id} 
+                                ref={el => { if (el) postRefs.current[post.id] = el }}
+                                style={isHighlighted ? {
+                                    borderLeft: '4px solid #4ade80',
+                                    paddingLeft: '12px',
+                                    opacity: 1
+                                } : {}}
+                            >
+                                <PostCard post={post} isHidden={post.isHidden} onHide={handleHide} onDeleted={handleDelete} />
+                            </div>
+                        )
+                    }) : (
                         <div className="glass-card" style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-secondary)' }}>
                             📝 Chưa có bài viết nào. Hãy là người đầu tiên chia sẻ!
                         </div>
