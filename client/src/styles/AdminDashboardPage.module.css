@@ -1,0 +1,296 @@
+.loadingState {
+    text-align: center;
+    padding: 60px 20px;
+}
+
+.adminTabBar {
+    max-width: 760px;
+    margin-bottom: 16px;
+}
+
+.phoneInline {
+    margin-left: 12px;
+}
+
+.requestReasonBox {
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: var(--bg-glass);
+    border-radius: var(--radius-sm);
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
+.requestReasonLabel {
+    color: var(--text-primary);
+}
+
+.requestAdminNoteBox {
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: rgba(255, 82, 82, 0.1);
+    border-radius: var(--radius-sm);
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
+.requestAdminNoteLabel {
+    color: #ff5252;
+}
+
+.statusBadgeMargin {
+    margin-right: 8px;
+}
+
+.emptyRequestsText {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    padding: 20px 0;
+    text-align: center;
+}
+
+.overviewList {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.overviewRow {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.875rem;
+}
+
+.overviewLabel {
+    color: var(--text-secondary);
+}
+
+.overviewValue {
+    font-weight: 700;
+}
+
+.overviewValueRevenue {
+    font-weight: 700;
+    color: var(--accent-green);
+}
+
+.overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+}
+
+.modalCard {
+    max-width: 500px;
+    width: 90%;
+    padding: 32px;
+    position: relative;
+    animation: slideUp 0.3s ease;
+}
+
+.modalTitle {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.modalDesc {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin-bottom: 20px;
+}
+
+.userInfoBox {
+    background: var(--bg-glass);
+    padding: 12px 16px;
+    border-radius: var(--radius-md);
+    margin-bottom: 20px;
+    font-size: 0.875rem;
+}
+
+.userInfoNameRow {
+    margin-bottom: 6px;
+}
+
+.userInfoName {
+    color: var(--text-primary);
+}
+
+.userInfoText {
+    color: var(--text-secondary);
+}
+
+.inputGroup {
+    margin-bottom: 24px;
+}
+
+.inputLabel {
+    font-weight: 600;
+    margin-bottom: 8px;
+    display: block;
+}
+
+.noteTextarea {
+    width: 100%;
+    padding: 12px 16px;
+    background: var(--bg-glass);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    resize: vertical;
+    min-height: 100px;
+    font-family: inherit;
+}
+
+.inputHint {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 6px;
+}
+
+.modalActions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+}
+
+.minButton {
+    min-width: 100px;
+}
+
+.licenseOverlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1001;
+    backdrop-filter: blur(4px);
+}
+
+.licenseLoading {
+    color: white;
+    text-align: center;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid rgba(255, 255, 255, 0.3);
+    border-top: 4px solid white;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 16px;
+}
+
+.licensePanel {
+    max-width: 800px;
+    width: 90%;
+    max-height: 85vh;
+    background: var(--bg-primary);
+    border-radius: var(--radius-lg);
+    overflow: auto;
+    position: relative;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    animation: slideUp 0.3s ease;
+}
+
+.licensePanelHeader {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border-glass);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    background: var(--bg-primary);
+    z-index: 10;
+}
+
+.licensePanelTitle {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+
+.closeButton {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+}
+
+.licensePanelContent {
+    padding: 24px;
+}
+
+.licenseFrame {
+    width: 100%;
+    height: 600px;
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-md);
+}
+
+.licenseImage {
+    max-width: 100%;
+    max-height: 70vh;
+    display: block;
+    margin: 0 auto;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-glass);
+}
+
+.downloadHint {
+    margin-top: 16px;
+    padding: 12px 16px;
+    background: var(--bg-glass);
+    border-radius: var(--radius-md);
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.downloadLink {
+    color: var(--accent-green);
+    text-decoration: none;
+    font-weight: 600;
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(8px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}

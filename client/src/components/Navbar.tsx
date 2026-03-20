@@ -154,18 +154,14 @@ export default function Navbar() {
 
                 <div style={{ position: 'relative' }} ref={dropdownRef}>
                     <button className={styles.profileBtn} onClick={() => setDropdownOpen(!dropdownOpen)}>
+                        <div className="avatar avatar-sm">{getInitials(user.full_name)}</div> 
+                        <div className={styles.profileMeta}>    
+                        <div className={styles.profileName}>{user.full_name}</div>       
+                        <div className={styles.profileRole}>{user.role}</div>       
+                        </div>                   
+                        </button>
 
-                        <div className="avatar avatar-sm" style={{ overflow: 'hidden' }}>
-                            {user.avatar ? (
-                                <img src={user.avatar} alt={user.full_name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
-                            ) : getInitials(user.full_name)}
-                        </div>
-                        <div>
-
-                            <div className={styles.profileName}>{user.full_name}</div>
-                            <div className={styles.profileRole}>{user.role}</div>
-                        </div>
-                    </button>
+                    
 
                     {dropdownOpen && (
                         <div className={styles.dropdown}>
