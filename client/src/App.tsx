@@ -31,6 +31,7 @@ import AdminNotifications from './pages/AdminNotifications'
 import PostPhoto from './pages/PostPhoto'
 import PaymentCancel from './pages/PaymentCancel'
 import UserProfile from './pages/UserProfile'
+import Notifications from './pages/Notifications'
 
 export default function App() {
     const { user } = useAuth()
@@ -78,6 +79,9 @@ export default function App() {
                 } />
                 <Route path="/settings" element={
                     <ProtectedRoute><Settings /></ProtectedRoute>
+                } />
+                <Route path="/notifications" element={
+                    <ProtectedRoute><Notifications /></ProtectedRoute>
                 } />
                 <Route path="/dashboard" element={
                     <ProtectedRoute roles={['user']}><UserDashboard /></ProtectedRoute>

@@ -1,5 +1,6 @@
 import { sql, poolPromise } from '../config/db';
 import { getIO } from '../socket/index';
+import { createNotification } from './notification.controller';
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -232,6 +233,33 @@ export const createMatch = async (req, res) => {
             .input('chat_room_id', sql.Int, chatRoomId).input('user_id', sql.Int, req.user.id)
             .query('INSERT INTO chat_room_members (chat_room_id, user_id) VALUES (@chat_room_id, @user_id)');
 
+        // Notify court owner about this new match
+        const courtOwner = await pool.request()
+            .input('court_id', sql.Int, court_id)
+            .query(`
+                SELECT f.owner_id, f.name AS facility_name, c.name AS court_name
+                FROM courts c
+                JOIN facilities f ON c.facility_id = f.id
+                WHERE c.id = @court_id
+            `);
+
+        if (courtOwner.recordset.length > 0) {
+            const { owner_id, facility_name, court_name } = courtOwner.recordset[0];
+            const matchDateTime = `${new Date(match_date).toLocaleDateString('vi-VN')} lúc ${start_time}`;
+            
+            // Only notify if owner is not the creator
+            if (owner_id !== req.user.id) {
+                await createNotification(
+                    owner_id,
+                    '🎯 Có trận ghép mới trên sân',
+                    `Trận ${format} tại "${court_name}" (${facility_name}) - ${matchDateTime}`,
+                    'match_created',
+                    matchId
+                );
+                try { getIO()?.to(`user_${owner_id}`).emit('new_notification'); } catch { }
+            }
+        }
+
         res.status(201).json({ message: 'Tạo trận thành công', matchId, price_per_player, total_cost, chatRoomId });
     } catch (err) {
         console.error('[createMatch]', err);
@@ -390,6 +418,29 @@ export const joinMatch = async (req, res) => {
                         .query('INSERT INTO chat_room_members (chat_room_id, user_id) VALUES (@chat_room_id, @user_id)');
                 }
             }
+        }
+
+        // Notify match creator that someone joined
+        const creator = await pool.request()
+            .input('id', sql.Int, m.creator_id)
+            .query('SELECT full_name FROM users WHERE id = @id');
+        
+        if (creator.recordset.length > 0 && m.creator_id !== req.user.id) {
+            const notificationTitle = isWaitlist 
+                ? '⏳ Có người chờ tham gia' 
+                : '✅ Có người tham gia trận';
+            const notificationMsg = isWaitlist
+                ? `${req.user.full_name} chờ xếp hàng cho trận #${req.params.id}`
+                : `${req.user.full_name} đã tham gia trận của bạn (${m.current_players + 1}/${m.max_players})`;
+            
+            await createNotification(
+                m.creator_id,
+                notificationTitle,
+                notificationMsg,
+                'match_join',
+                parseInt(req.params.id)
+            );
+            try { getIO()?.to(`user_${m.creator_id}`).emit('new_notification'); } catch { }
         }
 
         res.json({

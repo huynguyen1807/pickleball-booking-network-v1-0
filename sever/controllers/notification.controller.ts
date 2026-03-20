@@ -4,11 +4,19 @@ export const getNotifications = async (req, res) => {
     try {
         const pool = await poolPromise;
         const result = await pool.request().input('user_id', sql.Int, req.user.id)
-            .query(`SELECT TOP 30 n.id, n.title, n.message, n.type, n.reference_id, n.is_read, n.created_at,
+            .query(`SELECT TOP 50 n.id, n.title, n.message, n.type, n.reference_id, n.is_read, n.created_at,
                 CASE n.type 
                     WHEN 'like'    THEN '❤️'
                     WHEN 'comment' THEN '💬'
                     WHEN 'share'   THEN '🔗'
+                    WHEN 'match_join' THEN '✅'
+                    WHEN 'match_payment_confirmed' THEN '💰'
+                    WHEN 'booking_confirmed' THEN '🎫'
+                    WHEN 'match_full' THEN '🏆'
+                    WHEN 'match_cancelled' THEN '❌'
+                    WHEN 'match_created' THEN '🎯'
+                    WHEN 'booking_payment' THEN '💵'
+                    WHEN 'match_payment_owner' THEN '💰'
                     ELSE '🔔'
                 END AS icon
                 FROM notifications n

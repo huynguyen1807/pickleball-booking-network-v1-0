@@ -1,0 +1,283 @@
+.container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 2rem 1rem;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #f5f7fa 0%, #f9fafb 100%);
+}
+
+.pageHeader {
+    margin-bottom: 2rem;
+    text-align: center;
+}
+
+.pageHeader h1 {
+    font-size: 2rem;
+    margin: 0 0 0.5rem 0;
+    color: #333;
+    font-weight: 700;
+}
+
+.subtitle {
+    color: #666;
+    font-size: 0.95rem;
+    margin: 0;
+}
+
+.controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.filterTabs {
+    display: flex;
+    gap: 0.5rem;
+    background: white;
+    padding: 0.5rem;
+    border-radius: 0.5rem;
+    border: 1px solid #e0e0e0;
+}
+
+.tab {
+    background: none;
+    border: none;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    color: #666;
+    border-radius: 0.375rem;
+    font-weight: 500;
+    transition: all 0.2s;
+    font-size: 0.9rem;
+}
+
+.tab:hover {
+    background-color: #f0f0f0;
+}
+
+.tab.active {
+    background: linear-gradient(135deg, #00d084, #00c853);
+    color: white;
+}
+
+.markAllBtn {
+    background: linear-gradient(135deg, #00d084, #00c853);
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+}
+
+.markAllBtn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 208, 132, 0.3);
+}
+
+.notificationsList {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.loading,
+.empty {
+    text-align: center;
+    padding: 2rem;
+    background: white;
+    border-radius: 0.75rem;
+    border: 1px solid #e0e0e0;
+    color: #666;
+}
+
+.loading {
+    font-size: 1rem;
+    color: #0066cc;
+}
+
+.empty p {
+    margin: 0.5rem 0;
+}
+
+.empty p:first-child {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.emptySubtext {
+    font-size: 0.9rem;
+    color: #999;
+}
+
+.notificationCard {
+    display: flex;
+    gap: 1rem;
+    padding: 1.25rem;
+    background: white;
+    border-radius: 0.75rem;
+    border: 1px solid #e0e0e0;
+    transition: all 0.2s;
+    position: relative;
+    align-items: flex-start;
+}
+
+.notificationCard:hover {
+    border-color: #d0d0d0;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.notificationCard.unread {
+    background: linear-gradient(135deg, #f0f8ff 0%, #f5f9ff 100%);
+    border-color: #b3d9ff;
+}
+
+.iconBox {
+    flex-shrink: 0;
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #00d084, #00c853);
+    border-radius: 50%;
+    color: white;
+    font-size: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0, 208, 132, 0.2);
+}
+
+.contentBox {
+    flex: 1;
+    min-width: 0;
+}
+
+.title {
+    margin: 0 0 0.5rem 0;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #333;
+    line-height: 1.4;
+}
+
+.message {
+    margin: 0 0 0.75rem 0;
+    font-size: 0.9rem;
+    color: #666;
+    line-height: 1.5;
+    word-break: break-word;
+}
+
+.time {
+    font-size: 0.8rem;
+    color: #999;
+}
+
+.actions {
+    flex-shrink: 0;
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.actionBtn {
+    background: none;
+    border: 1px solid #d0d0d0;
+    width: 32px;
+    height: 32px;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    color: #666;
+    font-weight: 600;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+}
+
+.actionBtn:hover {
+    background-color: #f5f5f5;
+    border-color: #999;
+    color: #333;
+}
+
+.actionBtn.deleteBtn:hover {
+    background-color: #ffe6e6;
+    border-color: #ff6b6b;
+    color: #ff4444;
+}
+
+.unreadIndicator {
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 4px;
+    height: 4px;
+    background: #0066cc;
+    border-radius: 50%;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+    .container {
+        padding: 1rem;
+    }
+
+    .pageHeader h1 {
+        font-size: 1.5rem;
+    }
+
+    .controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .filterTabs {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .tab {
+        flex: 1;
+        text-align: center;
+    }
+
+    .markAllBtn {
+        width: 100%;
+    }
+
+    .notificationCard {
+        gap: 0.75rem;
+        padding: 1rem;
+    }
+
+    .iconBox {
+        width: 40px;
+        height: 40px;
+        font-size: 1.25rem;
+    }
+
+    .title {
+        font-size: 0.95rem;
+    }
+
+    .message {
+        font-size: 0.85rem;
+    }
+
+    .actions {
+        gap: 0.25rem;
+    }
+
+    .actionBtn {
+        width: 28px;
+        height: 28px;
+        font-size: 0.8rem;
+    }
+}
