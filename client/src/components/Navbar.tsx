@@ -167,6 +167,8 @@ export default function Navbar() {
                         </div>
                     </button>
 
+                    
+
                     {dropdownOpen && (
                         <div className={styles.dropdown}>
                             <Link to={getDashboardLink()} className={styles.dropdownItem}

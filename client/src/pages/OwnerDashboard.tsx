@@ -214,7 +214,7 @@ export default function OwnerDashboard() {
                         <button
                             key={tab.key}
                             onClick={() => setActiveTab(tab.key)}
-                            className={`${styles.tabButton} ${activeTab === tab.key ? styles.tabButtonActive : ''}`}
+                            className={`${styles.tabButton} ${pageStyles.ownerTabButton} ${activeTab === tab.key ? styles.tabButtonActive : ''}`}
                         >
                             {tab.label}
                         </button>
@@ -232,7 +232,7 @@ export default function OwnerDashboard() {
                         ) : (
                             <>
                                 <div className={pageStyles.tableWrap}>
-                                    <table className={styles.table}>
+                                    <table className={`${styles.table} ${pageStyles.dataTable}`}>
                                         <thead>
                                             <tr>
                                                 <th>#</th>
@@ -293,7 +293,7 @@ export default function OwnerDashboard() {
                         ) : (
                             <>
                                 <div className={pageStyles.tableWrap}>
-                                    <table className={styles.table}>
+                                    <table className={`${styles.table} ${pageStyles.dataTable}`}>
                                         <thead>
                                             <tr>
                                                 <th>#</th>
@@ -387,7 +387,7 @@ export default function OwnerDashboard() {
                         ) : (
                             <>
                                 <div className={pageStyles.tableWrap}>
-                                    <table className={styles.table}>
+                                    <table className={`${styles.table} ${pageStyles.dataTable}`}>
                                         <thead>
                                             <tr>
                                                 <th>#</th>
@@ -487,7 +487,7 @@ export default function OwnerDashboard() {
                         {ownerBookings.length > 0 ? (
                             <>
                                 <div className={pageStyles.tableWrap}>
-                                    <table className={styles.table}>
+                                    <table className={`${styles.table} ${pageStyles.dataTable}`}>
                                         <thead>
                                             <tr>
                                                 <th>#</th>
