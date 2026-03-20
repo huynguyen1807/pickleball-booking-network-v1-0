@@ -62,7 +62,8 @@ export default function NotificationsPage() {
         setNotifications(prev => prev.filter(n => n.id !== id))
     }
 
-    const handleNotificationClick = async (notification: Notification) => {\n        // Mark as read
+    const handleNotificationClick = async (notification: Notification) => {
+        // Mark as read
         if (!notification.is_read) {
             await markAsRead(notification.id)
         }
