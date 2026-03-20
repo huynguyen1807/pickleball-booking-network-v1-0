@@ -17,6 +17,44 @@ interface PostCardProps {
     onHide?: (id: number) => void
 }
 
+const HOME_SCROLL_KEY = 'home_feed_scroll_y'
+
+const parseFindPlayerPost = (content?: string) => {
+    if (!content) return null
+
+    const lines = content
+        .split('\n')
+        .map(l => l.trim())
+        .filter(Boolean)
+
+    const titleLine = lines.find(l => l.includes('Tìm người chơi')) || ''
+    const dateLine = lines.find(l => l.includes('🗓️') || l.includes('📅')) || ''
+    const priceLine = lines.find(l => l.includes('💰')) || ''
+    const noteLine = lines.find(l => l.toLowerCase().startsWith('ghi chú:')) || ''
+
+    const formatMatch = titleLine.match(/\b(1v1|2v2)\b/i)
+    const courtMatch = titleLine.match(/tại\s+(.+?)\s*\((.+?)\)/i)
+    const dateTimeMatch = dateLine.match(/(\d{1,2}\/\d{1,2}\/\d{4}).*?(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/)
+    const priceMatch = priceLine.match(/([\d.,]+)\s*đ?\s*\/\s*người/i)
+    const skillMatch = dateLine.match(/trình độ\s+(.+)$/i)
+    const matchIdMatch = content.match(/(?:Trận|Match)\s*#(\d+)/i)
+
+    if (!formatMatch && !courtMatch && !dateTimeMatch && !priceMatch) return null
+
+    return {
+        format: formatMatch?.[1]?.toUpperCase() || null,
+        courtName: courtMatch?.[1]?.trim() || null,
+        facilityName: courtMatch?.[2]?.trim() || null,
+        dateText: dateTimeMatch?.[1] || null,
+        startTime: dateTimeMatch?.[2] || null,
+        endTime: dateTimeMatch?.[3] || null,
+        pricePerPlayer: priceMatch?.[1] || null,
+        skillLevel: skillMatch?.[1]?.trim() || null,
+        note: noteLine ? noteLine.replace(/^ghi chú:\s*/i, '') : null,
+        matchId: matchIdMatch ? Number(matchIdMatch[1]) : null
+    }
+}
+
 export default function PostCard({ post, isHidden = false, onDeleted, onHide }: PostCardProps) {
     const { user } = useAuth()
     const navigate = useNavigate()
@@ -112,6 +150,7 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
         event: { text: '🎉 Sự kiện', class: 'purple' }
     }
     const typeInfo = (typeLabels[(data.post_type as string) || 'share'] || typeLabels.share)
+    const findPlayerMeta = data.post_type === 'find_player' ? parseFindPlayerPost(data.content) : null
 
     const handleLike = async () => {
         if (!user) return await showAlert('Thông báo', 'Vui lòng đăng nhập để tương tác')
@@ -194,6 +233,11 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
         setShowMenu(false)
     }
 
+    const handleOpenPhoto = () => {
+        sessionStorage.setItem(HOME_SCROLL_KEY, String(window.scrollY || 0))
+        navigate(`/post/${data.id}/photo`)
+    }
+
     // show minimal card when hidden
     if (isHidden) {
         return (
@@ -262,12 +306,55 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
                 <span className={`badge badge-${typeInfo.class}`}>{typeInfo.text}</span>
             </div>
 
-            <div className={styles.postContent}>{data.content}</div>
+            {findPlayerMeta ? (
+                <div className={styles.findPlayerCard}>
+                    {findPlayerMeta.format && (
+                        <div className={styles.findPlayerTopRow}>
+                            <span className={styles.findPlayerFormatBadge}>⚔️ {findPlayerMeta.format}</span>
+                            {findPlayerMeta.skillLevel && (
+                                <span className={styles.findPlayerSkill}>Trình độ: {findPlayerMeta.skillLevel}</span>
+                            )}
+                        </div>
+                    )}
+
+                    <div className={styles.findPlayerMainInfo}>
+                        <div className={styles.findPlayerLine}>🏟️ {findPlayerMeta.courtName || 'Sân đang cập nhật'}</div>
+                        {findPlayerMeta.facilityName && (
+                            <div className={styles.findPlayerSubLine}>📍 {findPlayerMeta.facilityName}</div>
+                        )}
+                        {(findPlayerMeta.dateText || findPlayerMeta.startTime || findPlayerMeta.endTime) && (
+                            <div className={styles.findPlayerLine}>
+                                📅 {findPlayerMeta.dateText || '--/--/----'} | {findPlayerMeta.startTime || '--:--'} - {findPlayerMeta.endTime || '--:--'}
+                            </div>
+                        )}
+                        {findPlayerMeta.pricePerPlayer && (
+                            <div className={styles.findPlayerLine}>💰 {findPlayerMeta.pricePerPlayer}đ / người</div>
+                        )}
+                        {findPlayerMeta.note && (
+                            <div className={styles.findPlayerNote}>📝 {findPlayerMeta.note}</div>
+                        )}
+                    </div>
+
+                    {findPlayerMeta.matchId && (
+                        <div className={styles.findPlayerFooter}>
+                            <button
+                                type="button"
+                                className="btn btn-primary btn-sm"
+                                onClick={() => navigate(`/matches/${findPlayerMeta.matchId}`)}
+                            >
+                                Xem trận #{findPlayerMeta.matchId}
+                            </button>
+                        </div>
+                    )}
+                </div>
+            ) : (
+                <div className={styles.postContent}>{data.content}</div>
+            )}
 
             {data.image && (
                 <>
                     <button
-                        onClick={() => navigate(`/post/${data.id}/photo`)}
+                        onClick={handleOpenPhoto}
                         style={{ display: 'block', width: '100%', padding: 0, border: 'none', background: 'none', cursor: 'zoom-in' }}
                         title="Click để xem ảnh phóng to"
                     >

@@ -13,6 +13,11 @@ export default function PostDetail() {
     const [post, setPost] = useState<any>(null)
     const [loading, setLoading] = useState(true)
 
+    const handleClose = () => {
+        if (window.history.length > 1) navigate(-1)
+        else navigate('/')
+    }
+
     useEffect(() => {
         if (!id) return
 
@@ -33,7 +38,7 @@ export default function PostDetail() {
     if (loading) {
         return (
             <div className={styles.container}>
-                <div className={styles.close} onClick={() => navigate('/')}>
+                <div className={styles.close} onClick={handleClose}>
                     <X size={24} />
                 </div>
                 <div className={styles.loading}>⏳ Đang tải...</div>
@@ -44,12 +49,12 @@ export default function PostDetail() {
     if (!post) {
         return (
             <div className={styles.container}>
-                <div className={styles.close} onClick={() => navigate('/')}>
+                <div className={styles.close} onClick={handleClose}>
                     <X size={24} />
                 </div>
                 <div className={styles.notFound}>
                     <p>😕 Không tìm thấy bài viết</p>
-                    <button className="btn btn-primary" onClick={() => navigate('/')}>
+                    <button className="btn btn-primary" onClick={handleClose}>
                         Quay lại trang chủ
                     </button>
                 </div>
@@ -59,18 +64,18 @@ export default function PostDetail() {
 
     return (
         <div className={styles.container}>
-            <div className={styles.close} onClick={() => navigate('/')}>
+            <div className={styles.close} onClick={handleClose}>
                 <X size={24} />
             </div>
 
-            <div className={styles.overlay} onClick={() => navigate('/')}></div>
+            <div className={styles.overlay} onClick={handleClose}></div>
 
             <div className={styles.modal}>
                 <div className={styles.header}>
                     <h2>🎯 Chi tiết bài viết</h2>
                     <button
                         className={styles.closeBtn}
-                        onClick={() => navigate('/')}
+                        onClick={handleClose}
                         title="Đóng"
                     >
                         <X size={24} />
@@ -78,7 +83,7 @@ export default function PostDetail() {
                 </div>
 
                 <div className={styles.content}>
-                    <PostCard post={post} onDeleted={() => navigate('/')} />
+                    <PostCard post={post} onDeleted={handleClose} />
                 </div>
             </div>
         </div>

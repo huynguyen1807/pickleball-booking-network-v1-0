@@ -233,7 +233,7 @@ export const createMatch = async (req, res) => {
             .input('chat_room_id', sql.Int, chatRoomId).input('user_id', sql.Int, req.user.id)
             .query('INSERT INTO chat_room_members (chat_room_id, user_id) VALUES (@chat_room_id, @user_id)');
 
-        // Notify court owner about this new match
+        // Get court + facility info for notification and auto post content
         const courtOwner = await pool.request()
             .input('court_id', sql.Int, court_id)
             .query(`
@@ -242,6 +242,46 @@ export const createMatch = async (req, res) => {
                 JOIN facilities f ON c.facility_id = f.id
                 WHERE c.id = @court_id
             `);
+
+        // Auto-create feed post with type=find_player whenever a match is created
+        try {
+            const matchDateText = new Date(match_date).toLocaleDateString('vi-VN');
+            const courtName = courtOwner.recordset?.[0]?.court_name || `Sân #${court_id}`;
+            const facilityName = courtOwner.recordset?.[0]?.facility_name || 'Cơ sở chưa xác định';
+            const skillLabel = skill_level && skill_level !== 'all' ? `, trình độ ${skill_level}` : '';
+            const descText = description?.trim() ? `\nGhi chú: ${description.trim()}` : '';
+
+            const postContent =
+                `🎯 Tìm người chơi ${format} tại ${courtName} (${facilityName})\n` +
+                `🗓️ ${matchDateText} | ⏰ ${start_time} - ${end_time}${skillLabel}\n` +
+                `💰 ${price_per_player.toLocaleString('vi-VN')}đ/người\n` +
+                `🎮 Trận #${matchId}${descText}`;
+
+            const postInsert = await pool.request()
+                .input('user_id', sql.Int, req.user.id)
+                .input('content', sql.NVarChar(sql.MAX), postContent)
+                .input('post_type', sql.NVarChar, 'find_player')
+                .query(`INSERT INTO posts (user_id, content, post_type)
+                        OUTPUT INSERTED.id
+                        VALUES (@user_id, @content, @post_type)`);
+
+            const createdPostId = postInsert.recordset[0].id;
+            const createdPostRes = await pool.request()
+                .input('id', sql.Int, createdPostId)
+                .query(`SELECT p.*, u.full_name AS user_name, u.avatar, u.role AS user_role,
+                    (SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = p.id) AS likes,
+                    (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id) AS comments,
+                    (SELECT COUNT(*) FROM post_shares ps WHERE ps.post_id = p.id) AS shares
+                    FROM posts p JOIN users u ON p.user_id = u.id WHERE p.id = @id`);
+
+            const createdPost = createdPostRes.recordset[0];
+            if (createdPost?.created_at) {
+                createdPost.created_at = new Date(createdPost.created_at).toISOString();
+            }
+            try { getIO()?.emit('post_created', createdPost); } catch { }
+        } catch (postErr) {
+            console.error('[createMatch][auto-post]', postErr);
+        }
 
         if (courtOwner.recordset.length > 0) {
             const { owner_id, facility_name, court_name } = courtOwner.recordset[0];
