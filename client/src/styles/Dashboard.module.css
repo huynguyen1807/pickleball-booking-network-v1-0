@@ -242,6 +242,8 @@
 .requestActions {
     display: flex;
     gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
 }
 
 /* Owner Court Management */
@@ -375,6 +377,16 @@
 
     .contentGrid {
         grid-template-columns: 1fr;
+    }
+
+    .requestCard {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .requestActions {
+        width: 100%;
+        justify-content: flex-start;
     }
 }
 
