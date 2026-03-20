@@ -239,10 +239,18 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
             <div className={styles.postHeader}>
                 {data.user_id ? (
                     <UserProfileCard userId={data.user_id}>
-                        <div className="avatar" style={{ cursor: 'pointer' }}>{getInitials(data.user_name)}</div>
+                        <div className="avatar" style={{ cursor: 'pointer', overflow: 'hidden' }}>
+                            {data.avatar ? (
+                                <img src={data.avatar} alt={data.user_name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                            ) : getInitials(data.user_name)}
+                        </div>
                     </UserProfileCard>
                 ) : (
-                    <div className="avatar">{getInitials(data.user_name)}</div>
+                    <div className="avatar" style={{ overflow: 'hidden' }}>
+                        {data.avatar ? (
+                            <img src={data.avatar} alt={data.user_name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                        ) : getInitials(data.user_name)}
+                    </div>
                 )}
                 <div className={styles.postMeta}>
                     <div className={styles.postAuthor}>
@@ -349,10 +357,18 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
                                     <div key={c.id} className={styles.commentItem}>
                                         {c.user_id ? (
                                             <UserProfileCard userId={c.user_id}>
-                                                <div className={`avatar avatar-sm ${styles.commentAvatar}`} style={{ cursor: 'pointer' }}>{getInitials(commenterName)}</div>
+                                                <div className={`avatar avatar-sm ${styles.commentAvatar}`} style={{ cursor: 'pointer', overflow: 'hidden' }}>
+                                                    {c.avatar ? (
+                                                        <img src={c.avatar} alt={commenterName} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                                                    ) : getInitials(commenterName)}
+                                                </div>
                                             </UserProfileCard>
                                         ) : (
-                                            <div className={`avatar avatar-sm ${styles.commentAvatar}`}>{getInitials(commenterName)}</div>
+                                            <div className={`avatar avatar-sm ${styles.commentAvatar}`} style={{ overflow: 'hidden' }}>
+                                                {c.avatar ? (
+                                                    <img src={c.avatar} alt={commenterName} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                                                ) : getInitials(commenterName)}
+                                            </div>
                                         )}
                                         <div className={styles.commentBubble}>
                                             <span className={styles.commentUser}>{commenterName}</span>
@@ -367,7 +383,11 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
 
                     {/* Comment input */}
                     <form className={styles.commentForm} onSubmit={handleAddComment}>
-                        <div className={`avatar avatar-sm`}>{getInitials(user?.full_name)}</div>
+                        <div className={`avatar avatar-sm`} style={{ overflow: 'hidden' }}>
+                            {user?.avatar ? (
+                                <img src={user.avatar} alt={user.full_name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                            ) : getInitials(user?.full_name)}
+                        </div>
                         <input
                             type="text"
                             className={styles.commentInput}
