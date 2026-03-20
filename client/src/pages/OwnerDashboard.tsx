@@ -2,44 +2,47 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api/axios'
 import styles from '../styles/Dashboard.module.css'
+import pageStyles from '../styles/OwnerDashboardPage.module.css'
 import { formatDateVN, formatDateTimeVN, formatTimeHHmm } from '../utils/dateTime'
 
 type ActiveTab = 'bookings' | 'payments' | 'matches' | 'owner'
 
-const BOOKING_STATUS: Record<string, { label: string; color: string }> = {
-    pending: { label: 'Chờ xác nhận', color: '#f59e0b' },
-    confirmed: { label: 'Đã xác nhận', color: '#10b981' },
-    completed: { label: 'Hoàn thành', color: '#3b82f6' },
-    cancelled: { label: 'Đã hủy', color: '#ef4444' },
+type BadgeConfig = { label: string; className: string }
+
+const BOOKING_STATUS: Record<string, BadgeConfig> = {
+    pending: { label: 'Chờ xác nhận', className: pageStyles.bookingPending },
+    confirmed: { label: 'Đã xác nhận', className: pageStyles.bookingConfirmed },
+    completed: { label: 'Hoàn thành', className: pageStyles.bookingCompleted },
+    cancelled: { label: 'Đã hủy', className: pageStyles.bookingCancelled },
 }
 
-const PAYMENT_STATUS: Record<string, { label: string; bg: string; color: string }> = {
-    pending: { label: 'Chờ thanh toán', bg: 'rgba(245,158,11,0.15)', color: '#f59e0b' },
-    completed: { label: 'Thành công', bg: 'rgba(16,185,129,0.15)', color: '#10b981' },
-    failed: { label: 'Thất bại', bg: 'rgba(239,68,68,0.15)', color: '#ef4444' },
-    cancelled: { label: 'Đã hủy', bg: 'rgba(107,114,128,0.15)', color: '#9ca3af' },
-    expired: { label: 'Hết hạn', bg: 'rgba(249,115,22,0.15)', color: '#f97316' },
-    refunded: { label: 'Hoàn tiền', bg: 'rgba(139,92,246,0.15)', color: '#8b5cf6' },
+const PAYMENT_STATUS: Record<string, BadgeConfig> = {
+    pending: { label: 'Chờ thanh toán', className: pageStyles.paymentPending },
+    completed: { label: 'Thành công', className: pageStyles.paymentCompleted },
+    failed: { label: 'Thất bại', className: pageStyles.paymentFailed },
+    cancelled: { label: 'Đã hủy', className: pageStyles.paymentCancelled },
+    expired: { label: 'Hết hạn', className: pageStyles.paymentExpired },
+    refunded: { label: 'Hoàn tiền', className: pageStyles.paymentRefunded },
 }
 
-const MATCH_STATUS: Record<string, { label: string; bg: string; color: string }> = {
-    waiting: { label: 'Đang tìm người', bg: 'rgba(245,158,11,0.15)', color: '#f59e0b' },
-    open: { label: 'Đang mở', bg: 'rgba(245,158,11,0.15)', color: '#f59e0b' },
-    full: { label: 'Đã đủ người', bg: 'rgba(59,130,246,0.15)', color: '#60a5fa' },
-    confirmed: { label: 'Đã xác nhận', bg: 'rgba(16,185,129,0.15)', color: '#10b981' },
-    completed: { label: 'Hoàn thành', bg: 'rgba(34,197,94,0.15)', color: '#22c55e' },
-    finished: { label: 'Hoàn thành', bg: 'rgba(34,197,94,0.15)', color: '#22c55e' },
-    cancelled: { label: 'Đã hủy', bg: 'rgba(239,68,68,0.15)', color: '#ef4444' }
+const MATCH_STATUS: Record<string, BadgeConfig> = {
+    waiting: { label: 'Đang tìm người', className: pageStyles.matchWaiting },
+    open: { label: 'Đang mở', className: pageStyles.matchOpen },
+    full: { label: 'Đã đủ người', className: pageStyles.matchFull },
+    confirmed: { label: 'Đã xác nhận', className: pageStyles.matchConfirmed },
+    completed: { label: 'Hoàn thành', className: pageStyles.matchCompleted },
+    finished: { label: 'Hoàn thành', className: pageStyles.matchFinished },
+    cancelled: { label: 'Đã hủy', className: pageStyles.matchCancelled }
 }
 
 const METHOD_ICON: Record<string, string> = { payos: '💳', mock: '🧪', cash: '💵' }
 const PAGE_SIZE = 8
 const VISIBLE_PAYMENT_STATUSES = ['completed', 'cancelled', 'expired', 'pending']
 
-function StatusBadge({ status, map }: { status: string; map: Record<string, { label: string; bg: string; color: string }> }) {
-    const cfg = map[status] || { label: status, bg: 'rgba(156,163,175,0.15)', color: '#9ca3af' }
+function StatusBadge({ status, map }: { status: string; map: Record<string, BadgeConfig> }) {
+    const cfg = map[status] || { label: status, className: pageStyles.statusNeutral }
     return (
-        <span style={{ padding: '3px 10px', borderRadius: 999, fontSize: '0.75rem', fontWeight: 600, background: cfg.bg, color: cfg.color, whiteSpace: 'nowrap' }}>
+        <span className={`${pageStyles.statusBadge} ${cfg.className}`}>
             {cfg.label}
         </span>
     )
@@ -134,7 +137,7 @@ export default function OwnerDashboard() {
         return Math.max(total - commission, 0)
     }
 
-    if (loading) return <div className={styles.dashboardPage} style={{ textAlign: 'center', padding: '60px 20px' }}>⏳ Đang tải...</div>
+    if (loading) return <div className={`${styles.dashboardPage} ${pageStyles.loadingState}`}>⏳ Đang tải...</div>
 
     const confirmedBookings = myBookings.filter(b => b.status === 'confirmed')
     const visiblePaymentHistory = payments.filter(p => VISIBLE_PAYMENT_STATUSES.includes(p.status))
@@ -145,11 +148,11 @@ export default function OwnerDashboard() {
     const cancelledHostMatches = matchHistory.filter(m => !!m.is_host && String(m.status || '').toLowerCase() === 'cancelled')
 
     const statCards = [
-        { icon: '🏟️', color: '#3b82f6', bg: 'rgba(59,130,246,0.12)', value: confirmedBookings.length, label: 'Lần đặt sân' },
-        { icon: '🏓', color: '#10b981', bg: 'rgba(16,185,129,0.12)', value: userStats?.matches_count ?? matchHistory.length, label: 'Tổng trận của bạn' },
-        { icon: '💰', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)', value: formatPrice(userStats?.total_spent ?? 0), label: 'Tổng chi tiêu' },
-        { icon: '✅', color: '#8b5cf6', bg: 'rgba(139,92,246,0.12)', value: completedPayments, label: 'GD thành công' },
-        { icon: '👛', color: '#10b981', bg: 'rgba(16,185,129,0.12)', value: formatPrice(walletBalance), label: 'Số dư ví' },
+        { icon: '🏟️', iconClass: pageStyles.primaryStatIconBlue, valueClass: pageStyles.primaryStatValueBlue, value: confirmedBookings.length, label: 'Lần đặt sân' },
+        { icon: '🏓', iconClass: pageStyles.primaryStatIconGreen, valueClass: pageStyles.primaryStatValueGreen, value: userStats?.matches_count ?? matchHistory.length, label: 'Tổng trận của bạn' },
+        { icon: '💰', iconClass: pageStyles.primaryStatIconYellow, valueClass: pageStyles.primaryStatValueYellow, value: formatPrice(userStats?.total_spent ?? 0), label: 'Tổng chi tiêu' },
+        { icon: '✅', iconClass: pageStyles.primaryStatIconPurple, valueClass: pageStyles.primaryStatValuePurple, value: completedPayments, label: 'GD thành công' },
+        { icon: '👛', iconClass: pageStyles.primaryStatIconGreen, valueClass: pageStyles.primaryStatValueGreen, value: formatPrice(walletBalance), label: 'Số dư ví' },
     ]
 
     const ownerStatCards = [
@@ -178,21 +181,21 @@ export default function OwnerDashboard() {
 
                 <div className={styles.statsGrid}>
                     {statCards.map((s, i) => (
-                        <div key={i} className={styles.statCard} style={{ animationDelay: `${i * 0.1}s` }}>
-                            <div style={{ width: 44, height: 44, borderRadius: 12, background: s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.3rem', marginBottom: 12 }}>
+                        <div key={i} className={styles.statCard}>
+                            <div className={`${pageStyles.primaryStatIcon} ${s.iconClass}`}>
                                 {s.icon}
                             </div>
-                            <div style={{ fontSize: '1.6rem', fontWeight: 800, lineHeight: 1.1, marginBottom: 4, color: s.color }}>{s.value}</div>
-                            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{s.label}</div>
+                            <div className={`${pageStyles.primaryStatValue} ${s.valueClass}`}>{s.value}</div>
+                            <div className={pageStyles.primaryStatLabel}>{s.label}</div>
                         </div>
                     ))}
                 </div>
 
-                <div style={{ marginTop: -6, marginBottom: 22 }}>
+                <div className={pageStyles.ownerMetricsSection}>
                     <h3 className={styles.sectionTitle}>🏟️ Chỉ số vận hành Owner</h3>
-                    <div className={styles.statsGrid} style={{ gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', marginBottom: 0 }}>
+                    <div className={`${styles.statsGrid} ${pageStyles.ownerMetricsGrid}`}>
                         {ownerStatCards.map((s, i) => (
-                            <div key={i} className={styles.statCard} style={{ animationDelay: `${i * 0.1}s` }}>
+                            <div key={i} className={styles.statCard}>
                                 <div className={`${styles.statIcon} ${s.iconClass}`}>{s.icon}</div>
                                 <div className={styles.statValue}>{s.value}</div>
                                 <div className={styles.statLabel}>{s.label}</div>
@@ -201,7 +204,7 @@ export default function OwnerDashboard() {
                     </div>
                 </div>
 
-                <div className={styles.tabBar} style={{ maxWidth: 920 }}>
+                <div className={`${styles.tabBar} ${pageStyles.wideTabBar}`}>
                     {([
                         { key: 'bookings', label: `🏟️ Lịch đặt sân (${confirmedBookings.length})` },
                         { key: 'payments', label: `💰 Thanh toán (${visiblePaymentHistory.length})` },
@@ -222,13 +225,13 @@ export default function OwnerDashboard() {
                     <div className={`glass-card ${styles.tabPanel}`}>
                         <h3 className={styles.sectionTitle}>🏟️ Lịch đặt sân</h3>
                         {confirmedBookings.length === 0 ? (
-                            <div style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--text-muted)' }}>
-                                <div style={{ fontSize: '3rem', marginBottom: 12 }}>🏟️</div>
-                                <p style={{ fontWeight: 600, marginBottom: 8 }}>Chưa có booking nào đã xác nhận</p>
+                            <div className={pageStyles.emptyState}>
+                                <div className={pageStyles.emptyIcon}>🏟️</div>
+                                <p className={pageStyles.emptyTitle}>Chưa có booking nào đã xác nhận</p>
                             </div>
                         ) : (
                             <>
-                                <div style={{ overflowX: 'auto' }}>
+                                <div className={pageStyles.tableWrap}>
                                     <table className={styles.table}>
                                         <thead>
                                             <tr>
@@ -243,21 +246,21 @@ export default function OwnerDashboard() {
                                         </thead>
                                         <tbody>
                                             {visibleBookings.map((b, i) => {
-                                                const st = BOOKING_STATUS[b.status] || { label: b.status, color: '#9ca3af' }
+                                                const st = BOOKING_STATUS[b.status] || { label: b.status, className: pageStyles.statusNeutral }
                                                 return (
                                                     <tr key={b.id || i}>
-                                                        <td style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{i + 1}</td>
-                                                        <td style={{ fontWeight: 600 }}>{b.court_name || '—'}</td>
-                                                        <td style={{ color: 'var(--text-muted)', fontSize: '0.8rem', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                        <td className={pageStyles.tableIndexCell}>{i + 1}</td>
+                                                        <td className={pageStyles.tableStrongCell}>{b.court_name || '—'}</td>
+                                                        <td className={pageStyles.tableMutedEllipsisCell}>
                                                             {b.address || '—'}
                                                         </td>
-                                                        <td style={{ whiteSpace: 'nowrap' }}>{formatDate(b.booking_date)}</td>
-                                                        <td style={{ fontSize: '0.82rem', whiteSpace: 'nowrap', color: 'var(--text-secondary)' }}>
+                                                        <td className={pageStyles.tableNowrapCell}>{formatDate(b.booking_date)}</td>
+                                                        <td className={pageStyles.tableTimeCell}>
                                                             {formatTime(b.start_time)} - {formatTime(b.end_time)}
                                                         </td>
-                                                        <td style={{ fontWeight: 700, color: '#f59e0b', whiteSpace: 'nowrap' }}>{formatPrice(b.total_price)}</td>
+                                                        <td className={pageStyles.tableAmountCell}>{formatPrice(b.total_price)}</td>
                                                         <td>
-                                                            <span style={{ padding: '3px 10px', borderRadius: 999, fontSize: '0.75rem', fontWeight: 600, background: st.color + '22', color: st.color, whiteSpace: 'nowrap' }}>
+                                                            <span className={`${pageStyles.statusBadge} ${st.className}`}>
                                                                 {st.label}
                                                             </span>
                                                         </td>
@@ -268,8 +271,8 @@ export default function OwnerDashboard() {
                                     </table>
                                 </div>
                                 {confirmedBookings.length > PAGE_SIZE && (
-                                    <div style={{ textAlign: 'center', marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border-glass)' }}>
-                                        <button onClick={() => setShowAllBookings(v => !v)} style={{ background: 'none', border: '1px solid var(--border-glass)', borderRadius: 8, padding: '6px 20px', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 600 }}>
+                                    <div className={pageStyles.showMoreWrap}>
+                                        <button onClick={() => setShowAllBookings(v => !v)} className={pageStyles.showMoreBtn}>
                                             {showAllBookings ? '▲ Thu gọn' : `▼ Xem thêm ${confirmedBookings.length - PAGE_SIZE} booking`}
                                         </button>
                                     </div>
@@ -283,13 +286,13 @@ export default function OwnerDashboard() {
                     <div className={`glass-card ${styles.tabPanel}`}>
                         <h3 className={styles.sectionTitle}>💰 Thanh toán</h3>
                         {visiblePaymentHistory.length === 0 ? (
-                            <div style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--text-muted)' }}>
-                                <div style={{ fontSize: '3rem', marginBottom: 12 }}>💳</div>
-                                <p style={{ fontWeight: 600 }}>Chưa có giao dịch nào</p>
+                            <div className={pageStyles.emptyState}>
+                                <div className={pageStyles.emptyIcon}>💳</div>
+                                <p className={pageStyles.emptyTitle}>Chưa có giao dịch nào</p>
                             </div>
                         ) : (
                             <>
-                                <div style={{ overflowX: 'auto' }}>
+                                <div className={pageStyles.tableWrap}>
                                     <table className={styles.table}>
                                         <thead>
                                             <tr>
@@ -305,22 +308,22 @@ export default function OwnerDashboard() {
                                         <tbody>
                                             {visiblePayments.map((p, i) => (
                                                 <tr key={p.id || i}>
-                                                    <td style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{i + 1}</td>
+                                                    <td className={pageStyles.tableIndexCell}>{i + 1}</td>
                                                     <td>
-                                                        <div style={{ fontWeight: 600, fontSize: '0.875rem' }}>
+                                                        <div className={pageStyles.tableContentTitle}>
                                                             {p.court_name || (p.match_date ? `Trận ${formatDate(p.match_date)}` : 'Thanh toán')}
                                                         </div>
                                                     </td>
-                                                    <td style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                                                    <td className={pageStyles.tableOrderCodeCell}>
                                                         #{p.transaction_id?.split('_')[1] || '—'}
                                                     </td>
-                                                    <td style={{ fontSize: '0.8rem', whiteSpace: 'nowrap', color: 'var(--text-secondary)' }}>
+                                                    <td className={pageStyles.tableDateTimeCell}>
                                                         {formatDateTime(p.created_at)}
                                                     </td>
-                                                    <td style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
+                                                    <td className={pageStyles.tableMethodCell}>
                                                         {(METHOD_ICON[p.payment_method] || '💳')} {String(p.payment_method || 'mock').toUpperCase()}
                                                     </td>
-                                                    <td style={{ fontWeight: 700, color: p.status === 'completed' ? '#f59e0b' : 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                                                    <td className={p.status === 'completed' ? pageStyles.tableAmountCell : pageStyles.tableAmountMutedCell}>
                                                         -{formatPrice(p.amount)}
                                                     </td>
                                                     <td>
@@ -328,17 +331,7 @@ export default function OwnerDashboard() {
                                                             <button
                                                                 onClick={() => handlePayNow(p)}
                                                                 disabled={redirectingPaymentId === p.id}
-                                                                style={{
-                                                                    whiteSpace: 'nowrap',
-                                                                    padding: '3px 10px',
-                                                                    borderRadius: 999,
-                                                                    fontSize: '0.75rem',
-                                                                    fontWeight: 600,
-                                                                    background: 'rgba(245,158,11,0.15)',
-                                                                    color: '#f59e0b',
-                                                                    cursor: redirectingPaymentId === p.id ? 'not-allowed' : 'pointer',
-                                                                    opacity: redirectingPaymentId === p.id ? 0.8 : 1
-                                                                }}
+                                                                className={pageStyles.payNowButton}
                                                             >
                                                                 {redirectingPaymentId === p.id ? 'Đang chuyển...' : '-> Thanh toán ngay'}
                                                             </button>
@@ -352,8 +345,8 @@ export default function OwnerDashboard() {
                                     </table>
                                 </div>
                                 {visiblePaymentHistory.length > PAGE_SIZE && (
-                                    <div style={{ textAlign: 'center', marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border-glass)' }}>
-                                        <button onClick={() => setShowAllPayments(v => !v)} style={{ background: 'none', border: '1px solid var(--border-glass)', borderRadius: 8, padding: '6px 20px', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 600 }}>
+                                    <div className={pageStyles.showMoreWrap}>
+                                        <button onClick={() => setShowAllPayments(v => !v)} className={pageStyles.showMoreBtn}>
                                             {showAllPayments ? '▲ Thu gọn' : `▼ Xem thêm ${visiblePaymentHistory.length - PAGE_SIZE} giao dịch`}
                                         </button>
                                     </div>
@@ -367,33 +360,33 @@ export default function OwnerDashboard() {
                     <div className={`glass-card ${styles.tabPanel}`}>
                         <h3 className={styles.sectionTitle}>🏓 Lịch sử trận đấu</h3>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px,1fr))', gap: 10, marginBottom: 14 }}>
-                            <div style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.25)' }}>
-                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Đã tạo</div>
-                                <div style={{ fontSize: '1.1rem', fontWeight: 800 }}>{createdMatches.length}</div>
+                        <div className={pageStyles.matchSummaryGrid}>
+                            <div className={`${pageStyles.matchSummaryCard} ${pageStyles.matchSummaryCreate}`}>
+                                <div className={pageStyles.matchSummaryLabel}>Đã tạo</div>
+                                <div className={pageStyles.matchSummaryValue}>{createdMatches.length}</div>
                             </div>
-                            <div style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.25)' }}>
-                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Đã tham gia</div>
-                                <div style={{ fontSize: '1.1rem', fontWeight: 800 }}>{joinedMatches.length}</div>
+                            <div className={`${pageStyles.matchSummaryCard} ${pageStyles.matchSummaryJoin}`}>
+                                <div className={pageStyles.matchSummaryLabel}>Đã tham gia</div>
+                                <div className={pageStyles.matchSummaryValue}>{joinedMatches.length}</div>
                             </div>
-                            <div style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.25)' }}>
-                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Đã hoàn thành</div>
-                                <div style={{ fontSize: '1.1rem', fontWeight: 800 }}>{completedMatches.length}</div>
+                            <div className={`${pageStyles.matchSummaryCard} ${pageStyles.matchSummaryCompleted}`}>
+                                <div className={pageStyles.matchSummaryLabel}>Đã hoàn thành</div>
+                                <div className={pageStyles.matchSummaryValue}>{completedMatches.length}</div>
                             </div>
-                            <div style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)' }}>
-                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Đã hủy (host)</div>
-                                <div style={{ fontSize: '1.1rem', fontWeight: 800 }}>{cancelledHostMatches.length}</div>
+                            <div className={`${pageStyles.matchSummaryCard} ${pageStyles.matchSummaryCancelled}`}>
+                                <div className={pageStyles.matchSummaryLabel}>Đã hủy (host)</div>
+                                <div className={pageStyles.matchSummaryValue}>{cancelledHostMatches.length}</div>
                             </div>
                         </div>
 
                         {matchHistory.length === 0 ? (
-                            <div style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--text-muted)' }}>
-                                <div style={{ fontSize: '3rem', marginBottom: 12 }}>🏓</div>
-                                <p style={{ fontWeight: 600, marginBottom: 8 }}>Chưa có lịch sử trận đấu</p>
+                            <div className={pageStyles.emptyState}>
+                                <div className={pageStyles.emptyIcon}>🏓</div>
+                                <p className={pageStyles.emptyTitle}>Chưa có lịch sử trận đấu</p>
                             </div>
                         ) : (
                             <>
-                                <div style={{ overflowX: 'auto' }}>
+                                <div className={pageStyles.tableWrap}>
                                     <table className={styles.table}>
                                         <thead>
                                             <tr>
@@ -411,20 +404,20 @@ export default function OwnerDashboard() {
                                                 const status = String(m.status || '').toLowerCase()
                                                 const isHost = !!m.is_host
                                                 const roleLabel = isHost ? 'Host' : (m.is_waitlisted ? 'Waitlist' : 'Player')
-                                                const roleColor = isHost ? '#60a5fa' : (m.is_waitlisted ? '#f59e0b' : '#10b981')
+                                                const roleClass = isHost ? pageStyles.roleBadgeHost : (m.is_waitlisted ? pageStyles.roleBadgeWaitlist : pageStyles.roleBadgePlayer)
                                                 return (
                                                     <tr key={m.id || i}>
-                                                        <td style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{i + 1}</td>
+                                                        <td className={pageStyles.tableIndexCell}>{i + 1}</td>
                                                         <td>
-                                                            <span style={{ padding: '3px 10px', borderRadius: 999, fontSize: '0.75rem', fontWeight: 700, background: roleColor + '22', color: roleColor, whiteSpace: 'nowrap' }}>
+                                                            <span className={`${pageStyles.statusBadge} ${roleClass}`}>
                                                                 {roleLabel}
                                                             </span>
                                                         </td>
-                                                        <td style={{ fontWeight: 600 }}>{m.court_name || '—'}</td>
-                                                        <td style={{ fontSize: '0.82rem', whiteSpace: 'nowrap', color: 'var(--text-secondary)' }}>
+                                                        <td className={pageStyles.tableStrongCell}>{m.court_name || '—'}</td>
+                                                        <td className={pageStyles.tableTimeCell}>
                                                             {formatDate(m.match_date)} • {formatTime(m.start_time)} - {formatTime(m.end_time)}
                                                         </td>
-                                                        <td style={{ fontSize: '0.82rem', whiteSpace: 'nowrap', color: 'var(--text-secondary)' }}>
+                                                        <td className={pageStyles.tableTimeCell}>
                                                             {m.current_players ?? m.active_players ?? 0}/{m.max_players ?? '--'}
                                                         </td>
                                                         <td>
@@ -442,8 +435,8 @@ export default function OwnerDashboard() {
                                     </table>
                                 </div>
                                 {matchHistory.length > PAGE_SIZE && (
-                                    <div style={{ textAlign: 'center', marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border-glass)' }}>
-                                        <button onClick={() => setShowAllMatches(v => !v)} style={{ background: 'none', border: '1px solid var(--border-glass)', borderRadius: 8, padding: '6px 20px', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 600 }}>
+                                    <div className={pageStyles.showMoreWrap}>
+                                        <button onClick={() => setShowAllMatches(v => !v)} className={pageStyles.showMoreBtn}>
                                             {showAllMatches ? '▲ Thu gọn' : `▼ Xem thêm ${matchHistory.length - PAGE_SIZE} trận`}
                                         </button>
                                     </div>
@@ -457,16 +450,16 @@ export default function OwnerDashboard() {
                     <div className={`glass-card ${styles.tabPanel}`}>
                         <h3 className={styles.sectionTitle}>🏟️ Chức năng Owner</h3>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10, marginBottom: 16 }}>
-                            <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.25)' }}>
-                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 4 }}>Doanh thu thực nhận</div>
-                                <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#10b981', marginBottom: 4 }}>{formatPrice(netRevenue)}</div>
-                                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{receivedBookings.length} booking đã xác nhận/hoàn thành</div>
+                        <div className={pageStyles.ownerSummaryGrid}>
+                            <div className={`${pageStyles.ownerSummaryCard} ${pageStyles.ownerSummaryCardRevenue}`}>
+                                <div className={pageStyles.ownerSummaryLabel}>Doanh thu thực nhận</div>
+                                <div className={`${pageStyles.ownerSummaryValue} ${pageStyles.ownerSummaryValueRevenue}`}>{formatPrice(netRevenue)}</div>
+                                <div className={pageStyles.ownerSummaryDesc}>{receivedBookings.length} booking đã xác nhận/hoàn thành</div>
                             </div>
-                            <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.25)' }}>
-                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 4 }}>Booking chờ xử lý</div>
-                                <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#f59e0b', marginBottom: 4 }}>{pendingBookings.length}</div>
-                                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Cần xác nhận từ chủ sân</div>
+                            <div className={`${pageStyles.ownerSummaryCard} ${pageStyles.ownerSummaryCardPending}`}>
+                                <div className={pageStyles.ownerSummaryLabel}>Booking chờ xử lý</div>
+                                <div className={`${pageStyles.ownerSummaryValue} ${pageStyles.ownerSummaryValuePending}`}>{pendingBookings.length}</div>
+                                <div className={pageStyles.ownerSummaryDesc}>Cần xác nhận từ chủ sân</div>
                             </div>
                         </div>
 
@@ -488,12 +481,12 @@ export default function OwnerDashboard() {
                             </div>
                         </div>
 
-                        <div style={{ marginTop: 16 }}>
+                        <div className={pageStyles.ownerSectionSpacing}>
                             <h3 className={styles.sectionTitle}>📋 Booking của owner</h3>
                         </div>
                         {ownerBookings.length > 0 ? (
                             <>
-                                <div style={{ overflowX: 'auto' }}>
+                                <div className={pageStyles.tableWrap}>
                                     <table className={styles.table}>
                                         <thead>
                                             <tr>
@@ -509,12 +502,12 @@ export default function OwnerDashboard() {
                                         <tbody>
                                             {ownerVisibleBookings.map((b, i) => (
                                                 <tr key={`${b.id || i}-owner`}>
-                                                    <td style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{i + 1}</td>
-                                                    <td style={{ fontWeight: 600 }}>{b.user_name}</td>
+                                                    <td className={pageStyles.tableIndexCell}>{i + 1}</td>
+                                                    <td className={pageStyles.tableStrongCell}>{b.user_name}</td>
                                                     <td>{b.court_name}</td>
                                                     <td>{formatDate(b.booking_date)}</td>
                                                     <td>{b.start_time} - {b.end_time}</td>
-                                                    <td style={{ color: isReceivedStatus(b.status) ? 'var(--accent-green)' : 'var(--text-muted)', fontWeight: 600 }}>
+                                                    <td className={isReceivedStatus(b.status) ? pageStyles.tableStrongCell : pageStyles.tableIndexCell}>
                                                         {isReceivedStatus(b.status) ? formatPrice(getNetReceived(b)) : '—'}
                                                     </td>
                                                     <td>
@@ -528,15 +521,15 @@ export default function OwnerDashboard() {
                                     </table>
                                 </div>
                                 {ownerBookings.length > PAGE_SIZE && (
-                                    <div style={{ textAlign: 'center', marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border-glass)' }}>
-                                        <button onClick={() => setShowAllOwnerBookings(v => !v)} style={{ background: 'none', border: '1px solid var(--border-glass)', borderRadius: 8, padding: '6px 20px', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 600 }}>
+                                    <div className={pageStyles.showMoreWrap}>
+                                        <button onClick={() => setShowAllOwnerBookings(v => !v)} className={pageStyles.showMoreBtn}>
                                             {showAllOwnerBookings ? '▲ Thu gọn' : `▼ Xem thêm ${ownerBookings.length - PAGE_SIZE} booking`}
                                         </button>
                                     </div>
                                 )}
                             </>
                         ) : (
-                            <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>Chưa có booking nào</p>
+                            <p className={pageStyles.ownerEmptyText}>Chưa có booking nào</p>
                         )}
                     </div>
                 )}
