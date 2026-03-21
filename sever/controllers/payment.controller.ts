@@ -3,6 +3,8 @@ import crypto from 'crypto';
 import axios from 'axios';
 import dotenv from 'dotenv';
 import { successResponse, errorResponse, serverError, webhookResponse } from '../utils/response';
+import { createNotification } from './notification.controller';
+import { getIO } from '../socket/index';
 
 dotenv.config();
 
@@ -453,6 +455,7 @@ export const payosWebhook = async (req: any, res: any) => {
             String(code || data?.code || '').toUpperCase() === '00';
 
         const bookingId = toValidInt(paymentRecord.booking_id);
+        const matchId = toValidInt(paymentRecord.match_id);
 
         if (isSuccess) {
             await updatePaymentStatus(paymentRecord.id, 'completed');
@@ -465,11 +468,79 @@ export const payosWebhook = async (req: any, res: any) => {
                         SET status = 'confirmed'
                         WHERE id = @booking_id AND status = 'pending'
                     `);
+                
+                // Notify user about booking confirmation
+                const bookingData = await pool.request()
+                    .input('id', sql.Int, bookingId)
+                    .query('SELECT c.name, b.booking_date, CONVERT(VARCHAR(5), b.start_time, 108) AS start_time, f.owner_id, u.full_name FROM bookings b JOIN courts c ON b.court_id = c.id JOIN facilities f ON c.facility_id = f.id JOIN users u ON b.user_id = u.id WHERE b.id = @id');
+                
+                if (bookingData.recordset.length > 0) {
+                    const { name, booking_date, start_time, owner_id, full_name } = bookingData.recordset[0];
+                    
+                    // Notify player
+                    await createNotification(
+                        paymentRecord.user_id,
+                        '✅ Đặt sân thành công',
+                        `Đã xác nhận đơn đặt sân "${name}" ngày ${booking_date} lúc ${start_time}`,
+                        'booking_confirmed',
+                        bookingId
+                    );
+                    try { getIO()?.to(`user_${paymentRecord.user_id}`).emit('new_notification'); } catch { }
+                    
+                    // Notify court owner about booking payment
+                    if (owner_id !== paymentRecord.user_id) {
+                        await createNotification(
+                            owner_id,
+                            '💵 Có thanh toán đặt sân',
+                            `${full_name} thanh toán cho "${name}" - ${booking_date} lúc ${start_time}`,
+                            'booking_payment',
+                            bookingId
+                        );
+                        try { getIO()?.to(`user_${owner_id}`).emit('new_notification'); } catch { }
+                    }
+                }
             } else if (paymentRecord.booking_id !== null && paymentRecord.booking_id !== undefined) {
                 console.warn('PayOS Webhook: skip booking sync due to invalid booking_id', {
                     paymentId: paymentRecord.id,
                     rawBookingId: paymentRecord.booking_id
                 });
+            }
+
+            if (matchId) {
+                // Notify user about match payment confirmation
+                const matchData = await pool.request()
+                    .input('id', sql.Int, matchId)
+                    .query('SELECT c.name, m.match_date, CONVERT(VARCHAR(5), m.start_time, 108) AS start_time, f.owner_id, u.full_name FROM matches m JOIN courts c ON m.court_id = c.id JOIN facilities f ON c.facility_id = f.id JOIN users u ON m.creator_id = u.id WHERE m.id = @id');
+                
+                if (matchData.recordset.length > 0) {
+                    const { name, match_date, start_time, owner_id, full_name } = matchData.recordset[0];
+                    
+                    // Notify match participant
+                    await createNotification(
+                        paymentRecord.user_id,
+                        '✅ Thanh toán ghép trận thành công',
+                        `Chỉ số chuyến "${name}" ngày ${match_date} lúc ${start_time} - Sẵn sàng chơi!`,
+                        'match_payment_confirmed',
+                        matchId
+                    );
+                    try { getIO()?.to(`user_${paymentRecord.user_id}`).emit('new_notification'); } catch { }
+                    
+                    // Notify court owner about match payment
+                    if (owner_id !== paymentRecord.user_id) {
+                        const playerName = paymentRecord.user_id === full_name ? 'Host' : (await pool.request()
+                            .input('id', sql.Int, paymentRecord.user_id)
+                            .query('SELECT full_name FROM users WHERE id = @id')).recordset[0]?.full_name || 'Player';
+                        
+                        await createNotification(
+                            owner_id,
+                            '💰 Có thanh toán ghép trận',
+                            `Trận tại "${name}" - Ngày ${match_date} lúc ${start_time} (${playerName} thanh toán)`,
+                            'match_payment_owner',
+                            matchId
+                        );
+                        try { getIO()?.to(`user_${owner_id}`).emit('new_notification'); } catch { }
+                    }
+                }
             }
 
             await syncMatchPaymentState(paymentRecord, 'completed');
