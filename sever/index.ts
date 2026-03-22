@@ -15,6 +15,7 @@ import chatRoutes from './routes/chat.routes';
 import adminRoutes from './routes/admin.routes';
 import statsRoutes from './routes/stats.routes';
 import facilityRoutes from './routes/facility.routes';
+import reportRoutes from './routes/report.routes';
 import initSocket from './socket/index';
 import { cancelExpiredPayments } from './controllers/payment.controller';
 import { autoCheckMatches } from './controllers/match.controller';
@@ -48,6 +49,7 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/facilities', facilityRoutes);
+app.use('/api/reports', reportRoutes);
 
 // Health check
 app.get('/api/health', (req: Request, res: Response) => {

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
+import ReportModal from './ReportModal'
 import styles from '../styles/UserProfileCard.module.css'
 
 interface UserProfileCardProps {
@@ -17,6 +18,7 @@ export default function UserProfileCard({ userId, children, onStartChat }: UserP
     const [show, setShow] = useState(false)
     const [userInfo, setUserInfo] = useState<any>(null)
     const [loading, setLoading] = useState(false)
+    const [showReportModal, setShowReportModal] = useState(false)
     const containerRef = useRef<HTMLDivElement>(null)
     const cardRef = useRef<HTMLDivElement>(null)
     const timeoutRef = useRef<any>(null)
@@ -170,9 +172,28 @@ export default function UserProfileCard({ userId, children, onStartChat }: UserP
                                     👤 Xem hồ sơ
                                 </button>
                                 {!isMe && (
-                                    <button className={styles.btnChat} onClick={handleStartChat}>
-                                        💬 Nhắn tin
-                                    </button>
+                                    <>
+                                        <button className={styles.btnChat} onClick={handleStartChat}>
+                                            💬 Nhắn tin
+                                        </button>
+                                        <button
+                                            style={{
+                                                flex: 1,
+                                                padding: '6px',
+                                                background: 'var(--accent-red-dim)',
+                                                color: 'var(--accent-red)',
+                                                border: 'none',
+                                                borderRadius: 'var(--radius-sm)',
+                                                fontSize: '0.85rem',
+                                                fontWeight: 600,
+                                                cursor: 'pointer',
+                                                transition: 'all 0.2s'
+                                            }}
+                                            onClick={() => { setShowReportModal(true); setShow(false) }}
+                                        >
+                                            🚩 Báo cáo
+                                        </button>
+                                    </>
                                 )}
                             </div>
                         </>
@@ -180,6 +201,13 @@ export default function UserProfileCard({ userId, children, onStartChat }: UserP
                 </div>,
                 document.body
             )}
+            <ReportModal
+                isOpen={showReportModal}
+                targetId={userId}
+                targetType="user"
+                targetName={userInfo?.full_name}
+                onClose={() => setShowReportModal(false)}
+            />
         </div>
     )
 }
