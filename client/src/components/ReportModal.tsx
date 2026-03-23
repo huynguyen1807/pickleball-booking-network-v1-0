@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import api from '../api/axios';
 import styles from '../styles/Modal.module.css';
 
@@ -35,6 +36,17 @@ export default function ReportModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  // Lock body scroll when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    }
+    
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,7 +92,7 @@ export default function ReportModal({
 
   if (!isOpen) return null;
 
-  return (
+  const modal = (
     <div className={styles.modalOverlay} onClick={onClose}>
       <div
         className={styles.modalContent}
@@ -261,4 +273,6 @@ export default function ReportModal({
       </div>
     </div>
   );
+
+  return createPortal(modal, document.body);
 }
