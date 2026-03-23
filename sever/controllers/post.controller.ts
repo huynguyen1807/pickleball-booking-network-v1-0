@@ -1,5 +1,6 @@
 import { sql, poolPromise } from '../config/db';
 import { getIO } from '../socket/index';
+import { createNotification } from './notification.controller';
 
 // Get single post by ID
 export const getPostById = async (req, res) => {
@@ -33,7 +34,24 @@ export const createPost = async (req, res) => {
             .input('image', sql.NVarChar(sql.MAX), image || null)
             .input('post_type', sql.NVarChar, post_type || 'share')
             .query(`INSERT INTO posts (user_id, content, image, post_type) OUTPUT INSERTED.id VALUES (@user_id, @content, @image, @post_type)`);
-        res.status(201).json({ message: 'Đã đăng bài', postId: result.recordset[0].id });
+
+        const postId = result.recordset[0].id;
+        const postRes = await pool.request()
+            .input('id', sql.Int, postId)
+            .query(`SELECT p.*, u.full_name AS user_name, u.avatar, u.role AS user_role,
+                (SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = p.id) AS likes,
+                (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id) AS comments,
+                (SELECT COUNT(*) FROM post_shares ps WHERE ps.post_id = p.id) AS shares
+                FROM posts p JOIN users u ON p.user_id = u.id WHERE p.id = @id`);
+
+        const createdPost = postRes.recordset[0];
+        if (createdPost?.created_at) createdPost.created_at = new Date(createdPost.created_at).toISOString();
+
+        try {
+            getIO()?.emit('post_created', createdPost);
+        } catch { }
+
+        res.status(201).json({ message: 'Đã đăng bài', postId, post: createdPost });
     } catch (err) {
         res.status(500).json({ message: 'Lỗi server' });
     }
@@ -71,13 +89,17 @@ export const getAllPosts = async (req, res) => {
 // Delete post
 export const deletePost = async (req, res) => {
     try {
+        const postId = parseInt(req.params.id);
         const pool = await poolPromise;
-        const post = await pool.request().input('id', sql.Int, req.params.id).query('SELECT user_id FROM posts WHERE id = @id');
+        const post = await pool.request().input('id', sql.Int, postId).query('SELECT user_id FROM posts WHERE id = @id');
         if (post.recordset.length === 0) return res.status(404).json({ message: 'Không tìm thấy bài viết' });
         if (post.recordset[0].user_id !== req.user.id && req.user.role !== 'admin') {
             return res.status(403).json({ message: 'Không có quyền' });
         }
-        await pool.request().input('id', sql.Int, req.params.id).query('DELETE FROM posts WHERE id = @id');
+        await pool.request().input('id', sql.Int, postId).query('DELETE FROM posts WHERE id = @id');
+        try {
+            getIO()?.emit('post_deleted', { postId });
+        } catch { }
         res.json({ message: 'Đã xóa bài viết' });
     } catch (err) {
         res.status(500).json({ message: 'Lỗi server' });
@@ -89,8 +111,9 @@ export const likePost = async (req, res) => {
     try {
         const postId = parseInt(req.params.id);
         const pool = await poolPromise;
-        const post = await pool.request().input('id', sql.Int, postId).query('SELECT id FROM posts WHERE id = @id');
-        if (post.recordset.length === 0) return res.status(404).json({ message: 'Không tìm thấy bài viết' });
+        const postRes = await pool.request().input('id', sql.Int, postId).query('SELECT id, user_id FROM posts WHERE id = @id');
+        if (postRes.recordset.length === 0) return res.status(404).json({ message: 'Không tìm thấy bài viết' });
+        const postOwnerId = postRes.recordset[0].user_id;
 
         try {
             await pool.request()
@@ -103,8 +126,13 @@ export const likePost = async (req, res) => {
 
         const likesRes = await pool.request().input('post_id', sql.Int, postId).query('SELECT COUNT(*) AS cnt FROM post_likes WHERE post_id = @post_id');
         const likes = likesRes.recordset[0].cnt;
-        // Broadcast real-time
+        // Broadcast real-time like count
         try { getIO()?.to(`post_${postId}`).emit('post_liked', { postId, likes }); } catch { }
+        // Notify post owner (not self)
+        if (postOwnerId !== req.user.id) {
+            await createNotification(postOwnerId, '❤️ Thích mới', `${req.user.full_name} đã thích bài viết của bạn`, 'like', postId);
+            try { getIO()?.to(`user_${postOwnerId}`).emit('new_notification'); } catch { }
+        }
         res.json({ message: 'Đã thích', likes });
     } catch (err) {
         res.status(500).json({ message: 'Lỗi server' });
@@ -150,8 +178,9 @@ export const addComment = async (req, res) => {
         const { content } = req.body;
         if (!content || !content.trim()) return res.status(400).json({ message: 'Nội dung bình luận không được trống' });
         const pool = await poolPromise;
-        const post = await pool.request().input('id', sql.Int, postId).query('SELECT id FROM posts WHERE id = @id');
-        if (post.recordset.length === 0) return res.status(404).json({ message: 'Không tìm thấy bài viết' });
+        const postRes = await pool.request().input('id', sql.Int, postId).query('SELECT id, user_id FROM posts WHERE id = @id');
+        if (postRes.recordset.length === 0) return res.status(404).json({ message: 'Không tìm thấy bài viết' });
+        const postOwnerId = postRes.recordset[0].user_id;
 
         const insert = await pool.request()
             .input('post_id', sql.Int, postId)
@@ -160,7 +189,6 @@ export const addComment = async (req, res) => {
             .query('INSERT INTO comments (post_id, user_id, content) OUTPUT INSERTED.id, INSERTED.created_at VALUES (@post_id, @user_id, @content)');
 
         const commentId = insert.recordset[0].id;
-        const createdAt = insert.recordset[0].created_at;
 
         const commentRes = await pool.request().input('id', sql.Int, commentId)
             .query('SELECT c.id, c.content, c.created_at, u.id AS user_id, u.full_name AS user_name, u.avatar FROM comments c JOIN users u ON c.user_id = u.id WHERE c.id = @id');
@@ -172,6 +200,12 @@ export const addComment = async (req, res) => {
         const comments = countRes.recordset[0].cnt;
         // Broadcast real-time
         try { getIO()?.to(`post_${postId}`).emit('post_commented', { postId, comment, comments }); } catch { }
+        // Notify post owner (not self)
+        if (postOwnerId !== req.user.id) {
+            const preview = content.length > 50 ? content.substring(0, 50) + '...' : content;
+            await createNotification(postOwnerId, '💬 Bình luận mới', `${req.user.full_name}: "${preview}"`, 'comment', postId);
+            try { getIO()?.to(`user_${postOwnerId}`).emit('new_notification'); } catch { }
+        }
         res.status(201).json({ comment, comments });
     } catch (err) {
         res.status(500).json({ message: 'Lỗi server' });
@@ -183,8 +217,9 @@ export const sharePost = async (req, res) => {
     try {
         const postId = parseInt(req.params.id);
         const pool = await poolPromise;
-        const post = await pool.request().input('id', sql.Int, postId).query('SELECT id FROM posts WHERE id = @id');
-        if (post.recordset.length === 0) return res.status(404).json({ message: 'Không tìm thấy bài viết' });
+        const postRes = await pool.request().input('id', sql.Int, postId).query('SELECT id, user_id FROM posts WHERE id = @id');
+        if (postRes.recordset.length === 0) return res.status(404).json({ message: 'Không tìm thấy bài viết' });
+        const postOwnerId = postRes.recordset[0].user_id;
 
         await pool.request()
             .input('post_id', sql.Int, postId)
@@ -192,6 +227,11 @@ export const sharePost = async (req, res) => {
             .query('INSERT INTO post_shares (post_id, user_id) VALUES (@post_id, @user_id)');
 
         const sharesRes = await pool.request().input('post_id', sql.Int, postId).query('SELECT COUNT(*) AS cnt FROM post_shares WHERE post_id = @post_id');
+        // Notify post owner (not self)
+        if (req.user?.id && postOwnerId !== req.user.id) {
+            await createNotification(postOwnerId, '🔗 Chia sẻ mới', `${req.user.full_name} đã chia sẻ bài viết của bạn`, 'share', postId);
+            try { getIO()?.to(`user_${postOwnerId}`).emit('new_notification'); } catch { }
+        }
         res.json({ message: 'Đã lưu chia sẻ', shares: sharesRes.recordset[0].cnt });
     } catch (err) {
         res.status(500).json({ message: 'Lỗi server' });

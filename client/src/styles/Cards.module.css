@@ -67,6 +67,76 @@
     margin-bottom: 14px;
 }
 
+.findPlayerCard {
+    margin-bottom: 14px;
+    padding: 14px;
+    border: 1px solid rgba(0, 230, 118, 0.25);
+    border-radius: var(--radius-md);
+    background: linear-gradient(145deg, rgba(0, 230, 118, 0.08), rgba(255, 255, 255, 0.02));
+}
+
+.findPlayerTopRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.findPlayerFormatBadge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    background: rgba(0, 230, 118, 0.14);
+    border: 1px solid rgba(0, 230, 118, 0.35);
+    color: var(--accent-green);
+}
+
+.findPlayerSkill {
+    font-size: 0.76rem;
+    color: var(--text-muted);
+}
+
+.findPlayerMainInfo {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+.findPlayerLine {
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    line-height: 1.45;
+}
+
+.findPlayerSubLine {
+    font-size: 0.83rem;
+    color: var(--text-secondary);
+    margin-top: -2px;
+}
+
+.findPlayerNote {
+    margin-top: 4px;
+    font-size: 0.84rem;
+    color: var(--text-secondary);
+    padding: 8px 10px;
+    border-left: 2px solid rgba(0, 230, 118, 0.5);
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 6px;
+}
+
+.findPlayerFooter {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-glass);
+    display: flex;
+    justify-content: flex-end;
+}
+
 .postImage {
     width: 100%;
     border-radius: var(--radius-md);

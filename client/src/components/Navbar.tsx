@@ -3,6 +3,7 @@ import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
 import { io } from 'socket.io-client'
+import NotificationDropdown from './NotificationDropdown'
 import styles from '../styles/Navbar.module.css'
 
 const socket = io('http://localhost:5000')
@@ -147,19 +148,18 @@ export default function Navbar() {
             </ul>
 
             <div className={styles.navRight}>
-                <button className={styles.notifBtn} onClick={() => navigate(getDashboardLink())}>
-                    🔔
-                    {unreadCount > 0 && <span className={styles.notifBadge}>{unreadCount}</span>}
-                </button>
+                <NotificationDropdown />
 
                 <div style={{ position: 'relative' }} ref={dropdownRef}>
                     <button className={styles.profileBtn} onClick={() => setDropdownOpen(!dropdownOpen)}>
-                        <div className="avatar avatar-sm">{getInitials(user.full_name)}</div>
-                        <div className={styles.profileMeta}>
-                            <div className={styles.profileName}>{user.full_name}</div>
-                            <div className={styles.profileRole}>{user.role}</div>
-                        </div>
-                    </button>
+                        <div className="avatar avatar-sm">{getInitials(user.full_name)}</div> 
+                        <div className={styles.profileMeta}>    
+                        <div className={styles.profileName}>{user.full_name}</div>       
+                        <div className={styles.profileRole}>{user.role}</div>       
+                        </div>                   
+                        </button>
+
+                    
 
                     {dropdownOpen && (
                         <div className={styles.dropdown}>

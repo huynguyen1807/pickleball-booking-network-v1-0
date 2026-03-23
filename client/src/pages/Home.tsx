@@ -3,10 +3,13 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useDialog } from '../context/DialogContext'
 import api from '../api/axios'
+import { io as socketIO } from 'socket.io-client'
 import PostCard from '../components/PostCard'
 import CameraModal from '../components/CameraModal'
 import styles from '../styles/Home.module.css'
 import { formatDateVN, formatTimeHHmm } from '../utils/dateTime'
+
+const HOME_SCROLL_KEY = 'home_feed_scroll_y'
 
 export default function Home() {
     const { user } = useAuth()
@@ -31,6 +34,51 @@ export default function Home() {
     useEffect(() => {
         loadData()
     }, [])
+
+    useEffect(() => {
+        const socket = socketIO('http://localhost:5000', { transports: ['websocket'] })
+
+        socket.on('post_created', (newPost: any) => {
+            if (!newPost?.id) return
+            setPosts(prev => {
+                if (prev.some((p: any) => p.id === newPost.id)) return prev
+                return [newPost, ...prev]
+            })
+        })
+
+        socket.on('post_deleted', ({ postId }: { postId: number }) => {
+            if (!postId) return
+            setPosts(prev => prev.filter((p: any) => p.id !== postId))
+        })
+
+        socket.on('post_liked', ({ postId, likes }: { postId: number; likes: number }) => {
+            if (!postId) return
+            setPosts(prev => prev.map((p: any) => p.id === postId ? { ...p, likes } : p))
+        })
+
+        socket.on('post_commented', ({ postId, comments }: { postId: number; comments: number }) => {
+            if (!postId) return
+            setPosts(prev => prev.map((p: any) => p.id === postId ? { ...p, comments } : p))
+        })
+
+        return () => {
+            socket.disconnect()
+        }
+    }, [])
+
+    useEffect(() => {
+        if (loading) return
+        const savedY = sessionStorage.getItem(HOME_SCROLL_KEY)
+        if (!savedY) return
+
+        const y = Number(savedY)
+        if (!Number.isNaN(y)) {
+            requestAnimationFrame(() => {
+                window.scrollTo({ top: y, behavior: 'auto' })
+            })
+        }
+        sessionStorage.removeItem(HOME_SCROLL_KEY)
+    }, [loading, posts.length])
 
    const loadData = async () => {
         try {
@@ -85,15 +133,23 @@ export default function Home() {
         if (!postContent.trim() && !postImage) return
         setPosting(true)
         try {
-            await api.post('/posts', {
+            const res = await api.post('/posts', {
                 content: postContent,
                 post_type: postType,
                 image: postImage || null
             })
+
+            if (res.data?.post?.id) {
+                setPosts(prev => {
+                    const post = res.data.post
+                    if (prev.some((p: any) => p.id === post.id)) return prev
+                    return [post, ...prev]
+                })
+            }
+
             setPostContent('')
             setPostType('share')
             setPostImage(null)
-            loadData()
         } catch (err: any) {
             await showAlert(err.response?.data?.message || 'Lỗi khi đăng bài')
         } finally {
@@ -168,7 +224,11 @@ export default function Home() {
 
             {/* Create Post */}
             <div className={styles.createPost}>
-                <div className="avatar">{user?.full_name?.charAt(0) || '?'}</div>
+                <div className="avatar" style={{ overflow: 'hidden' }}>
+                    {user?.avatar ? (
+                        <img src={user.avatar} alt={user.full_name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                    ) : (user?.full_name?.charAt(0) || '?')}
+                </div>
                 <div style={{ flex: 1 }}>
                     <textarea
                         className={styles.createPostInput}

@@ -1,7 +1,8 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import Navbar from './components/Navbar'
 import ProtectedRoute from './components/ProtectedRoute'
+import AdminLayout from './components/AdminLayout'
 
 // Pages
 import Login from './pages/Login'
@@ -22,16 +23,25 @@ import OwnerCourts from './pages/OwnerCourts'
 import OwnerCreateFacility from './pages/OwnerCreateFacility'
 import OwnerCreateCourt from './pages/OwnerCreateCourt'
 import AdminDashboard from './pages/AdminDashboard'
+import AdminUsers from './pages/AdminUsers'
+import AdminStats from './pages/AdminStats'
+import AdminReports from './pages/AdminReports'
+import AdminChat from './pages/AdminChat'
+import AdminNotifications from './pages/AdminNotifications'
 import PostPhoto from './pages/PostPhoto'
+import PostDetail from './pages/PostDetail'
 import PaymentCancel from './pages/PaymentCancel'
 import UserProfile from './pages/UserProfile'
+import Notifications from './pages/Notifications'
 
 export default function App() {
     const { user } = useAuth()
+    const location = useLocation()
+    const isAdminPage = location.pathname.startsWith('/admin')
 
     return (
         <>
-            {user && <Navbar />}
+            {user && !isAdminPage && <Navbar />}
             <Routes>
                 {/* Public */}
                 <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
@@ -39,6 +49,10 @@ export default function App() {
                 <Route path="/forgot-password" element={user ? <Navigate to="/" /> : <ForgotPassword />} />
                 {/* Photo permalink — accessible without login */}
                 <Route path="/post/:id/photo" element={<PostPhoto />} />
+                {/* Post detail — show in modal */}
+                <Route path="/post/:id" element={
+                    <ProtectedRoute><PostDetail /></ProtectedRoute>
+                } />
 
                 {/* Protected - All authenticated users */}
                 <Route path="/" element={
@@ -71,6 +85,9 @@ export default function App() {
                 <Route path="/settings" element={
                     <ProtectedRoute><Settings /></ProtectedRoute>
                 } />
+                <Route path="/notifications" element={
+                    <ProtectedRoute><Notifications /></ProtectedRoute>
+                } />
                 <Route path="/dashboard" element={
                     <ProtectedRoute roles={['user']}><UserDashboard /></ProtectedRoute>
                 } />
@@ -89,10 +106,19 @@ export default function App() {
                     <ProtectedRoute roles={['owner']}><OwnerCreateCourt /></ProtectedRoute>
                 } />
 
-                {/* Admin routes */}
+                {/* Admin routes — wrapped in AdminLayout with sidebar */}
                 <Route path="/admin" element={
-                    <ProtectedRoute roles={['admin']}><AdminDashboard /></ProtectedRoute>
-                } />
+                    <ProtectedRoute roles={['admin']}><AdminLayout /></ProtectedRoute>
+                }>
+                    <Route index element={<AdminDashboard />} />
+                    <Route path="users" element={<AdminUsers />} />
+                    <Route path="stats" element={<AdminStats />} />
+                    <Route path="reports" element={<AdminReports />} />
+                    <Route path="notifications" element={<AdminNotifications />} />
+                    <Route path="chat" element={<AdminChat />} />
+                    <Route path="profile/:id" element={<UserProfile />} />
+                    <Route path="settings" element={<Settings />} />
+                </Route>
 
                 {/* Payment result pages */}
                 <Route path="/payment/cancel" element={<PaymentCancel />} />

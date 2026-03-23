@@ -190,7 +190,7 @@ export const rejectUpgrade = async (req, res) => {
 export const getAllUsers = async (req, res) => {
     try {
         const pool = await poolPromise;
-        const result = await pool.request().query('SELECT id, email, full_name, phone, role, status, created_at FROM users ORDER BY created_at DESC');
+        const result = await pool.request().query('SELECT id, email, full_name, phone, avatar, role, status, created_at FROM users ORDER BY created_at DESC');
         res.json(result.recordset);
     } catch (err) { res.status(500).json({ message: 'Lỗi server' }); }
 };
@@ -205,3 +205,46 @@ export const toggleUserStatus = async (req, res) => {
     } catch (err) { res.status(500).json({ message: 'Lỗi server' }); }
 };
 
+// Send broadcast notification to users by role
+export const sendBroadcastNotification = async (req, res) => {
+    try {
+        const { title, message, type, targetRole } = req.body;
+        if (!title || !message) {
+            return res.status(400).json({ message: 'Vui lòng nhập tiêu đề và nội dung' });
+        }
+
+        const pool = await poolPromise;
+
+        // Get target users based on role filter
+        let query = "SELECT id FROM users WHERE status = 'active'";
+        const request = pool.request();
+        if (targetRole && targetRole !== 'all') {
+            request.input('role', sql.NVarChar, targetRole);
+            query += ' AND role = @role';
+        }
+
+        const users = await request.query(query);
+
+        if (users.recordset.length === 0) {
+            return res.status(400).json({ message: 'Không tìm thấy người dùng nào' });
+        }
+
+        // Insert notification for each user
+        let count = 0;
+        for (const u of users.recordset) {
+            await pool.request()
+                .input('user_id', sql.Int, u.id)
+                .input('title', sql.NVarChar, title)
+                .input('message', sql.NVarChar, message)
+                .input('type', sql.NVarChar, type || 'system')
+                .query(`INSERT INTO notifications (user_id, title, message, type)
+                        VALUES (@user_id, @title, @message, @type)`);
+            count++;
+        }
+
+        res.json({ message: `Đã gửi thông báo đến ${count} người dùng`, count });
+    } catch (err) {
+        console.error('Broadcast notification error:', err);
+        res.status(500).json({ message: 'Lỗi server' });
+    }
+};

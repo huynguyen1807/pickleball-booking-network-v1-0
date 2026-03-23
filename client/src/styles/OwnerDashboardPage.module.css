@@ -1,0 +1,468 @@
+.loadingState {
+    text-align: center;
+    padding: 60px 20px;
+}
+
+.primaryStatIcon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+    margin-bottom: 12px;
+}
+
+.primaryStatValue {
+    font-size: 1.6rem;
+    font-weight: 800;
+    line-height: 1.1;
+    margin-bottom: 4px;
+}
+
+.primaryStatLabel {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
+.ownerMetricsSection {
+    margin-top: -6px;
+    margin-bottom: 22px;
+}
+
+.ownerMetricsGrid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    margin-bottom: 0;
+}
+
+.wideTabBar {
+    max-width: 920px;
+    flex-wrap: wrap;
+}
+
+.ownerTabButton {
+    flex: 1 1 calc(25% - 4px);
+}
+
+.emptyState {
+    text-align: center;
+    padding: 48px 20px;
+    color: var(--text-muted);
+}
+
+.emptyIcon {
+    font-size: 3rem;
+    margin-bottom: 12px;
+}
+
+.emptyTitle {
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.tableWrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.dataTable {
+    min-width: 760px;
+}
+
+.showMoreWrap {
+    text-align: center;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-glass);
+}
+
+.showMoreBtn {
+    background: none;
+    border: 1px solid var(--border-glass);
+    border-radius: 8px;
+    padding: 6px 20px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.ownerSummaryGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.ownerSummaryCard {
+    padding: 12px 14px;
+    border-radius: 12px;
+}
+
+.ownerSummaryCardRevenue {
+    background: rgba(16, 185, 129, 0.12);
+    border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.ownerSummaryCardPending {
+    background: rgba(245, 158, 11, 0.12);
+    border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.ownerSummaryLabel {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+}
+
+.ownerSummaryValue {
+    font-size: 1.15rem;
+    font-weight: 800;
+    margin-bottom: 4px;
+}
+
+.ownerSummaryValueRevenue {
+    color: #10b981;
+}
+
+.ownerSummaryValuePending {
+    color: #f59e0b;
+}
+
+.ownerSummaryDesc {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+}
+
+.ownerSectionSpacing {
+    margin-top: 16px;
+}
+
+.primaryStatIconBlue {
+    background: rgba(59, 130, 246, 0.12);
+}
+
+.primaryStatIconGreen {
+    background: rgba(16, 185, 129, 0.12);
+}
+
+.primaryStatIconYellow {
+    background: rgba(245, 158, 11, 0.12);
+}
+
+.primaryStatIconPurple {
+    background: rgba(139, 92, 246, 0.12);
+}
+
+.primaryStatValueBlue {
+    color: #3b82f6;
+}
+
+.primaryStatValueGreen {
+    color: #10b981;
+}
+
+.primaryStatValueYellow {
+    color: #f59e0b;
+}
+
+.primaryStatValuePurple {
+    color: #8b5cf6;
+}
+
+.statusBadge {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.bookingPending {
+    background: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
+}
+
+.bookingConfirmed {
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
+}
+
+.bookingCompleted {
+    background: rgba(59, 130, 246, 0.15);
+    color: #3b82f6;
+}
+
+.bookingCancelled {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+}
+
+.statusNeutral {
+    background: rgba(156, 163, 175, 0.15);
+    color: #9ca3af;
+}
+
+.paymentPending {
+    background: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
+}
+
+.paymentCompleted {
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
+}
+
+.paymentFailed {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+}
+
+.paymentCancelled {
+    background: rgba(107, 114, 128, 0.15);
+    color: #9ca3af;
+}
+
+.paymentExpired {
+    background: rgba(249, 115, 22, 0.15);
+    color: #f97316;
+}
+
+.paymentRefunded {
+    background: rgba(139, 92, 246, 0.15);
+    color: #8b5cf6;
+}
+
+.matchWaiting {
+    background: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
+}
+
+.matchOpen {
+    background: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
+}
+
+.matchFull {
+    background: rgba(59, 130, 246, 0.15);
+    color: #60a5fa;
+}
+
+.matchConfirmed {
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
+}
+
+.matchCompleted {
+    background: rgba(34, 197, 94, 0.15);
+    color: #22c55e;
+}
+
+.matchFinished {
+    background: rgba(34, 197, 94, 0.15);
+    color: #22c55e;
+}
+
+.matchCancelled {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+}
+
+.tableIndexCell {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+
+.tableStrongCell {
+    font-weight: 600;
+}
+
+.tableMutedEllipsisCell {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tableNowrapCell {
+    white-space: nowrap;
+}
+
+.tableTimeCell {
+    font-size: 0.82rem;
+    white-space: nowrap;
+    color: var(--text-secondary);
+}
+
+.tableAmountCell {
+    font-weight: 700;
+    color: #f59e0b;
+    white-space: nowrap;
+}
+
+.tableAmountMutedCell {
+    font-weight: 700;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.tableContentTitle {
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+.tableOrderCodeCell {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-family: monospace;
+}
+
+.tableDateTimeCell {
+    font-size: 0.8rem;
+    white-space: nowrap;
+    color: var(--text-secondary);
+}
+
+.tableMethodCell {
+    font-size: 0.8rem;
+    white-space: nowrap;
+}
+
+.payNowButton {
+    white-space: nowrap;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    background: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
+    border: none;
+}
+
+.payNowButton:disabled {
+    cursor: not-allowed;
+    opacity: 0.8;
+}
+
+.matchSummaryGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 10px;
+    margin-bottom: 14px;
+}
+
+.matchSummaryCard {
+    padding: 10px 12px;
+    border-radius: 10px;
+}
+
+.matchSummaryCreate {
+    background: rgba(59, 130, 246, 0.12);
+    border: 1px solid rgba(59, 130, 246, 0.25);
+}
+
+.matchSummaryJoin {
+    background: rgba(16, 185, 129, 0.12);
+    border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.matchSummaryCompleted {
+    background: rgba(139, 92, 246, 0.12);
+    border: 1px solid rgba(139, 92, 246, 0.25);
+}
+
+.matchSummaryCancelled {
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.matchSummaryLabel {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.matchSummaryValue {
+    font-size: 1.1rem;
+    font-weight: 800;
+}
+
+.roleBadgeHost {
+    background: rgba(96, 165, 250, 0.15);
+    color: #60a5fa;
+}
+
+.roleBadgeWaitlist {
+    background: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
+}
+
+.roleBadgePlayer {
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
+}
+
+.ownerEmptyText {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
+
+@media (max-width: 1200px) {
+    .ownerMetricsGrid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 992px) {
+    .ownerTabButton {
+        flex: 1 1 calc(50% - 4px);
+    }
+
+    .dataTable {
+        min-width: 680px;
+    }
+
+    .matchSummaryGrid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 768px) {
+    .ownerMetricsSection {
+        margin-top: 0;
+        margin-bottom: 16px;
+    }
+
+    .ownerMetricsGrid {
+        grid-template-columns: 1fr;
+    }
+
+    .wideTabBar {
+        max-width: 100%;
+        gap: 6px;
+    }
+
+    .ownerTabButton {
+        flex: 1 1 100%;
+    }
+
+    .primaryStatValue {
+        font-size: 1.4rem;
+    }
+
+    .dataTable {
+        min-width: 620px;
+    }
+
+    .matchSummaryGrid {
+        grid-template-columns: 1fr;
+    }
+
+    .showMoreBtn {
+        width: 100%;
+    }
+}
