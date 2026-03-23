@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { useDialog } from '../context/DialogContext'
 import api from '../api/axios'
 import PostCard from '../components/PostCard'
 import CameraModal from '../components/CameraModal'
@@ -9,6 +10,7 @@ import { formatDateVN, formatTimeHHmm } from '../utils/dateTime'
 
 export default function Home() {
     const { user } = useAuth()
+    const { showAlert } = useDialog()
     const navigate = useNavigate()
     const [filter, setFilter] = useState('latest')
     const [posts, setPosts] = useState([])
@@ -64,7 +66,7 @@ export default function Home() {
         const file = e.target.files?.[0]
         if (!file) return
         if (file.size > 5 * 1024 * 1024) {
-            alert('Ảnh quá lớn! Vui lòng chọn ảnh nhỏ hơn 5MB.')
+            void showAlert('Ảnh quá lớn! Vui lòng chọn ảnh nhỏ hơn 5MB.')
             return
         }
         const reader = new FileReader()
@@ -93,7 +95,7 @@ export default function Home() {
             setPostImage(null)
             loadData()
         } catch (err: any) {
-            alert(err.response?.data?.message || 'Lỗi khi đăng bài')
+            await showAlert(err.response?.data?.message || 'Lỗi khi đăng bài')
         } finally {
             setPosting(false)
         }

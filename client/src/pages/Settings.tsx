@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { useDialog } from '../context/DialogContext'
 import api from '../api/axios'
 import styles from '../styles/Dashboard.module.css'
 import settingStyles from '../styles/Settings.module.css'
 
 export default function Settings() {
     const { user, updateUser } = useAuth()
+    const { showAlert } = useDialog()
     const [form, setForm] = useState<any>({
         full_name: user?.full_name || '',
         email: user?.email || '',
@@ -33,9 +35,9 @@ export default function Settings() {
                 longitude: form.longitude || null
             })
             updateUser({ full_name: form.full_name, phone: form.phone })
-            alert('✅ Đã lưu thay đổi!')
-        } catch (err) {
-            alert(err.response?.data?.message || 'Lỗi cập nhật')
+            await showAlert('✅ Đã lưu thay đổi!')
+        } catch (err: any) {
+            await showAlert(err.response?.data?.message || 'Lỗi cập nhật')
         } finally {
             setSaving(false)
         }
@@ -43,11 +45,11 @@ export default function Settings() {
 
     const handleChangePassword = async () => {
         if (passwordForm.new_password !== passwordForm.confirm_password) {
-            alert('Mật khẩu xác nhận không khớp!')
+            await showAlert('Mật khẩu xác nhận không khớp!')
             return
         }
         if (passwordForm.new_password.length < 6) {
-            alert('Mật khẩu mới phải có ít nhất 6 ký tự!')
+            await showAlert('Mật khẩu mới phải có ít nhất 6 ký tự!')
             return
         }
         setChangingPassword(true)
@@ -57,9 +59,9 @@ export default function Settings() {
                 new_password: passwordForm.new_password
             })
             setPasswordForm({ current_password: '', new_password: '', confirm_password: '' })
-            alert('✅ Đổi mật khẩu thành công!')
+            await showAlert('✅ Đổi mật khẩu thành công!')
         } catch (err: any) {
-            alert(err.response?.data?.message || 'Lỗi đổi mật khẩu')
+            await showAlert(err.response?.data?.message || 'Lỗi đổi mật khẩu')
         } finally {
             setChangingPassword(false)
         }
@@ -67,11 +69,11 @@ export default function Settings() {
 
     const handleUpgradeRequest = async () => {
         if (!upgradeReason.trim()) {
-            alert('Vui lòng nhập lý do!');
+            await showAlert('Vui lòng nhập lý do!')
             return;
         }
         if (!licenseFile) {
-            alert('Vui lòng tải lên giấy phép kinh doanh!');
+            await showAlert('Vui lòng tải lên giấy phép kinh doanh!')
             return;
         }
 
@@ -86,7 +88,7 @@ export default function Settings() {
             })
             setUpgradeSubmitted(true)
         } catch (err: any) {
-            alert(err.response?.data?.message || 'Lỗi gửi yêu cầu')
+            await showAlert(err.response?.data?.message || 'Lỗi gửi yêu cầu')
         } finally {
             setSubmittingUpgrade(false)
         }

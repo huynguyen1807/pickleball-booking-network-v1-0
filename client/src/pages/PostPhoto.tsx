@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { useDialog } from '../context/DialogContext'
 import api from '../api/axios'
 import { io as socketIO } from 'socket.io-client'
 import UserProfileCard from '../components/UserProfileCard'
@@ -10,6 +11,7 @@ export default function PostPhoto() {
     const { id } = useParams<{ id: string }>()
     const navigate = useNavigate()
     const { user } = useAuth()
+    const { showAlert } = useDialog()
 
     const [post, setPost] = useState<any>(null)
     const [loading, setLoading] = useState(true)
@@ -107,7 +109,7 @@ export default function PostPhoto() {
 
     const handleCopyLink = () => {
         navigator.clipboard.writeText(window.location.href)
-        alert('Đã sao chép link ảnh!')
+        void showAlert('Đã sao chép link ảnh!')
         setShowShare(false)
     }
     const handleShareFb = () => {

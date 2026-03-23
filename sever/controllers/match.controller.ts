@@ -15,12 +15,42 @@ const FORMAT_PLAYERS: Record<string, number> = { '1v1': 2, '2v2': 4 };
 const REFUND_FULL_HOURS = 4;
 const REFUND_NO_REFUND_FROM_HOURS = 2;
 
+const pad2 = (value: number): string => String(value).padStart(2, '0');
+
+const toLocalDateOnly = (matchDate: any): string => {
+    if (matchDate instanceof Date) {
+        return `${matchDate.getFullYear()}-${pad2(matchDate.getMonth() + 1)}-${pad2(matchDate.getDate())}`;
+    }
+
+    const raw = String(matchDate || '').trim();
+    if (!raw) return '';
+
+    if (/^\d{4}-\d{2}-\d{2}/.test(raw)) {
+        return raw.slice(0, 10);
+    }
+
+    const parsed = new Date(raw);
+    if (!Number.isNaN(parsed.getTime())) {
+        return `${parsed.getFullYear()}-${pad2(parsed.getMonth() + 1)}-${pad2(parsed.getDate())}`;
+    }
+
+    return raw;
+};
+
 const getHoursUntilMatchStart = (matchDate: any, startTime: any): number => {
-    const dateStr = matchDate instanceof Date
-        ? matchDate.toISOString().split('T')[0]
-        : String(matchDate).split('T')[0];
+    const dateStr = toLocalDateOnly(matchDate);
     const timeStr = String(startTime || '').slice(0, 8);
+
+    if (!dateStr || !timeStr) {
+        return Number.NEGATIVE_INFINITY;
+    }
+
     const startAt = new Date(`${dateStr}T${timeStr}`);
+
+    if (Number.isNaN(startAt.getTime())) {
+        return Number.NEGATIVE_INFINITY;
+    }
+
     return (startAt.getTime() - Date.now()) / 3_600_000;
 };
 
@@ -411,7 +441,19 @@ export const leaveMatch = async (req, res) => {
     try {
         const pool = await poolPromise;
         const matchRes = await pool.request().input('id', sql.Int, req.params.id)
-            .query('SELECT * FROM matches WHERE id = @id');
+            .query(`
+                SELECT *,
+                       DATEDIFF(
+                           MINUTE,
+                           SYSDATETIMEOFFSET(),
+                           CONVERT(
+                               DATETIMEOFFSET,
+                               CONVERT(NVARCHAR(10), match_date, 23) + 'T' + LEFT(CONVERT(NVARCHAR(8), start_time, 108), 8)
+                           )
+                       ) AS minutes_until_start
+                FROM matches
+                WHERE id = @id
+            `);
         if (matchRes.recordset.length === 0) return res.status(404).json({ message: 'Không tìm thấy trận' });
         const m = matchRes.recordset[0];
 
@@ -433,7 +475,7 @@ export const leaveMatch = async (req, res) => {
         let shouldResetPaymentStatus = false;
 
         if (player.payment_status === 'paid') {
-            const hoursUntil = getHoursUntilMatchStart(m.match_date, m.start_time);
+            const hoursUntil = Number(m.minutes_until_start ?? Number.NEGATIVE_INFINITY) / 60;
             const policy = evaluateRefundPolicyForLeave(hoursUntil);
 
             refundStatus = policy.status;

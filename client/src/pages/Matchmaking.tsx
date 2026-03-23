@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { useDialog } from '../context/DialogContext'
 import api from '../api/axios'
 import MatchCard from '../components/MatchCard'
 import styles from '../styles/Matchmaking.module.css'
@@ -18,6 +19,7 @@ const SKILL_OPTIONS = [
 
 export default function Matchmaking() {
     const { user } = useAuth()
+    const { showAlert } = useDialog()
     const [tab, setTab] = useState('all')
     const [filterSkill, setFilterSkill] = useState('all')
     const [showCreate, setShowCreate] = useState(false)
@@ -60,11 +62,11 @@ export default function Matchmaking() {
 
     const handleSearchCourts = async () => {
         if (!createForm.date || !createForm.start_time || !createForm.end_time) {
-            alert('Vui lòng chọn ngày và khoảng thời gian')
+            await showAlert('Vui lòng chọn ngày và khoảng thời gian')
             return
         }
         if (createForm.start_time >= createForm.end_time) {
-            alert('Giờ kết thúc phải sau giờ bắt đầu')
+            await showAlert('Giờ kết thúc phải sau giờ bắt đầu')
             return
         }
         setSearchingCourts(true)
@@ -78,7 +80,7 @@ export default function Matchmaking() {
             setModalStep(2)
         } catch (err) {
             console.error('Lỗi tìm sân:', err)
-            alert('Không thể tải danh sách sân. Vui lòng thử lại.')
+            await showAlert('Không thể tải danh sách sân. Vui lòng thử lại.')
         } finally {
             setSearchingCourts(false)
         }
@@ -86,7 +88,7 @@ export default function Matchmaking() {
 
     const handleCreateMatch = async () => {
         if (!selectedCourt) {
-            alert('Vui lòng chọn sân')
+            await showAlert('Vui lòng chọn sân')
             return
         }
         setCreating(true)
@@ -105,7 +107,7 @@ export default function Matchmaking() {
             resetModal()
             loadData()
         } catch (err: any) {
-            alert(err.response?.data?.message || 'Tạo trận thất bại')
+            await showAlert(err.response?.data?.message || 'Tạo trận thất bại')
         } finally {
             setCreating(false)
         }
@@ -254,7 +256,7 @@ export default function Matchmaking() {
                                     {/* Skill level */}
                                     <div className="input-group">
                                         <label>Yêu cầu trình độ</label>
-                                        <select className="input-field" value={createForm.skill_level}
+                                        <select className={`input-field ${styles.timeSelect}`} value={createForm.skill_level}
                                             onChange={e => setCreateForm(p => ({ ...p, skill_level: e.target.value }))}>
                                             {SKILL_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                                         </select>

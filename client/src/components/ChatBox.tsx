@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { useDialog } from '../context/DialogContext'
 import api from '../api/axios'
 import { io } from 'socket.io-client'
 import UserProfileCard from './UserProfileCard'
@@ -15,6 +16,7 @@ interface ChatBoxProps {
 
 export default function ChatBox({ roomId, roomName, otherUser }: ChatBoxProps) {
     const { user } = useAuth()
+    const { showAlert } = useDialog()
     const [messages, setMessages] = useState<any[]>([])
     const [newMsg, setNewMsg] = useState('')
     const [loading, setLoading] = useState(true)
@@ -103,7 +105,7 @@ export default function ChatBox({ roomId, roomName, otherUser }: ChatBoxProps) {
             setNewMsg('')
             socket.emit('stop_typing', { roomId, userId: user?.id })
         } catch (err: any) {
-            alert(err.response?.data?.message || 'Lỗi gửi tin nhắn')
+            await showAlert(err.response?.data?.message || 'Lỗi gửi tin nhắn')
         }
     }
 

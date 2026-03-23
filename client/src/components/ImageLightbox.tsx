@@ -1,5 +1,6 @@
 import { useEffect, useCallback, useState, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { useDialog } from '../context/DialogContext'
 import api from '../api/axios'
 import { io as socketIO } from 'socket.io-client'
 import UserProfileCard from './UserProfileCard'
@@ -13,6 +14,7 @@ interface LightboxProps {
 
 export default function ImageLightbox({ imageUrl, post, onClose }: LightboxProps) {
     const { user } = useAuth()
+    const { showAlert } = useDialog()
     const [liked, setLiked] = useState(false)
     const [likeCount, setLikeCount] = useState(post?.likes || 0)
     const [commentsList, setCommentsList] = useState<any[]>([])
@@ -117,7 +119,7 @@ export default function ImageLightbox({ imageUrl, post, onClose }: LightboxProps
         navigator.clipboard.writeText(window.location.origin + `/post/${post?.id}`)
         if (user) api.post(`/posts/${post.id}/share`).then(r => setShareCount(r.data.shares)).catch(() => { })
         setShowShare(false)
-        alert('Đã sao chép link!')
+        void showAlert('Đã sao chép link!')
     }
 
     const getInitials = (name?: string) => {
