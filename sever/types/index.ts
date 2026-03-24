@@ -18,6 +18,24 @@ export interface AuthRequest extends Request {
   user?: User;
 }
 
+export interface Report {
+  id: number;
+  reporter_id: number;
+  reporter_name?: string;
+  reporter_email?: string;
+  report_type: 'account' | 'post' | 'impostor' | 'court' | 'other';
+  report_target_id?: number;
+  report_target_type?: 'user' | 'post' | 'court';
+  description: string;
+  evidence_urls?: string;
+  status: 'pending' | 'investigating' | 'resolved' | 'rejected';
+  admin_note?: string;
+  resolved_by?: number;
+  resolved_by_name?: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
 export interface TokenPayload extends JwtPayload {
   userId: number;
   role: string;

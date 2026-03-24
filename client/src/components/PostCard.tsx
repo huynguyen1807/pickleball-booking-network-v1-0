@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import api from '../api/axios'
 import { io as socketIO } from 'socket.io-client'
 import UserProfileCard from './UserProfileCard'
+import ReportModal from './ReportModal'
 import { useDialog } from '../context/DialogContext'
 import styles from '../styles/Cards.module.css'
 
@@ -212,6 +213,7 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
 
     const canDelete = user && (user.id === data.user_id || user.role === 'admin')
     const [showMenu, setShowMenu] = useState(false)
+    const [showReportModal, setShowReportModal] = useState(false)
 
     const toggleMenu = () => setShowMenu(prev => !prev)
 
@@ -276,6 +278,15 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
                             <button className={styles.menuItem} onClick={handleActionHide}>Bỏ ẩn bài viết</button>
                         )}
                         {canDelete && <button className={styles.menuItem} onClick={handleActionDelete}>Xóa bài viết</button>}
+                        {user?.id !== data.user_id && (
+                            <button 
+                                className={styles.menuItem} 
+                                style={{ color: 'var(--accent-red)' }}
+                                onClick={() => { setShowReportModal(true); setShowMenu(false) }}
+                            >
+                                🚩 Báo cáo bài viết
+                            </button>
+                        )}
                     </div>
                 )}
             </div>
@@ -491,6 +502,14 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
                     </form>
                 </div>
             )}
+
+            <ReportModal
+                isOpen={showReportModal}
+                targetId={data.id}
+                targetType="post"
+                targetName={`Bài viết của ${data.user_name}`}
+                onClose={() => setShowReportModal(false)}
+            />
         </div>
     )
 }
