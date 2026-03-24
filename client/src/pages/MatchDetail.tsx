@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
 import UserProfileCard from '../components/UserProfileCard'
 import { PayOSPayment } from '../components/PayOSPayment'
+import { useDialog } from '../context/DialogContext'
 import styles from '../styles/Matchmaking.module.css'
 import { formatDateVN, formatTimeHHmm } from '../utils/dateTime'
 
@@ -31,6 +32,7 @@ export default function MatchDetail() {
     const { id } = useParams()
     const navigate = useNavigate()
     const { user } = useAuth()
+    const { showAlert, showConfirm } = useDialog()
 
     const [match, setMatch] = useState<any>(null)
     const [loading, setLoading] = useState(true)
@@ -57,11 +59,13 @@ export default function MatchDetail() {
     const currentUserId = toId(user?.id)
     const creatorId = toId(match?.creator_id)
     const isCreatorByFlag = Number(match?.is_creator) === 1
-    const isPlayer = match?.players?.some((p: any) => toId(p.user_id) === currentUserId && p.status === 'joined')
-    const isWaitlisted = match?.players?.some((p: any) => toId(p.user_id) === currentUserId && p.status === 'waitlist')
+    const myPlayer = [...(match?.players || [])]
+        .reverse()
+        .find((p: any) => toId(p.user_id) === currentUserId && ['joined', 'waitlist'].includes(p.status))
+    const isPlayer = myPlayer?.status === 'joined'
+    const isWaitlisted = myPlayer?.status === 'waitlist'
     const isCreator = isCreatorByFlag || (!!currentUserId && !!creatorId && creatorId === currentUserId)
     const spotsLeft = match ? match.max_players - match.current_players : 0
-    const myPlayer = match?.players?.find((p: any) => toId(p.user_id) === currentUserId)
     const canJoin = !isPlayer && !isWaitlisted && ['waiting', 'open', 'full'].includes(match?.status)
     const canCancelMatch = isCreator && !['cancelled', 'completed', 'finished'].includes(match?.status)
 
@@ -70,13 +74,13 @@ export default function MatchDetail() {
         try {
             const res = await api.post(`/matches/${id}/join`)
             if (res.data.isWaitlist) {
-                alert(`✅ ${res.data.message}`)
+                await showAlert(`✅ ${res.data.message}`)
             } else {
-                alert(`✅ ${res.data.message}\n\n💰 Số tiền cần thanh toán: ${new Intl.NumberFormat('vi-VN').format(res.data.price_per_player)}đ`)
+                await showAlert(`✅ ${res.data.message}\n\n💰 Số tiền cần thanh toán: ${new Intl.NumberFormat('vi-VN').format(res.data.price_per_player)}đ`)
             }
             loadMatch()
         } catch (err: any) {
-            alert(err.response?.data?.message || 'Không thể tham gia')
+            await showAlert(err.response?.data?.message || 'Không thể tham gia')
         } finally {
             setJoining(false)
         }
@@ -88,14 +92,15 @@ export default function MatchDetail() {
             const res = await api.post('/payments/payos-init', { match_id: parseInt(id!) })
             setPayosData(res.data.data)
         } catch (err: any) {
-            alert(err.response?.data?.message || 'Không thể khởi tạo thanh toán')
+            await showAlert(err.response?.data?.message || 'Không thể khởi tạo thanh toán')
         } finally {
             setInitiatingPayment(false)
         }
     }
 
     const handleLeave = async () => {
-        if (!confirm('Bạn có chắc muốn rời trận này?')) return
+        const isConfirm = await showConfirm('Bạn có chắc muốn rời trận này?')
+        if (!isConfirm) return
         setLeaving(true)
         try {
             const res = await api.post(`/matches/${id}/leave`)
@@ -107,17 +112,18 @@ export default function MatchDetail() {
             if (balanceAfter !== null && balanceAfter !== undefined) {
                 detailLines.push(`Số dư hiện tại: ${Number(balanceAfter).toLocaleString('vi-VN')}đ`)
             }
-            alert(detailLines.join('\n'))
+            await showAlert(detailLines.join('\n'))
             loadMatch()
         } catch (err: any) {
-            alert(err.response?.data?.message || 'Không thể rời trận')
+            await showAlert(err.response?.data?.message || 'Không thể rời trận')
         } finally {
             setLeaving(false)
         }
     }
 
     const handleCancelMatch = async () => {
-        if (!confirm('Hủy trận sẽ hoàn tiền cho tất cả người đã thanh toán. Xác nhận hủy?')) return
+        const isConfirm = await showConfirm('Hủy trận sẽ hoàn tiền cho tất cả người đã thanh toán. Xác nhận hủy?')
+        if (!isConfirm) return
         setCancelling(true)
         try {
             const res = await api.post(`/matches/${id}/cancel`)
@@ -126,10 +132,10 @@ export default function MatchDetail() {
             const detailLines = [res.data.message]
             if (refundedCount > 0) detailLines.push(`Đã hoàn cho ${refundedCount} giao dịch`) 
             if (refundedAmount > 0) detailLines.push(`Tổng tiền hoàn: ${refundedAmount.toLocaleString('vi-VN')}đ`)
-            alert(detailLines.join('\n'))
+            await showAlert(detailLines.join('\n'))
             loadMatch()
         } catch (err: any) {
-            alert(err.response?.data?.message || 'Không thể hủy trận')
+            await showAlert(err.response?.data?.message || 'Không thể hủy trận')
         } finally {
             setCancelling(false)
         }

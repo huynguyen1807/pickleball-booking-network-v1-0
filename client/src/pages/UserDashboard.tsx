@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import api from '../api/axios'
 import styles from '../styles/Dashboard.module.css'
 import { useAuth } from '../context/AuthContext'
+import { useDialog } from '../context/DialogContext'
 import { formatDateVN, formatDateTimeVN, formatTimeHHmm } from '../utils/dateTime'
 
 type ActiveTab = 'bookings' | 'payments' | 'matches'
@@ -58,6 +59,7 @@ function StatusBadge({ status, map }: { status: string; map: Record<string, { la
 
 export default function UserDashboard() {
     const { user } = useAuth()
+    const { showAlert } = useDialog()
     const navigate = useNavigate()
     const [stats, setStats] = useState<any>(null)
     const [bookings, setBookings] = useState<any[]>([])
@@ -79,7 +81,7 @@ export default function UserDashboard() {
         const paymentLinkId = parts.length >= 3 ? parts.slice(2).join('_') : ''
 
         if (!paymentLinkId) {
-            alert('Không tìm thấy thông tin link thanh toán cho giao dịch này')
+            await showAlert('Không tìm thấy thông tin link thanh toán cho giao dịch này')
             return
         }
 
@@ -99,7 +101,7 @@ export default function UserDashboard() {
             window.location.href = checkoutUrl
         } catch (err: any) {
             console.error('Failed to redirect payment:', err)
-            alert(err?.response?.data?.message || 'Không thể chuyển đến trang thanh toán')
+            await showAlert(err?.response?.data?.message || 'Không thể chuyển đến trang thanh toán')
             setRedirectingPaymentId(null)
         }
     }

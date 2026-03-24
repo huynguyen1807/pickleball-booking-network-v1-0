@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { useDialog } from '../context/DialogContext'
 import api from '../api/axios'
 import { io as socketIO } from 'socket.io-client'
 import PostCard from '../components/PostCard'
@@ -12,6 +13,7 @@ const HOME_SCROLL_KEY = 'home_feed_scroll_y'
 
 export default function Home() {
     const { user } = useAuth()
+    const { showAlert } = useDialog()
     const navigate = useNavigate()
     const [filter, setFilter] = useState('latest')
     const [posts, setPosts] = useState([])
@@ -112,7 +114,7 @@ export default function Home() {
         const file = e.target.files?.[0]
         if (!file) return
         if (file.size > 5 * 1024 * 1024) {
-            alert('Ảnh quá lớn! Vui lòng chọn ảnh nhỏ hơn 5MB.')
+            void showAlert('Ảnh quá lớn! Vui lòng chọn ảnh nhỏ hơn 5MB.')
             return
         }
         const reader = new FileReader()
@@ -149,7 +151,7 @@ export default function Home() {
             setPostType('share')
             setPostImage(null)
         } catch (err: any) {
-            alert(err.response?.data?.message || 'Lỗi khi đăng bài')
+            await showAlert(err.response?.data?.message || 'Lỗi khi đăng bài')
         } finally {
             setPosting(false)
         }
