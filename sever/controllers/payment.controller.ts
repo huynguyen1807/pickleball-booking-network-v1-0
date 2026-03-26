@@ -5,6 +5,11 @@ import dotenv from 'dotenv';
 import { successResponse, errorResponse, serverError, webhookResponse } from '../utils/response';
 import { createNotification } from './notification.controller';
 import { getIO } from '../socket/index';
+import {
+    HOST_PAYMENT_WINDOW_MINUTES,
+    JOIN_PAYMENT_WINDOW_MINUTES,
+    syncMatchState
+} from '../utils/matchLifecycle';
 
 dotenv.config();
 
@@ -97,7 +102,9 @@ export const insertPayment = async (
     paymentMethod: string,
     orderCode: number,
     paymentLinkId: string,
-    status: string = 'pending'
+    status: string = 'pending',
+    paymentContext: string = 'booking',
+    expiresAt: Date | null = null
 ) => {
     const pool = await poolPromise;
     const commission = amount * 0.05;
@@ -108,13 +115,23 @@ export const insertPayment = async (
         .input('match_id', sql.Int, matchId || null)
         .input('amount', sql.Decimal(12, 2), amount)
         .input('commission', sql.Decimal(12, 2), commission)
+        .input('payment_context', sql.NVarChar, paymentContext)
         .input('payment_method', sql.NVarChar, paymentMethod)
         .input('status', sql.NVarChar, status)
+        .input('payment_link_id', sql.NVarChar, paymentLinkId)
+        .input('order_code', sql.BigInt, orderCode)
+        .input('expires_at', sql.DateTimeOffset, expiresAt)
         .input('transaction_id', sql.NVarChar, `${paymentMethod}_${orderCode}_${paymentLinkId}`)
         .query(`
-            INSERT INTO payments (user_id, booking_id, match_id, amount, commission, payment_method, status, transaction_id)
+            INSERT INTO payments (
+                user_id, booking_id, match_id, amount, commission, payment_context,
+                payment_method, status, payment_link_id, order_code, expires_at, transaction_id
+            )
             OUTPUT INSERTED.id
-            VALUES (@user_id, @booking_id, @match_id, @amount, @commission, @payment_method, @status, @transaction_id)
+            VALUES (
+                @user_id, @booking_id, @match_id, @amount, @commission, @payment_context,
+                @payment_method, @status, @payment_link_id, @order_code, @expires_at, @transaction_id
+            )
         `);
 
     return result.recordset[0]?.id;
@@ -186,6 +203,77 @@ const syncMatchPaymentState = async (paymentRecord: any, nextPaymentStatus: stri
     if (!matchId || !userId) return;
 
     const pool = await poolPromise;
+    const paymentContext = String(paymentRecord?.payment_context || '').toLowerCase();
+    const bookingId = toValidInt(paymentRecord?.booking_id);
+
+    if (paymentContext === 'host_match') {
+        if (nextPaymentStatus === 'completed') {
+            await pool.request()
+                .input('match_id', sql.Int, matchId)
+                .input('user_id', sql.Int, userId)
+                .query(`
+                    UPDATE match_players
+                    SET status = 'joined', payment_status = 'paid'
+                    WHERE match_id = @match_id
+                      AND user_id = @user_id
+                      AND status IN ('payment_pending', 'joined')
+                `);
+
+            if (bookingId) {
+                await pool.request()
+                    .input('booking_id', sql.Int, bookingId)
+                    .query(`
+                        UPDATE bookings
+                        SET status = 'confirmed'
+                        WHERE id = @booking_id
+                          AND status IN ('pending', 'payment_pending')
+                    `);
+            }
+
+            await pool.request()
+                .input('match_id', sql.Int, matchId)
+                .query(`
+                    UPDATE matches
+                    SET status = 'open'
+                    WHERE id = @match_id AND status = 'pending_host_payment'
+                `);
+        } else if (['failed', 'cancelled', 'expired'].includes(nextPaymentStatus)) {
+            await pool.request()
+                .input('match_id', sql.Int, matchId)
+                .input('user_id', sql.Int, userId)
+                .input('payment_status', sql.NVarChar, nextPaymentStatus)
+                .query(`
+                    UPDATE match_players
+                    SET status = 'expired', payment_status = @payment_status
+                    WHERE match_id = @match_id
+                      AND user_id = @user_id
+                      AND status = 'payment_pending'
+                `);
+
+            if (bookingId) {
+                await pool.request()
+                    .input('booking_id', sql.Int, bookingId)
+                    .input('status', sql.NVarChar, nextPaymentStatus === 'expired' ? 'expired' : 'cancelled')
+                    .query(`
+                        UPDATE bookings
+                        SET status = @status
+                        WHERE id = @booking_id
+                          AND status IN ('pending', 'payment_pending')
+                    `);
+            }
+
+            await pool.request()
+                .input('match_id', sql.Int, matchId)
+                .query(`
+                    UPDATE matches
+                    SET status = 'cancelled'
+                    WHERE id = @match_id AND status = 'pending_host_payment'
+                `);
+        }
+
+        await syncMatchState(matchId);
+        return;
+    }
 
     if (nextPaymentStatus === 'completed') {
         await pool.request()
@@ -193,25 +281,102 @@ const syncMatchPaymentState = async (paymentRecord: any, nextPaymentStatus: stri
             .input('user_id', sql.Int, userId)
             .query(`
                 UPDATE match_players
-                SET payment_status = 'paid'
+                SET status = 'joined', payment_status = 'paid'
                 WHERE match_id = @match_id
                   AND user_id = @user_id
-                  AND status = 'joined'
+                  AND status IN ('payment_pending', 'joined')
             `);
     } else if (['failed', 'cancelled', 'expired'].includes(nextPaymentStatus)) {
         await pool.request()
             .input('match_id', sql.Int, matchId)
             .input('user_id', sql.Int, userId)
+            .input('payment_status', sql.NVarChar, nextPaymentStatus)
             .query(`
                 UPDATE match_players
-                SET payment_status = 'pending'
+                SET status = 'expired', payment_status = @payment_status
                 WHERE match_id = @match_id
                   AND user_id = @user_id
-                  AND status = 'joined'
+                  AND status = 'payment_pending'
             `);
     }
 
-    await recalcMatchStatus(matchId);
+    await syncMatchState(matchId);
+};
+
+export const createPayOSPaymentSession = async (params: {
+    userId: number;
+    bookingId?: number | null;
+    matchId?: number | null;
+    amount: number;
+    paymentContext: 'booking' | 'host_match' | 'join_match';
+    expiresInMinutes: number;
+    description: string;
+}) => {
+    const {
+        userId,
+        bookingId = null,
+        matchId = null,
+        amount,
+        paymentContext,
+        expiresInMinutes,
+        description
+    } = params;
+
+    const orderCode = generateOrderCode();
+    const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000);
+    const payosData = {
+        orderCode,
+        amount: Math.round(amount),
+        description,
+        returnUrl: PAYOS_RETURN_URL,
+        cancelUrl: PAYOS_CANCEL_URL
+    };
+
+    const sorted = sortParams(payosData);
+    const queryString = createQueryString(sorted);
+    const signature = calculatePayOSSignature(queryString, PAYOS_CHECKSUM_KEY);
+
+    const payosResponse = await axios.post(
+        `${PAYOS_API_URL}/v2/payment-requests`,
+        { ...payosData, signature },
+        {
+            headers: {
+                'x-client-id': PAYOS_CLIENT_ID,
+                'x-api-key': PAYOS_API_KEY,
+                'Content-Type': 'application/json'
+            }
+        }
+    );
+
+    if (payosResponse.data.code !== '00') {
+        throw new Error(payosResponse.data?.desc || 'Không thể tạo link thanh toán');
+    }
+
+    const paymentData = payosResponse.data.data;
+    const paymentId = await insertPayment(
+        userId,
+        bookingId,
+        matchId,
+        Math.round(amount),
+        'payos',
+        orderCode,
+        paymentData.paymentLinkId,
+        'pending',
+        paymentContext,
+        expiresAt
+    );
+
+    return {
+        paymentId,
+        checkoutUrl: paymentData.checkoutUrl,
+        qrCode: paymentData.qrCode,
+        amount: paymentData.amount,
+        orderCode: paymentData.orderCode,
+        paymentLinkId: paymentData.paymentLinkId,
+        status: paymentData.status,
+        expiresAt: expiresAt.toISOString(),
+        expiresInSeconds: expiresInMinutes * 60
+    };
 };
 
 // ===== Public Functions =====
@@ -264,16 +429,18 @@ export const payosInit = async (req: any, res: any) => {
     try {
         const { booking_id, match_id } = req.body;
         const pool = await poolPromise;
-        let paymentDescription = '';
         const bookingId = booking_id ? Number(booking_id) : null;
         const matchId = match_id ? Number(match_id) : null;
-
-        // Kiểm tra booking hoặc match
         let amount = 0;
+        let paymentDescription = '';
+        let paymentContext: 'booking' | 'host_match' | 'join_match' = 'booking';
+        let resolvedBookingId = bookingId;
+        let resolvedMatchId = matchId;
+
         if (bookingId) {
             const booking = await pool.request()
-            .input('id', sql.Int, bookingId)
-                .query('SELECT user_id, total_price FROM bookings WHERE id = @id');
+                .input('id', sql.Int, bookingId)
+                .query('SELECT user_id, total_price, status FROM bookings WHERE id = @id');
 
             if (booking.recordset.length === 0) {
                 return res.status(404).json({ message: 'Booking không tồn tại' });
@@ -283,87 +450,65 @@ export const payosInit = async (req: any, res: any) => {
                 return res.status(403).json({ message: 'Không có quyền' });
             }
 
+             if (!['pending', 'payment_pending'].includes(String(booking.recordset[0].status || '').toLowerCase())) {
+                return res.status(400).json({ message: 'Booking này không còn chờ thanh toán' });
+            }
+
             amount = booking.recordset[0].total_price;
             paymentDescription = generatePaymentDescription('booking', bookingId);
         } else if (matchId) {
-            // Handle match payment
             const match = await pool.request()
                 .input('id', sql.Int, matchId)
-                .query('SELECT total_cost, max_players FROM matches WHERE id = @id');
+                .input('user_id', sql.Int, req.user.id)
+                .query(`
+                    SELECT
+                        m.id,
+                        m.booking_id,
+                        m.creator_id,
+                        m.status,
+                        mp.amount_due,
+                        mp.status AS player_status,
+                        mp.payment_status
+                    FROM matches m
+                    LEFT JOIN match_players mp ON mp.match_id = m.id AND mp.user_id = @user_id
+                    WHERE m.id = @id
+                `);
 
             if (match.recordset.length === 0) {
                 return res.status(404).json({ message: 'Match không tồn tại' });
             }
 
-            const { total_cost, max_players } = match.recordset[0];
-            amount = total_cost / (max_players || 4); // Chia theo số người chơi thực tế
-            paymentDescription = generatePaymentDescription('match', matchId);
+            const row = match.recordset[0];
+            if (Number(row.creator_id) === Number(req.user.id) && String(row.status || '').toLowerCase() === 'pending_host_payment') {
+                paymentContext = 'host_match';
+                resolvedBookingId = toValidInt(row.booking_id);
+                amount = Number(row.amount_due || 0);
+                paymentDescription = generatePaymentDescription('match', matchId);
+            } else if (String(row.player_status || '').toLowerCase() === 'payment_pending') {
+                paymentContext = 'join_match';
+                amount = Number(row.amount_due || 0);
+                paymentDescription = generatePaymentDescription('match', matchId);
+            } else {
+                return res.status(400).json({ message: 'Không có phiên thanh toán hợp lệ cho trận này' });
+            }
         } else {
             return res.status(400).json({ message: 'Cần booking_id hoặc match_id' });
         }
 
-        // Sinh order code
-        const orderCode = generateOrderCode();
-
-        // Prepare PayOS params
-        const payosData = {
-            orderCode,
-            amount: Math.round(amount),
-            description: paymentDescription || generateRandomDescription(),
-            returnUrl: PAYOS_RETURN_URL,
-            cancelUrl: PAYOS_CANCEL_URL
-        };
-
-        // Sắp xếp và tạo signature
-        const sorted = sortParams(payosData);
-        const queryString = createQueryString(sorted);
-        const signature = calculatePayOSSignature(queryString, PAYOS_CHECKSUM_KEY);
-
-        // Call PayOS API
-        const payosPayload = {
-            ...payosData,
-            signature
-        };
-
-        const payosResponse = await axios.post(
-            `${PAYOS_API_URL}/v2/payment-requests`,
-            payosPayload,
-            {
-                headers: {
-                    'x-client-id': PAYOS_CLIENT_ID,
-                    'x-api-key': PAYOS_API_KEY,
-                    'Content-Type': 'application/json'
-                }
-            }
-        );
-
-        if (payosResponse.data.code !== '00') {
-            return errorResponse(res, 'Không thể tạo link thanh toán', payosResponse.data.desc);
-        }
-
-        const paymentData = payosResponse.data.data;
-
-        // Lưu payment record
-        const paymentId = await insertPayment(
-            req.user.id,
-            bookingId,
-            matchId,
-            Math.round(amount),
-            'payos',
-            orderCode,
-            paymentData.paymentLinkId,
-            'pending'
-        );
+        const paymentData = await createPayOSPaymentSession({
+            userId: req.user.id,
+            bookingId: resolvedBookingId,
+            matchId: resolvedMatchId,
+            amount,
+            paymentContext,
+            expiresInMinutes: paymentContext === 'booking' ? 15 : (paymentContext === 'host_match' ? HOST_PAYMENT_WINDOW_MINUTES : JOIN_PAYMENT_WINDOW_MINUTES),
+            description: paymentDescription || generateRandomDescription()
+        });
 
         return successResponse(res, {
-            paymentId,
             data: {
-                checkoutUrl: paymentData.checkoutUrl,
-                qrCode: paymentData.qrCode,
-                amount: paymentData.amount,
-                orderCode: paymentData.orderCode,
-                paymentLinkId: paymentData.paymentLinkId,
-                status: paymentData.status
+                ...paymentData,
+                paymentContext
             }
         }, 'Khởi tạo PayOS thành công');
     } catch (err: any) {
@@ -418,26 +563,15 @@ export const payosWebhook = async (req: any, res: any) => {
 
         if (data?.paymentLinkId) {
             const byLink = await pool.request()
-                .input('transaction_suffix', sql.NVarChar, `%_${data.paymentLinkId}`)
-                .query(`
-                    SELECT TOP 1 p.*
-                    FROM payments p
-                    WHERE p.transaction_id LIKE @transaction_suffix
-                    ORDER BY p.created_at DESC
-                `);
+                .input('payment_link_id', sql.NVarChar, data.paymentLinkId)
+                .query(`SELECT TOP 1 p.* FROM payments p WHERE p.payment_link_id = @payment_link_id ORDER BY p.created_at DESC`);
             paymentRecord = byLink.recordset[0] || null;
         }
 
         if (!paymentRecord && data?.orderCode) {
-            const transactionPattern = `payos_${data.orderCode}_%`;
             const byOrderCode = await pool.request()
-                .input('transaction_pattern', sql.NVarChar, transactionPattern)
-                .query(`
-                    SELECT TOP 1 p.*
-                    FROM payments p
-                    WHERE p.transaction_id LIKE @transaction_pattern
-                    ORDER BY p.created_at DESC
-                `);
+                .input('order_code', sql.BigInt, Number(data.orderCode))
+                .query(`SELECT TOP 1 p.* FROM payments p WHERE p.order_code = @order_code ORDER BY p.created_at DESC`);
             paymentRecord = byOrderCode.recordset[0] || null;
         }
 
@@ -456,17 +590,18 @@ export const payosWebhook = async (req: any, res: any) => {
 
         const bookingId = toValidInt(paymentRecord.booking_id);
         const matchId = toValidInt(paymentRecord.match_id);
+        const paymentContext = String(paymentRecord.payment_context || 'booking').toLowerCase();
 
         if (isSuccess) {
             await updatePaymentStatus(paymentRecord.id, 'completed');
 
-            if (bookingId) {
+            if (bookingId && paymentContext === 'booking') {
                 await pool.request()
                     .input('booking_id', sql.Int, bookingId)
                     .query(`
                         UPDATE bookings
                         SET status = 'confirmed'
-                        WHERE id = @booking_id AND status = 'pending'
+                        WHERE id = @booking_id AND status IN ('pending', 'payment_pending')
                     `);
                 
                 // Notify user about booking confirmation
@@ -519,7 +654,7 @@ export const payosWebhook = async (req: any, res: any) => {
                     await createNotification(
                         paymentRecord.user_id,
                         '✅ Thanh toán ghép trận thành công',
-                        `Chỉ số chuyến "${name}" ngày ${match_date} lúc ${start_time} - Sẵn sàng chơi!`,
+                        `Thanh toán cho trận tại "${name}" ngày ${match_date} lúc ${start_time} đã thành công.`,
                         'match_payment_confirmed',
                         matchId
                     );
@@ -547,13 +682,13 @@ export const payosWebhook = async (req: any, res: any) => {
         } else {
             await updatePaymentStatus(paymentRecord.id, 'failed');
 
-            if (bookingId) {
+            if (bookingId && paymentContext === 'booking') {
                 await pool.request()
                     .input('booking_id', sql.Int, bookingId)
                     .query(`
                         UPDATE bookings
                         SET status = 'cancelled'
-                        WHERE id = @booking_id AND status = 'pending'
+                        WHERE id = @booking_id AND status IN ('pending', 'payment_pending')
                     `);
             } else if (paymentRecord.booking_id !== null && paymentRecord.booking_id !== undefined) {
                 console.warn('PayOS Webhook: skip booking cancel sync due to invalid booking_id', {
@@ -628,13 +763,12 @@ export const payosCheckStatus = async (req: any, res: any) => {
     try {
         const { orderCode } = req.params;
         const pool = await poolPromise;
-        const transactionPattern = `payos_${orderCode}_%`;
         const latest = await pool.request()
-            .input('transaction_pattern', sql.NVarChar, transactionPattern)
+            .input('order_code', sql.BigInt, Number(orderCode))
             .query(`
-                SELECT TOP 1 id, user_id, booking_id, match_id, status, amount
+                SELECT TOP 1 id, user_id, booking_id, match_id, status, amount, expires_at
                 FROM payments
-                WHERE transaction_id LIKE @transaction_pattern
+                WHERE order_code = @order_code
                 ORDER BY created_at DESC
             `);
 
@@ -649,7 +783,8 @@ export const payosCheckStatus = async (req: any, res: any) => {
 
         return successResponse(res, {
             status: payment.status,
-            amount: payment.amount
+            amount: payment.amount,
+            expiresAt: payment.expires_at
         });
     } catch (err: any) {
         return serverError(res, 'Lỗi server', err);
@@ -716,11 +851,11 @@ export const payosCancelPayment = async (req: any, res: any) => {
         // Update payment status + sync booking/match state
         const pool = await poolPromise;
         const payment = await pool.request()
-            .input('transaction_id', sql.NVarChar, `payos_%${paymentLinkId}`)
+            .input('payment_link_id', sql.NVarChar, paymentLinkId)
             .query(`
-                SELECT TOP 1 id, user_id, booking_id, match_id, status
+                SELECT TOP 1 id, user_id, booking_id, match_id, status, payment_context
                 FROM payments
-                WHERE transaction_id LIKE @transaction_id
+                WHERE payment_link_id = @payment_link_id
                 ORDER BY created_at DESC
             `);
 
@@ -731,10 +866,10 @@ export const payosCancelPayment = async (req: any, res: any) => {
                 await updatePaymentStatus(record.id, 'cancelled');
             }
 
-            if (record.booking_id) {
+                if (record.booking_id && String(record.payment_context || '').toLowerCase() === 'booking') {
                 await pool.request()
                     .input('id', sql.Int, record.booking_id)
-                    .query(`UPDATE bookings SET status = 'cancelled' WHERE id = @id AND status = 'pending'`);
+                    .query(`UPDATE bookings SET status = 'cancelled' WHERE id = @id AND status IN ('pending', 'payment_pending')`);
             }
 
             await syncMatchPaymentState(record, 'cancelled');
@@ -762,15 +897,13 @@ export const payosCancelReturn = async (req: any, res: any) => {
     try {
         if (orderCode) {
             const pool = await poolPromise;
-            const transactionPattern = `payos_${orderCode}_%`;
-
             // Tìm và cập nhật payment + booking/match thành cancelled
             const payment = await pool.request()
-                .input('transaction_pattern', sql.NVarChar, transactionPattern)
+                .input('order_code', sql.BigInt, Number(orderCode))
                 .query(`
-                    SELECT TOP 1 id, booking_id, match_id, user_id
+                    SELECT TOP 1 id, booking_id, match_id, user_id, payment_context
                     FROM payments
-                    WHERE transaction_id LIKE @transaction_pattern AND status = 'pending'
+                    WHERE order_code = @order_code AND status = 'pending'
                     ORDER BY created_at DESC
                 `);
 
@@ -779,18 +912,18 @@ export const payosCancelReturn = async (req: any, res: any) => {
 
                 await updatePaymentStatus(record.id, 'cancelled');
 
-                if (record.booking_id) {
+                if (record.booking_id && String(record.payment_context || '').toLowerCase() === 'booking') {
                     const bk = await pool.request()
                         .input('id', sql.Int, record.booking_id)
                         .query(`
                             SELECT court_id, booking_date, start_time, end_time
                             FROM bookings
-                            WHERE id = @id AND status = 'pending'
+                            WHERE id = @id AND status IN ('pending', 'payment_pending')
                         `);
 
                     await pool.request()
                         .input('id', sql.Int, record.booking_id)
-                        .query(`UPDATE bookings SET status = 'cancelled' WHERE id = @id AND status = 'pending'`);
+                        .query(`UPDATE bookings SET status = 'cancelled' WHERE id = @id AND status IN ('pending', 'payment_pending')`);
 
                     // Trả court_slots về trạng thái trống
                     if (bk.recordset.length > 0) {
@@ -837,14 +970,12 @@ export const payosCancelByOrderCode = async (req: any, res: any) => {
             : 'cancelled';
 
         const pool = await poolPromise;
-        const transactionPattern = `payos_${orderCode}_%`;
-
         const payment = await pool.request()
-            .input('pattern', sql.NVarChar, transactionPattern)
+            .input('order_code', sql.BigInt, Number(orderCode))
             .query(`
-                SELECT TOP 1 id, booking_id, match_id, user_id, status
+                SELECT TOP 1 id, booking_id, match_id, user_id, status, payment_context
                 FROM payments
-                WHERE transaction_id LIKE @pattern
+                WHERE order_code = @order_code
                 ORDER BY created_at DESC
             `);
 
@@ -859,15 +990,15 @@ export const payosCancelByOrderCode = async (req: any, res: any) => {
 
         await updatePaymentStatus(record.id, targetStatus);
 
-        if (record.booking_id) {
+        if (record.booking_id && String(record.payment_context || '').toLowerCase() === 'booking') {
             // Lấy thông tin booking để trả slot
             const bk = await pool.request()
                 .input('id', sql.Int, record.booking_id)
-                .query('SELECT court_id, booking_date, start_time, end_time FROM bookings WHERE id = @id AND status = \'pending\'');
+                .query('SELECT court_id, booking_date, start_time, end_time FROM bookings WHERE id = @id AND status IN (\'pending\', \'payment_pending\')');
 
             await pool.request()
                 .input('id', sql.Int, record.booking_id)
-                .query(`UPDATE bookings SET status = 'cancelled' WHERE id = @id AND status = 'pending'`);
+                .query(`UPDATE bookings SET status = 'cancelled' WHERE id = @id AND status IN ('pending', 'payment_pending')`);
 
             // Trả court_slots về trạng thái trống
             if (bk.recordset.length > 0) {
@@ -903,31 +1034,20 @@ export const cancelExpiredPayments = async (): Promise<void> => {
     try {
         const pool = await poolPromise;
 
-        // Cancel associated bookings first (while join is still valid)
-        await pool.request().query(`
-            UPDATE b SET b.status = 'cancelled'
-            FROM bookings b
-            INNER JOIN payments p ON p.booking_id = b.id
-            WHERE p.status = 'pending'
-              AND p.transaction_id LIKE 'payos_%'
-              AND p.created_at < DATEADD(MINUTE, -15, GETDATE())
-              AND b.status = 'pending'
-        `);
-
         const expiredPayments = await pool.request().query(`
-            SELECT id, user_id, booking_id, match_id
+                        SELECT id, user_id, booking_id, match_id, payment_context
             FROM payments
             WHERE status = 'pending'
-              AND transaction_id LIKE 'payos_%'
-              AND created_at < DATEADD(MINUTE, -15, GETDATE())
+                            AND expires_at IS NOT NULL
+                            AND expires_at < SYSDATETIMEOFFSET()
         `);
 
         // Mark expired payments as expired (not cancelled — user didn't cancel)
         const result = await pool.request().query(`
             UPDATE payments SET status = 'expired'
             WHERE status = 'pending'
-              AND transaction_id LIKE 'payos_%'
-              AND created_at < DATEADD(MINUTE, -15, GETDATE())
+                            AND expires_at IS NOT NULL
+                            AND expires_at < SYSDATETIMEOFFSET()
         `);
 
         for (const record of expiredPayments.recordset) {

@@ -101,8 +101,8 @@ CREATE TABLE courts (
   price_per_hour DECIMAL(12,2) DEFAULT 0.00,
   peak_start_time DATETIME NULL,
   peak_end_time DATETIME NULL,
-  peak_price_per_hour DECIMAL(12,2) DEFAULT 0.00,
-  weekend_price_per_hour DECIMAL(12,2) DEFAULT 0.00,
+  peak_price DECIMAL(12,2) DEFAULT 0.00,
+  weekend_price DECIMAL(12,2) DEFAULT 0.00,
   min_booking_minutes INT DEFAULT 30,
   slot_step_minutes INT DEFAULT 15,
   created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
@@ -121,8 +121,8 @@ CREATE TABLE sub_courts (
   price_per_hour DECIMAL(12,2) DEFAULT 0.00,
   peak_start_time TIMESTAMP NULL,
   peak_end_time TIMESTAMP NULL,
-  peak_price_per_hour DECIMAL(12,2) DEFAULT 0.00,
-  weekend_price_per_hour DECIMAL(12,2) DEFAULT 0.00,
+  peak_price DECIMAL(12,2) DEFAULT 0.00,
+  weekend_price DECIMAL(12,2) DEFAULT 0.00,
   min_booking_minutes INT DEFAULT 30,
   slot_step_minutes INT DEFAULT 15,
   created_at DATETIME DEFAULT GETDATE(),
@@ -143,12 +143,12 @@ IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('sub_courts
   ALTER TABLE sub_courts ADD peak_end_time TIME NULL;
 GO
 
-IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('sub_courts') AND name = 'peak_price_per_hour')
-  ALTER TABLE sub_courts ADD peak_price_per_hour DECIMAL(12,2) DEFAULT 0.00;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('sub_courts') AND name = 'peak_price')
+  ALTER TABLE sub_courts ADD peak_price DECIMAL(12,2) DEFAULT 0.00;
 GO
 
-IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('sub_courts') AND name = 'weekend_price_per_hour')
-  ALTER TABLE sub_courts ADD weekend_price_per_hour DECIMAL(12,2) DEFAULT 0.00;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('sub_courts') AND name = 'weekend_price')
+  ALTER TABLE sub_courts ADD weekend_price DECIMAL(12,2) DEFAULT 0.00;
 GO
 
 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('sub_courts') AND name = 'min_booking_minutes')
@@ -233,7 +233,7 @@ CREATE TABLE bookings (
   total_price DECIMAL(12,2) NOT NULL,
   commission_rate DECIMAL(4,2) DEFAULT 0.05,
   commission_amount DECIMAL(12,2),
-  status NVARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending','confirmed','cancelled','completed')),
+  status NVARCHAR(20) DEFAULT 'payment_pending' CHECK (status IN ('pending','payment_pending','confirmed','cancelled','completed','expired')),
   payment_method NVARCHAR(50),
   created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
 );
@@ -245,15 +245,17 @@ CREATE TABLE matches (
   id INT IDENTITY(1,1) PRIMARY KEY,
   creator_id INT NOT NULL FOREIGN KEY REFERENCES users(id),
   court_id INT NOT NULL FOREIGN KEY REFERENCES courts(id),
+  booking_id INT NULL FOREIGN KEY REFERENCES bookings(id),
   court_slot_id INT FOREIGN KEY REFERENCES court_slots(id),
   match_date DATE NOT NULL,
   start_time TIME NOT NULL,
   end_time TIME NOT NULL,
   max_players INT DEFAULT 4,
+  min_players INT DEFAULT 2,
   current_players INT DEFAULT 1,
   total_cost DECIMAL(12,2) NOT NULL,
   commission_rate DECIMAL(4,2) DEFAULT 0.05,
-  status NVARCHAR(20) DEFAULT 'waiting' CHECK (status IN ('waiting','confirmed','completed','cancelled')),
+  status NVARCHAR(20) DEFAULT 'pending_host_payment' CHECK (status IN ('waiting','pending_host_payment','open','full','confirmed','completed','finished','cancelled','expired')),
   created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
 );
 GO
@@ -264,8 +266,8 @@ CREATE TABLE match_players (
   id INT IDENTITY(1,1) PRIMARY KEY,
   match_id INT NOT NULL FOREIGN KEY REFERENCES matches(id) ON DELETE CASCADE,
   user_id INT NOT NULL FOREIGN KEY REFERENCES users(id),
-  status NVARCHAR(20) DEFAULT 'joined' CHECK (status IN ('joined','left')),
-  payment_status NVARCHAR(20) DEFAULT 'pending' CHECK (payment_status IN ('pending','paid')),
+  status NVARCHAR(20) DEFAULT 'payment_pending' CHECK (status IN ('payment_pending','joined','waitlist','left','expired')),
+  payment_status NVARCHAR(20) DEFAULT 'pending' CHECK (payment_status IN ('pending','paid','failed','expired','cancelled','refunded','partial_refunded')),
   amount_due DECIMAL(12,2),
   created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
 );
@@ -279,10 +281,15 @@ CREATE TABLE payments (
   booking_id INT FOREIGN KEY REFERENCES bookings(id),
   match_id INT FOREIGN KEY REFERENCES matches(id),
   amount DECIMAL(12,2) NOT NULL,
+  refunded_amount DECIMAL(12,2) DEFAULT 0,
   commission DECIMAL(12,2) DEFAULT 0,
+  payment_context NVARCHAR(50) DEFAULT 'booking',
   payment_method NVARCHAR(50) DEFAULT 'mock',
+  payment_link_id NVARCHAR(100),
+  order_code BIGINT NULL,
+  expires_at DATETIMEOFFSET NULL,
   transaction_id NVARCHAR(100) UNIQUE,
-  status NVARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending','completed','failed','refunded','cancelled','expired')),
+  status NVARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending','completed','failed','refunded','partial_refunded','cancelled','expired')),
   created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
 );
 GO
@@ -361,4 +368,130 @@ GO
 
 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('users') AND name = 'locked_until')
     ALTER TABLE users ADD locked_until DATETIMEOFFSET NULL;
+GO
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('matches') AND name = 'booking_id')
+  ALTER TABLE matches ADD booking_id INT NULL;
+GO
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('matches') AND name = 'min_players')
+  ALTER TABLE matches ADD min_players INT NOT NULL CONSTRAINT DF_matches_min_players DEFAULT(2);
+GO
+
+IF NOT EXISTS (
+  SELECT 1 FROM sys.foreign_keys
+  WHERE name = 'FK_matches_booking_id' AND parent_object_id = OBJECT_ID('matches')
+)
+  ALTER TABLE matches ADD CONSTRAINT FK_matches_booking_id FOREIGN KEY (booking_id) REFERENCES bookings(id);
+GO
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('payments') AND name = 'refunded_amount')
+  ALTER TABLE payments ADD refunded_amount DECIMAL(12,2) NOT NULL CONSTRAINT DF_payments_refunded_amount DEFAULT(0);
+GO
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('payments') AND name = 'payment_context')
+  ALTER TABLE payments ADD payment_context NVARCHAR(50) NOT NULL CONSTRAINT DF_payments_payment_context DEFAULT('booking');
+GO
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('payments') AND name = 'payment_link_id')
+  ALTER TABLE payments ADD payment_link_id NVARCHAR(100) NULL;
+GO
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('payments') AND name = 'order_code')
+  ALTER TABLE payments ADD order_code BIGINT NULL;
+GO
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('payments') AND name = 'expires_at')
+  ALTER TABLE payments ADD expires_at DATETIMEOFFSET NULL;
+GO
+
+DECLARE @bookingStatusConstraint NVARCHAR(200);
+WHILE 1 = 1
+BEGIN
+  SELECT TOP 1 @bookingStatusConstraint = cc.name
+  FROM sys.check_constraints cc
+  WHERE cc.parent_object_id = OBJECT_ID('bookings')
+    AND cc.definition LIKE '%[[]status[]]%';
+
+  IF @bookingStatusConstraint IS NULL BREAK;
+  EXEC('ALTER TABLE bookings DROP CONSTRAINT [' + @bookingStatusConstraint + ']');
+END
+GO
+
+ALTER TABLE bookings
+ADD CONSTRAINT CK_bookings_status
+CHECK (status IN ('pending','payment_pending','confirmed','cancelled','completed','expired'));
+GO
+
+DECLARE @matchStatusConstraintCurrent NVARCHAR(200);
+WHILE 1 = 1
+BEGIN
+  SELECT TOP 1 @matchStatusConstraintCurrent = cc.name
+  FROM sys.check_constraints cc
+  WHERE cc.parent_object_id = OBJECT_ID('matches')
+    AND cc.definition LIKE '%[[]status[]]%';
+
+  IF @matchStatusConstraintCurrent IS NULL BREAK;
+  EXEC('ALTER TABLE matches DROP CONSTRAINT [' + @matchStatusConstraintCurrent + ']');
+END
+GO
+
+ALTER TABLE matches
+ADD CONSTRAINT CK_matches_status_v2
+CHECK (status IN ('waiting','pending_host_payment','open','full','confirmed','completed','finished','cancelled','expired'));
+GO
+
+DECLARE @matchPlayersStatusConstraint NVARCHAR(200);
+WHILE 1 = 1
+BEGIN
+  SELECT TOP 1 @matchPlayersStatusConstraint = cc.name
+  FROM sys.check_constraints cc
+  WHERE cc.parent_object_id = OBJECT_ID('match_players')
+    AND cc.definition LIKE '%[[]status[]]%'
+    AND cc.definition NOT LIKE '%[[]payment_status[]]%';
+
+  IF @matchPlayersStatusConstraint IS NULL BREAK;
+  EXEC('ALTER TABLE match_players DROP CONSTRAINT [' + @matchPlayersStatusConstraint + ']');
+END
+GO
+
+ALTER TABLE match_players
+ADD CONSTRAINT CK_match_players_status_v2
+CHECK (status IN ('payment_pending','joined','waitlist','left','expired'));
+GO
+
+DECLARE @matchPlayersPaymentStatusConstraint NVARCHAR(200);
+WHILE 1 = 1
+BEGIN
+  SELECT TOP 1 @matchPlayersPaymentStatusConstraint = cc.name
+  FROM sys.check_constraints cc
+  WHERE cc.parent_object_id = OBJECT_ID('match_players')
+    AND cc.definition LIKE '%[[]payment_status[]]%';
+
+  IF @matchPlayersPaymentStatusConstraint IS NULL BREAK;
+  EXEC('ALTER TABLE match_players DROP CONSTRAINT [' + @matchPlayersPaymentStatusConstraint + ']');
+END
+GO
+
+ALTER TABLE match_players
+ADD CONSTRAINT CK_match_players_payment_status_v2
+CHECK (payment_status IN ('pending','paid','failed','expired','cancelled','refunded','partial_refunded'));
+GO
+
+DECLARE @paymentsStatusConstraint NVARCHAR(200);
+WHILE 1 = 1
+BEGIN
+  SELECT TOP 1 @paymentsStatusConstraint = cc.name
+  FROM sys.check_constraints cc
+  WHERE cc.parent_object_id = OBJECT_ID('payments')
+    AND cc.definition LIKE '%[[]status[]]%';
+
+  IF @paymentsStatusConstraint IS NULL BREAK;
+  EXEC('ALTER TABLE payments DROP CONSTRAINT [' + @paymentsStatusConstraint + ']');
+END
+GO
+
+ALTER TABLE payments
+ADD CONSTRAINT CK_payments_status_v2
+CHECK (status IN ('pending','completed','failed','refunded','partial_refunded','cancelled','expired'));
 GO

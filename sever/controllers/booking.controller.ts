@@ -1,7 +1,9 @@
 import { sql, poolPromise } from '../config/db';
 import dotenv from 'dotenv';
+import { getHoursUntilStart, getScheduleConflictMessage, getUserScheduleConflict } from '../utils/matchLifecycle';
 dotenv.config();
 const COMMISSION = parseFloat(process.env.COMMISSION_RATE) || 0.05;
+const MIN_ADVANCE_HOURS = 1;
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -24,8 +26,17 @@ export const createBooking = async (req, res) => {
             return res.status(400).json({ message: 'Thiếu thông tin đặt sân' });
         }
 
+        if (getHoursUntilStart(booking_date, start_time) < MIN_ADVANCE_HOURS) {
+            return res.status(400).json({ message: `Thời gian bắt đầu booking phải cách hiện tại ít nhất ${MIN_ADVANCE_HOURS} giờ` });
+        }
+
         const pool = await poolPromise;
         const isPayOS = payment_method === 'payos';
+
+        const scheduleConflict = await getUserScheduleConflict(pool, Number(req.user.id), booking_date, start_time, end_time);
+        if (scheduleConflict) {
+            return res.status(409).json({ message: getScheduleConflictMessage(scheduleConflict) });
+        }
 
         // 1. Lấy thông tin sân
         const courtQuery = await pool.request()
@@ -39,6 +50,9 @@ export const createBooking = async (req, res) => {
         // 2. Tính giá
         const startH = parseFloat(start_time.split(':')[0]) + parseFloat(start_time.split(':')[1]) / 60;
         const endH = parseFloat(end_time.split(':')[0]) + parseFloat(end_time.split(':')[1]) / 60;
+        if (endH <= startH) {
+            return res.status(400).json({ message: 'Giờ kết thúc phải sau giờ bắt đầu' });
+        }
         const peakStartH = extractTimeH(court.peak_start_time);
         const peakEndH = extractTimeH(court.peak_end_time);
 
@@ -52,7 +66,7 @@ export const createBooking = async (req, res) => {
         const regularHours = (endH - startH) - peakHours;
         const total = Math.round(regularHours * court.price_per_hour + peakHours * (court.peak_price || court.price_per_hour));
         const commission = Math.round(total * COMMISSION);
-        const bookingStatus = isPayOS ? 'pending' : 'confirmed';
+        const bookingStatus = isPayOS ? 'payment_pending' : 'confirmed';
 
         // 3. Transaction + lock để chống race condition
         const transaction = pool.transaction();
@@ -70,7 +84,7 @@ export const createBooking = async (req, res) => {
                     FROM bookings WITH (UPDLOCK, HOLDLOCK)
                     WHERE court_id     = @court_id
                       AND booking_date = @booking_date
-                      AND status IN ('confirmed', 'pending')
+                        AND status IN ('confirmed', 'pending', 'payment_pending')
                       AND start_time   < @end_time
                       AND end_time     > @start_time
                 `);
@@ -116,8 +130,8 @@ export const createBooking = async (req, res) => {
                     .input('commission', sql.Decimal(12, 2), commission)
                     .input('payment_method', sql.NVarChar, payment_method || 'mock')
                     .query(`
-                        INSERT INTO payments (user_id, booking_id, amount, commission, payment_method, status)
-                        VALUES (@user_id, @booking_id, @amount, @commission, @payment_method, 'completed')
+                        INSERT INTO payments (user_id, booking_id, amount, commission, payment_context, payment_method, status)
+                        VALUES (@user_id, @booking_id, @amount, @commission, 'booking', @payment_method, 'completed')
                     `);
             }
 
@@ -219,7 +233,7 @@ export const cancelBooking = async (req, res) => {
         const b = booking.recordset[0];
         if (b.user_id !== req.user.id)
             return res.status(403).json({ message: 'Không có quyền' });
-        if (b.status !== 'pending' && b.status !== 'confirmed')
+        if (!['pending', 'payment_pending', 'confirmed'].includes(String(b.status || '').toLowerCase()))
             return res.status(400).json({ message: 'Không thể hủy booking này' });
 
         await pool.request()
@@ -249,7 +263,7 @@ export const getBookedSlots = async (req, res) => {
                 FROM bookings
                 WHERE court_id     = @court_id
                   AND booking_date = @booking_date
-                  AND status IN ('confirmed', 'pending')
+                  AND status IN ('confirmed', 'pending', 'payment_pending')
             `);
         res.json(result.recordset);
     } catch (err) {

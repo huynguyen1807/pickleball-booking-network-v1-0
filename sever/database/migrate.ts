@@ -6,6 +6,11 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const DB_NAME = process.env.DB_NAME || 'pickleball_danang';
+const MIGRATION_FILES = [
+    'schema.sql',
+    '07-match-payment-locking.sql',
+    '08-normalize-court-pricing-columns.sql'
+];
 
 const masterConfig = {
     server: process.env.DB_SERVER || 'localhost',
@@ -39,39 +44,49 @@ async function migrate() {
             database: DB_NAME
         }).connect();
 
-        // Step 3: Read and execute migrate.sql
-        const migratePath = path.join(__dirname, 'schema.sql');
-        if (!fs.existsSync(migratePath)) {
-            console.error('❌ File migrate.sql not found at:', migratePath);
-            process.exit(1);
-        }
+        let totalSuccess = 0;
+        let totalSkipped = 0;
 
-        const schema = fs.readFileSync(migratePath, 'utf8');
-        const batches = schema.split(/\bGO\b/i)
-            .map(b => b.trim())
-            .filter(b => b.length > 0)
-            .filter(b => !b.match(/CREATE\s+DATABASE/i) && !b.match(/^USE\s+/i));
+        for (const fileName of MIGRATION_FILES) {
+            const filePath = path.join(__dirname, fileName);
+            if (!fs.existsSync(filePath)) {
+                console.error(`❌ File ${fileName} not found at:`, filePath);
+                process.exit(1);
+            }
 
-        let success = 0;
-        let skipped = 0;
+            const content = fs.readFileSync(filePath, 'utf8');
+            const batches = content.split(/\bGO\b/i)
+                .map(b => b.trim())
+                .filter(b => b.length > 0)
+                .filter(b => !b.match(/CREATE\s+DATABASE/i) && !b.match(/^USE\s+/i));
 
-        for (const batch of batches) {
-            try {
-                await pool.request().query(batch);
-                success++;
-            } catch (err) {
-                if (err.message.includes('already exists')) {
-                    skipped++;
-                } else {
-                    console.warn('⚠️  Warning:', err.message.substring(0, 120));
-                    skipped++;
+            let fileSuccess = 0;
+            let fileSkipped = 0;
+            console.log(`\n📄 Running ${fileName} ...`);
+
+            for (const batch of batches) {
+                try {
+                    await pool.request().query(batch);
+                    fileSuccess++;
+                } catch (err) {
+                    const msg = String(err?.message || 'Unknown error');
+                    if (msg.includes('already exists')) {
+                        fileSkipped++;
+                    } else {
+                        console.warn('⚠️  Warning:', msg.substring(0, 120));
+                        fileSkipped++;
+                    }
                 }
             }
+
+            totalSuccess += fileSuccess;
+            totalSkipped += fileSkipped;
+            console.log(`   ✅ ${fileName}: ${fileSuccess} executed, ${fileSkipped} skipped`);
         }
 
         console.log(`\n📊 Migration result:`);
-        console.log(`   ✅ Executed: ${success} batches`);
-        console.log(`   ⏭️  Skipped: ${skipped} batches`);
+        console.log(`   ✅ Executed: ${totalSuccess} batches`);
+        console.log(`   ⏭️  Skipped: ${totalSkipped} batches`);
         console.log(`\n🎉 Migration completed successfully!`);
 
         await pool.close();

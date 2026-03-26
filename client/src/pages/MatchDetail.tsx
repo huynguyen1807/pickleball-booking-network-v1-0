@@ -9,13 +9,15 @@ import styles from '../styles/Matchmaking.module.css'
 import { formatDateVN, formatTimeHHmm } from '../utils/dateTime'
 
 const STATUS_LABELS: Record<string, { text: string; cls: string }> = {
+    pending_host_payment: { text: 'Chờ host thanh toán', cls: 'yellow' },
     waiting: { text: 'Đang tìm người', cls: 'yellow' },
     open:    { text: 'Đang tìm người', cls: 'yellow' },
     full:    { text: 'Đã đủ người',    cls: 'blue' },
     confirmed: { text: 'Đã xác nhận', cls: 'green' },
     completed: { text: 'Hoàn thành',  cls: 'blue' },
     finished:  { text: 'Hoàn thành',  cls: 'blue' },
-    cancelled: { text: 'Đã hủy',      cls: 'red' }
+    cancelled: { text: 'Đã hủy',      cls: 'red' },
+    expired:   { text: 'Hết hạn',     cls: 'red' }
 }
 
 const SKILL_LABELS: Record<string, string> = {
@@ -61,21 +63,21 @@ export default function MatchDetail() {
     const isCreatorByFlag = Number(match?.is_creator) === 1
     const myPlayer = [...(match?.players || [])]
         .reverse()
-        .find((p: any) => toId(p.user_id) === currentUserId && ['joined', 'waitlist'].includes(p.status))
+        .find((p: any) => toId(p.user_id) === currentUserId && ['joined', 'payment_pending'].includes(p.status))
     const isPlayer = myPlayer?.status === 'joined'
-    const isWaitlisted = myPlayer?.status === 'waitlist'
+    const isPendingPlayer = myPlayer?.status === 'payment_pending'
     const isCreator = isCreatorByFlag || (!!currentUserId && !!creatorId && creatorId === currentUserId)
     const spotsLeft = match ? match.max_players - match.current_players : 0
-    const canJoin = !isPlayer && !isWaitlisted && ['waiting', 'open', 'full'].includes(match?.status)
-    const canCancelMatch = isCreator && !['cancelled', 'completed', 'finished'].includes(match?.status)
+    const canJoin = !isPlayer && !isPendingPlayer && !isCreator && match?.status === 'open' && spotsLeft > 0
+    const canCancelMatch = isCreator && !['cancelled', 'completed', 'finished', 'expired'].includes(match?.status)
+    const canPayAsHost = isCreator && match?.status === 'pending_host_payment'
 
     const handleJoin = async () => {
         setJoining(true)
         try {
             const res = await api.post(`/matches/${id}/join`)
-            if (res.data.isWaitlist) {
-                await showAlert(`✅ ${res.data.message}`)
-            } else {
+            if (res.data?.payment) {
+                setPayosData(res.data.payment)
                 await showAlert(`✅ ${res.data.message}\n\n💰 Số tiền cần thanh toán: ${new Intl.NumberFormat('vi-VN').format(res.data.price_per_player)}đ`)
             }
             loadMatch()
@@ -146,8 +148,7 @@ export default function MatchDetail() {
 
     const costPerPerson = Math.round(match.total_cost / match.max_players)
     const statusInfo = STATUS_LABELS[match.status] || STATUS_LABELS.waiting
-    const joinedPlayers = match.players?.filter((p: any) => p.status === 'joined') || []
-    const waitlistPlayers = match.players?.filter((p: any) => p.status === 'waitlist') || []
+    const joinedPlayers = match.players?.filter((p: any) => ['joined', 'payment_pending'].includes(p.status)) || []
     const displayDate = formatDateVN(match.match_date)
     const displayStartTime = formatTimeHHmm(match.start_time)
     const displayEndTime = formatTimeHHmm(match.end_time)
@@ -169,7 +170,7 @@ export default function MatchDetail() {
                             <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
                                 {match.format && (
                                     <span className={styles.formatBadge}>
-                                        {match.format === '1v1' ? '⚔️' : '🤝'} {match.format?.toUpperCase()}
+                                        {match.format === '1v1' ? '⚔️' : match.format === 'open' ? '🎾' : '🤝'} {match.format?.toUpperCase()}
                                     </span>
                                 )}
                                 {match.skill_level && match.skill_level !== 'all' && (
@@ -223,11 +224,11 @@ export default function MatchDetail() {
                                 <div className={styles.playerInfo}>
                                     <div className={styles.playerName}>{p.full_name}</div>
                                     <div className={styles.playerStatus} style={{ color: 'var(--text-muted)' }}>
-                                        {p.user_id === match.creator_id ? '👑 Người tạo' : '✅ Đã tham gia'}
+                                        {p.user_id === match.creator_id ? '👑 Người tạo' : p.status === 'payment_pending' ? '⏳ Đang giữ chỗ' : '✅ Đã tham gia'}
                                     </div>
                                 </div>
                                 <span className={`badge ${p.payment_status === 'paid' ? 'badge-green' : 'badge-yellow'}`}>
-                                    {p.payment_status === 'paid' ? '✓ Đã TT' : '⏳ Chưa TT'}
+                                    {p.payment_status === 'paid' ? '✓ Đã TT' : '⏳ Chờ TT'}
                                 </span>
                             </div>
                         ))}
@@ -237,24 +238,6 @@ export default function MatchDetail() {
                             </div>
                         ))}
                     </div>
-
-                    {/* Waitlist */}
-                    {waitlistPlayers.length > 0 && (
-                        <div className={styles.waitlistSection}>
-                            <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '10px' }}>
-                                ⏳ Danh sách chờ ({waitlistPlayers.length})
-                            </h4>
-                            {waitlistPlayers.map((p: any, i: number) => (
-                                <div key={i} className={styles.waitlistItem}>
-                                    <div className="avatar avatar-sm" style={{ width: '28px', height: '28px', fontSize: '0.75rem' }}>
-                                        {p.full_name?.charAt(0)}
-                                    </div>
-                                    <span style={{ fontSize: '0.85rem' }}>{p.full_name}</span>
-                                    <span className="badge badge-yellow" style={{ marginLeft: 'auto' }}>Chờ #{i + 1}</span>
-                                </div>
-                            ))}
-                        </div>
-                    )}
 
                     {/* Cost Breakdown */}
                     <div className={styles.costBreakdown}>
@@ -274,7 +257,7 @@ export default function MatchDetail() {
                     </div>
 
                     {/* Payment instruction for joined but unpaid */}
-                    {isPlayer && myPlayer?.payment_status === 'pending' && match?.status !== 'cancelled' && (
+                    {(isPendingPlayer || canPayAsHost) && match?.status !== 'cancelled' && (
                         <div className={styles.paymentPrompt}>
                             <div style={{ fontWeight: 700, marginBottom: '6px' }}>💳 Thanh toán để xác nhận chỗ</div>
                             <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0 0 12px' }}>
@@ -282,28 +265,18 @@ export default function MatchDetail() {
                             </p>
                             <button className="btn btn-primary" style={{ width: '100%' }}
                                 onClick={handlePayment} disabled={initiatingPayment}>
-                                {initiatingPayment ? '⏳ Đang khởi tạo...' : '💳 Thanh toán ngay'}
+                                {initiatingPayment ? '⏳ Đang khởi tạo...' : canPayAsHost ? '💳 Host thanh toán để mở trận' : '💳 Thanh toán ngay'}
                             </button>
-                        </div>
-                    )}
-
-                    {/* Waitlist status */}
-                    {isWaitlisted && (
-                        <div className={styles.paymentPrompt} style={{ background: 'rgba(59,130,246,0.1)', borderColor: 'rgba(59,130,246,0.3)' }}>
-                            <div style={{ fontWeight: 700, marginBottom: '4px' }}>⏳ Bạn đang trong danh sách chờ</div>
-                            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>
-                                Bạn sẽ được thêm vào trận khi có chỗ trống.
-                            </p>
                         </div>
                     )}
 
                     {/* Refund policy */}
                     <div className={styles.refundPolicy}>
                         <div style={{ fontWeight: 600, marginBottom: '6px', fontSize: '0.85rem' }}>📋 Chính sách hoàn tiền</div>
-                        <div className={styles.refundRow}><span>🟢</span><span>Hủy trước 4 giờ → Hoàn tiền 100%</span></div>
-                        <div className={styles.refundRow}><span>🟡</span><span>Hủy 2–4 giờ trước trận → Không hoàn tiền</span></div>
-                        <div className={styles.refundRow}><span>🔴</span><span>Hủy trong vòng 2 giờ → Không hoàn tiền</span></div>
+                        <div className={styles.refundRow}><span>🟢</span><span>Rời trận trước 4 giờ → Hoàn 50%</span></div>
+                        <div className={styles.refundRow}><span>🔴</span><span>Rời trận trong vòng 4 giờ hoặc sau khi bắt đầu → Không hoàn tiền</span></div>
                         <div className={styles.refundRow}><span>🔵</span><span>Trận bị hủy do thiếu người → Hoàn tiền 100%</span></div>
+                        <div className={styles.refundRow}><span>🟠</span><span>Host hủy trước khi có người tham gia → Hoàn 50% cho host</span></div>
                     </div>
 
                     {/* Action buttons */}
@@ -311,10 +284,10 @@ export default function MatchDetail() {
                         {canJoin && (
                             <button className="btn btn-primary btn-lg" style={{ flex: 1 }}
                                 onClick={handleJoin} disabled={joining}>
-                                {joining ? '⏳...' : spotsLeft > 0 ? '🎯 Tham gia trận' : '⏳ Vào danh sách chờ'}
+                                {joining ? '⏳...' : '🎯 Tham gia trận'}
                             </button>
                         )}
-                        {(isPlayer || isWaitlisted) && !isCreator && (
+                        {(isPlayer || isPendingPlayer) && !isCreator && (
                             <button className="btn btn-danger btn-lg" style={{ flex: canJoin ? undefined : 1 }}
                                 onClick={handleLeave} disabled={leaving}>
                                 {leaving ? '⏳...' : '🚪 Rời trận'}
@@ -348,6 +321,7 @@ export default function MatchDetail() {
                             orderCode={payosData.orderCode}
                             paymentLinkId={payosData.paymentLinkId}
                             amount={payosData.amount ?? costPerPerson}
+                            expiresInSeconds={payosData.expiresInSeconds}
                             onSuccess={() => { setPayosData(null); loadMatch() }}
                             onCancel={() => setPayosData(null)}
                         />

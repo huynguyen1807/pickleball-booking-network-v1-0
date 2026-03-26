@@ -17,8 +17,8 @@ export default function SubCourtForm({ courtId, subCourt, onClose, onSuccess }: 
     price_per_hour: subCourt?.price_per_hour ?? 0,
     peak_start_time: subCourt?.peak_start_time || '17:00',
     peak_end_time: subCourt?.peak_end_time || '21:00',
-    peak_price_per_hour: subCourt?.peak_price_per_hour ?? 0,
-    weekend_price_per_hour: subCourt?.weekend_price_per_hour ?? 0,
+    peak_price: subCourt?.peak_price ?? 0,
+    weekend_price: subCourt?.weekend_price ?? 0,
     min_booking_minutes: subCourt?.min_booking_minutes ?? 60,
     slot_step_minutes: subCourt?.slot_step_minutes ?? 15
   })
@@ -28,8 +28,8 @@ export default function SubCourtForm({ courtId, subCourt, onClose, onSuccess }: 
   const submit = async () => {
     if (!form.name) return setError('Nhập tên sân')
 
-    if (form.peak_start_time || form.peak_end_time || form.peak_price_per_hour) {
-        if (!form.peak_start_time || !form.peak_end_time || !form.peak_price_per_hour) {
+    if (form.peak_start_time || form.peak_end_time || form.peak_price) {
+      if (!form.peak_start_time || !form.peak_end_time || !form.peak_price) {
             return setError('Vui lòng điền đầy đủ Giờ bắt đầu, Giờ kết thúc và Giá cho Khung giờ vàng')
         }
         if (form.peak_start_time >= form.peak_end_time) {
@@ -119,15 +119,15 @@ export default function SubCourtForm({ courtId, subCourt, onClose, onSuccess }: 
       <div style={{ marginTop: 8 }}>
         <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Giá giờ vàng (/giờ)</label>
         <input type="number" step="0.01" min={0} className="input-field"
-               value={form.peak_price_per_hour}
-               onChange={e=>setForm(p=>({...p,peak_price_per_hour:parseFloat(e.target.value)||0}))}/>
+           value={form.peak_price}
+           onChange={e=>setForm(p=>({...p,peak_price:parseFloat(e.target.value)||0}))}/>
       </div>
 
       <div style={{ marginTop: 8 }}>
         <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Giá cuối tuần (/giờ)</label>
         <input type="number" step="0.01" min={0} className="input-field"
-               value={form.weekend_price_per_hour}
-               onChange={e=>setForm(p=>({...p,weekend_price_per_hour:parseFloat(e.target.value)||0}))}/>
+           value={form.weekend_price}
+           onChange={e=>setForm(p=>({...p,weekend_price:parseFloat(e.target.value)||0}))}/>
       </div>
 
       <div style={{ marginTop: 8 }}>
