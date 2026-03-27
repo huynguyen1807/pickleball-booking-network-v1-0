@@ -5,7 +5,7 @@ import PaymentModal from '../components/PaymentModal'
 import { PayOSPayment } from '../components/PayOSPayment'
 import { useDialog } from '../context/DialogContext'
 import styles from '../styles/Booking.module.css'
-import { formatDateVN, getTodayYMD } from '../utils/dateTime'
+import { formatDateVN, getAdvanceValidationMessage, getTodayYMD, isAtLeastAdvanceHours } from '../utils/dateTime'
 
 export default function Booking() {
     const { id } = useParams()
@@ -27,6 +27,7 @@ export default function Booking() {
     const startTime = searchParams.get('start') || '18:00'
     const endTime = searchParams.get('end') || '20:00'
     const subCourtId = searchParams.get('subCourt')
+    const isStartTimeValid = isAtLeastAdvanceHours(bookingDate, startTime)
 
     useEffect(() => {
         const loadCourt = async () => {
@@ -91,6 +92,10 @@ export default function Booking() {
     const formatDate = (d) => formatDateVN(d)
 
     const handleConfirmBooking = async () => {
+        if (!isStartTimeValid) {
+            await showAlert('Khung giờ không hợp lệ', getAdvanceValidationMessage())
+            return
+        }
         setSubmitting(true)
         try {
             const res = await api.post('/bookings', {
@@ -155,6 +160,11 @@ export default function Booking() {
                         <div className={styles.summaryRow}><span>Sân</span><span style={{ fontWeight: 600 }}>{court.name}</span></div>
                         <div className={styles.summaryRow}><span>Ngày</span><span>{formatDate(bookingDate)}</span></div>
                         <div className={styles.summaryRow}><span>Khung giờ</span><span>{startTime} - {endTime}</span></div>
+                        {!isStartTimeValid && (
+                            <div style={{ marginTop: '12px', padding: '12px', borderRadius: '10px', background: 'rgba(239,68,68,0.12)', color: '#b91c1c', fontSize: '0.9rem' }}>
+                                {getAdvanceValidationMessage()}
+                            </div>
+                        )}
                         {regularHours > 0 && (
                             <div className={styles.summaryRow}><span>Giá thường ({regularHours.toFixed(1)}h)</span><span>{formatPrice(regularPrice)}</span></div>
                         )}
@@ -163,7 +173,7 @@ export default function Booking() {
                         )}
                         <div className={`${styles.summaryRow} ${styles.summaryTotal}`}><span>Tổng cộng</span><span>{formatPrice(total)}</span></div>
                     </div>
-                    <button className="btn btn-primary btn-lg" style={{ width: '100%' }} disabled={submitting} onClick={handleConfirmBooking}>
+                    <button className="btn btn-primary btn-lg" style={{ width: '100%' }} disabled={submitting || !isStartTimeValid} onClick={handleConfirmBooking}>
                         {submitting ? '⏳ Đang tạo booking...' : 'Tiếp tục →'}
                     </button>
                 </div>
@@ -264,6 +274,7 @@ export default function Booking() {
                             orderCode={paymentData.orderCode}
                             paymentLinkId={paymentData.paymentLinkId}
                             amount={paymentData.amount}
+                            expiresInSeconds={paymentData.expiresInSeconds}
                             onSuccess={handlePayOSSuccess}
                             onCancel={() => setPaymentData(null)}
                         />

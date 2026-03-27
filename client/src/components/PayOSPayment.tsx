@@ -7,6 +7,7 @@ interface PayOSPaymentProps {
   orderCode: number;
   paymentLinkId: string;
   amount: number;
+  expiresInSeconds?: number;
   onSuccess: () => void;
   onCancel?: () => void;
 }
@@ -16,13 +17,14 @@ export function PayOSPayment({
   orderCode,
   paymentLinkId,
   amount,
+  expiresInSeconds = 900,
   onSuccess,
   onCancel
 }: PayOSPaymentProps) {
   const [status, setStatus] = useState<
     'pending' | 'completed' | 'failed' | 'expired' | 'cancelled'
   >('pending');
-  const [timeLeft, setTimeLeft] = useState(900); // 15 minutes
+  const [timeLeft, setTimeLeft] = useState(expiresInSeconds);
   const [polling, setPolling] = useState(true);
   const payosWindow = useRef<Window | null>(null);
   const hasOpenedWindow = useRef(false);
@@ -41,7 +43,7 @@ export function PayOSPayment({
     }, 1000);
 
     return () => clearInterval(timer);
-  }, []);
+  }, [expiresInSeconds]);
 
   // Auto-open checkout URL in new tab (only once on mount)
   useEffect(() => {
@@ -234,7 +236,7 @@ export function PayOSPayment({
         <div className={styles.paymentExpired}>
           <div className={styles.warningIcon}>⏳</div>
           <h2>⏰ Giao dịch đã hết hạn</h2>
-          <p>Thời gian thanh toán đã hết (15 phút). Đơn đặt sân sẽ được hủy tự động.</p>
+          <p>Thời gian thanh toán đã hết. Slot giữ chỗ đã được giải phóng tự động.</p>
           <button 
             onClick={onCancel}
             className={styles.btnNewQR}

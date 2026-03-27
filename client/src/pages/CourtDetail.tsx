@@ -5,7 +5,7 @@ import api from '../api/axios'
 import UserProfileCard from '../components/UserProfileCard'
 import { useDialog } from '../context/DialogContext'
 import styles from '../styles/Booking.module.css'
-import { getTodayYMD } from '../utils/dateTime'
+import { getAdvanceValidationMessage, getTodayYMD, isAtLeastAdvanceHours } from '../utils/dateTime'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -64,15 +64,12 @@ export default function CourtDetail() {
             const res = await api.get(`/courts/${id}/slots?date=${selectedDate}`)
             const raw: Slot[] = res.data
 
-            // Nếu chọn ngày hôm nay → disable các slot đã qua hoặc còn < 30 phút
+            // Nếu chọn ngày hôm nay → disable các slot đã qua hoặc còn < 1 giờ
             const todayLocal = new Date().toLocaleDateString('en-CA') // YYYY-MM-DD theo local time
             if (selectedDate === todayLocal) {
-                const now = new Date()
-                // Thêm buffer 30 phút
-                const bufferMinutes = now.getHours() * 60 + now.getMinutes() + 30
                 const filtered = raw.map(slot => ({
                     ...slot,
-                    is_available: slot.is_available && toMinutes(slot.start_time) >= bufferMinutes,
+                    is_available: slot.is_available && isAtLeastAdvanceHours(selectedDate, slot.start_time),
                 }))
                 setSlots(filtered)
                 setBookedSlots(filtered.filter(slot => !slot.is_available))
@@ -219,18 +216,10 @@ export default function CourtDetail() {
     }
 
     const todayStr = getTodayYMD()
-    const now = new Date()
-    const currentH = now.getHours()
-    const currentM = now.getMinutes()
-    const minTimeValue = currentH + (currentM + 30) / 60
 
     // Các option giờ bắt đầu hợp lệ
     const availableStartTimes = allTimeOptions.filter(time => {
-        // Kiểm tra quá khứ / tối thiểu 30p trước
-        if (selectedDate === todayStr) {
-            const [h, m] = time.split(':').map(Number)
-            if (h + m / 60 < minTimeValue) return false
-        }
+        if (!isAtLeastAdvanceHours(selectedDate, time)) return false
         // Kiểm tra xem thời điểm này bắt đầu có lập tức đụng slot bị book không
         const [th, tm] = time.split(':').map(Number)
         let endM = tm + 30
@@ -390,6 +379,12 @@ export default function CourtDetail() {
                                     min={todayStr}
                                     onChange={e => setSelectedDate(e.target.value)} />
                             </div>
+
+                            {selectedDate === todayStr && (
+                                <div style={{ marginBottom: '14px', padding: '12px', borderRadius: '10px', background: 'rgba(245,158,11,0.14)', color: '#9a6700', fontSize: '0.85rem' }}>
+                                    {getAdvanceValidationMessage()}
+                                </div>
+                            )}
 
                             {/* Slot Grid */}
                             <div style={{ marginBottom: '16px' }}>
