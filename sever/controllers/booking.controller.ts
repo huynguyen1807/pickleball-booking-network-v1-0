@@ -33,7 +33,19 @@ export const createBooking = async (req, res) => {
         const pool = await poolPromise;
         const isPayOS = payment_method === 'payos';
 
-        const scheduleConflict = await getUserScheduleConflict(pool, Number(req.user.id), booking_date, start_time, end_time);
+        const scheduleConflict = await getUserScheduleConflict(
+            pool,
+            Number(req.user.id),
+            booking_date,
+            start_time,
+            end_time,
+            null,
+            null,
+            {
+                includeBookingConflicts: false,
+                includeMatchConflicts: true
+            }
+        );
         if (scheduleConflict) {
             return res.status(409).json({ message: getScheduleConflictMessage(scheduleConflict) });
         }

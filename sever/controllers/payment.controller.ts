@@ -104,12 +104,13 @@ export const insertPayment = async (
     paymentLinkId: string,
     status: string = 'pending',
     paymentContext: string = 'booking',
-    expiresAt: Date | null = null
+    expiresAt: Date | null = null,
+    executor?: any
 ) => {
-    const pool = await poolPromise;
+    const dbExecutor = executor || await poolPromise;
     const commission = amount * 0.05;
 
-    const result = await pool.request()
+    const result = await dbExecutor.request()
         .input('user_id', sql.Int, userId)
         .input('booking_id', sql.Int, bookingId || null)
         .input('match_id', sql.Int, matchId || null)
@@ -135,6 +136,57 @@ export const insertPayment = async (
         `);
 
     return result.recordset[0]?.id;
+};
+
+const getUserBalance = async (userId: number): Promise<number> => {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .input('id', sql.Int, userId)
+        .query('SELECT ISNULL(balance, 0) AS balance FROM users WHERE id = @id');
+    return Number(result.recordset?.[0]?.balance || 0);
+};
+
+const debitUserBalance = async (executor: any, userId: number, amount: number): Promise<boolean> => {
+    const result = await executor.request()
+        .input('user_id', sql.Int, userId)
+        .input('amount', sql.Decimal(12, 2), amount)
+        .query(`
+            UPDATE users
+            SET balance = ISNULL(balance, 0) - @amount
+            WHERE id = @user_id
+              AND ISNULL(balance, 0) >= @amount
+        `);
+
+    return (result.rowsAffected?.[0] || 0) > 0;
+};
+
+const addWalletDebitTransaction = async (executor: any, params: {
+    userId: number;
+    paymentId: number;
+    amount: number;
+    referenceType: 'booking' | 'match';
+    referenceId: number;
+    description: string;
+}) => {
+    const walletTable = await executor.request().query("SELECT OBJECT_ID('wallet_transactions', 'U') AS wallet_table_id");
+    if (!walletTable.recordset?.[0]?.wallet_table_id) return;
+
+    await executor.request()
+        .input('user_id', sql.Int, params.userId)
+        .input('payment_id', sql.Int, params.paymentId)
+        .input('amount', sql.Decimal(12, 2), -Math.abs(params.amount))
+        .input('type', sql.NVarChar, 'withdrawal')
+        .input('description', sql.NVarChar, params.description)
+        .input('reference_type', sql.NVarChar, params.referenceType)
+        .input('reference_id', sql.Int, params.referenceId)
+        .query(`
+            INSERT INTO wallet_transactions (
+                user_id, payment_id, amount, type, description, reference_type, reference_id, status
+            )
+            VALUES (
+                @user_id, @payment_id, @amount, @type, @description, @reference_type, @reference_id, 'completed'
+            )
+        `);
 };
 
 /**
@@ -501,7 +553,7 @@ export const payosInit = async (req: any, res: any) => {
             matchId: resolvedMatchId,
             amount,
             paymentContext,
-            expiresInMinutes: paymentContext === 'booking' ? 15 : (paymentContext === 'host_match' ? HOST_PAYMENT_WINDOW_MINUTES : JOIN_PAYMENT_WINDOW_MINUTES),
+            expiresInMinutes: paymentContext === 'booking' ? 5 : (paymentContext === 'host_match' ? HOST_PAYMENT_WINDOW_MINUTES : JOIN_PAYMENT_WINDOW_MINUTES),
             description: paymentDescription || generateRandomDescription()
         });
 
@@ -513,6 +565,222 @@ export const payosInit = async (req: any, res: any) => {
         }, 'Khởi tạo PayOS thành công');
     } catch (err: any) {
         return serverError(res, 'Lỗi khởi tạo thanh toán', err);
+    }
+};
+
+/**
+ * Wallet payment from user balance
+ * Route: POST /api/payments/balance-pay
+ * Body: { booking_id? , match_id? }
+ */
+export const payByBalance = async (req: any, res: any) => {
+    const pool = await poolPromise;
+    const bookingId = req.body?.booking_id ? Number(req.body.booking_id) : null;
+    const matchId = req.body?.match_id ? Number(req.body.match_id) : null;
+
+    if (!bookingId && !matchId) {
+        return res.status(400).json({ message: 'Cần booking_id hoặc match_id' });
+    }
+
+    const tx = pool.transaction();
+    await tx.begin();
+
+    try {
+        const userId = Number(req.user.id);
+        let amount = 0;
+        let paymentContext: 'booking' | 'host_match' | 'join_match' = 'booking';
+        let resolvedBookingId: number | null = null;
+        let resolvedMatchId: number | null = null;
+        let paymentDescription = '';
+
+        if (bookingId) {
+            const booking = await tx.request()
+                .input('id', sql.Int, bookingId)
+                .query(`
+                    SELECT id, user_id, total_price, status
+                    FROM bookings
+                    WHERE id = @id
+                `);
+
+            if (booking.recordset.length === 0) {
+                await tx.rollback();
+                return res.status(404).json({ message: 'Booking không tồn tại' });
+            }
+
+            const row = booking.recordset[0];
+            if (Number(row.user_id) !== userId) {
+                await tx.rollback();
+                return res.status(403).json({ message: 'Không có quyền thanh toán booking này' });
+            }
+
+            if (!['pending', 'payment_pending'].includes(String(row.status || '').toLowerCase())) {
+                await tx.rollback();
+                return res.status(400).json({ message: 'Booking này không còn chờ thanh toán' });
+            }
+
+            amount = Number(row.total_price || 0);
+            resolvedBookingId = Number(row.id);
+            paymentContext = 'booking';
+            paymentDescription = `Thanh toán booking #${row.id} bằng ví`;
+
+            await tx.request()
+                .input('booking_id', sql.Int, resolvedBookingId)
+                .query(`
+                    UPDATE bookings
+                    SET payment_method = 'balance'
+                    WHERE id = @booking_id
+                `);
+        } else {
+            const match = await tx.request()
+                .input('id', sql.Int, matchId)
+                .input('user_id', sql.Int, userId)
+                .query(`
+                    SELECT
+                        m.id,
+                        m.booking_id,
+                        m.creator_id,
+                        m.status,
+                        mp.amount_due,
+                        mp.status AS player_status
+                    FROM matches m
+                    LEFT JOIN match_players mp ON mp.match_id = m.id AND mp.user_id = @user_id
+                    WHERE m.id = @id
+                `);
+
+            if (match.recordset.length === 0) {
+                await tx.rollback();
+                return res.status(404).json({ message: 'Match không tồn tại' });
+            }
+
+            const row = match.recordset[0];
+            if (Number(row.creator_id) === userId && String(row.status || '').toLowerCase() === 'pending_host_payment') {
+                paymentContext = 'host_match';
+                resolvedBookingId = toValidInt(row.booking_id);
+                resolvedMatchId = Number(row.id);
+                amount = Number(row.amount_due || 0);
+                paymentDescription = `Host thanh toán trận #${row.id} bằng ví`;
+            } else if (String(row.player_status || '').toLowerCase() === 'payment_pending') {
+                paymentContext = 'join_match';
+                resolvedBookingId = toValidInt(row.booking_id);
+                resolvedMatchId = Number(row.id);
+                amount = Number(row.amount_due || 0);
+                paymentDescription = `Tham gia trận #${row.id} bằng ví`;
+            } else {
+                await tx.rollback();
+                return res.status(400).json({ message: 'Không có phiên thanh toán hợp lệ cho trận này' });
+            }
+        }
+
+        if (!Number.isFinite(amount) || amount <= 0) {
+            await tx.rollback();
+            return res.status(400).json({ message: 'Số tiền thanh toán không hợp lệ' });
+        }
+
+        const debited = await debitUserBalance(tx, userId, amount);
+        if (!debited) {
+            await tx.rollback();
+            const balance = await getUserBalance(userId);
+            return res.status(400).json({
+                message: 'Số dư ví không đủ để thanh toán',
+                currentBalance: balance,
+                requiredAmount: amount
+            });
+        }
+
+        const orderCode = generateOrderCode();
+        const paymentLinkId = `balance_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+        const paymentId = await insertPayment(
+            userId,
+            resolvedBookingId,
+            resolvedMatchId,
+            Math.round(amount),
+            'balance',
+            orderCode,
+            paymentLinkId,
+            'completed',
+            paymentContext,
+            null,
+            tx
+        );
+
+        if (paymentContext === 'booking' && resolvedBookingId) {
+            await tx.request()
+                .input('booking_id', sql.Int, resolvedBookingId)
+                .query(`
+                    UPDATE bookings
+                    SET status = 'confirmed', payment_method = 'balance'
+                    WHERE id = @booking_id AND status IN ('pending', 'payment_pending')
+                `);
+        }
+
+        if (resolvedBookingId) {
+            await tx.request()
+                .input('booking_id', sql.Int, resolvedBookingId)
+                .input('user_id', sql.Int, userId)
+                .input('context', sql.NVarChar, paymentContext)
+                .query(`
+                    UPDATE payments
+                    SET status = 'cancelled'
+                    WHERE booking_id = @booking_id
+                      AND user_id = @user_id
+                      AND status = 'pending'
+                      AND payment_method = 'payos'
+                      AND (@context = 'booking' OR payment_context = @context)
+                `);
+        }
+
+        if (resolvedMatchId) {
+            await tx.request()
+                .input('match_id', sql.Int, resolvedMatchId)
+                .input('user_id', sql.Int, userId)
+                .input('context', sql.NVarChar, paymentContext)
+                .query(`
+                    UPDATE payments
+                    SET status = 'cancelled'
+                    WHERE match_id = @match_id
+                      AND user_id = @user_id
+                      AND status = 'pending'
+                      AND payment_method = 'payos'
+                      AND payment_context = @context
+                `);
+        }
+
+        if (paymentId) {
+            await addWalletDebitTransaction(tx, {
+                userId,
+                paymentId,
+                amount,
+                referenceType: resolvedMatchId ? 'match' : 'booking',
+                referenceId: resolvedMatchId || resolvedBookingId!,
+                description: paymentDescription
+            });
+        }
+
+        await tx.commit();
+
+        const paymentRecord: any = {
+            match_id: resolvedMatchId,
+            user_id: userId,
+            booking_id: resolvedBookingId,
+            payment_context: paymentContext
+        };
+        await syncMatchPaymentState(paymentRecord, 'completed');
+
+        const currentBalance = await getUserBalance(userId);
+        return successResponse(res, {
+            paymentId,
+            method: 'balance',
+            amount: Math.round(amount),
+            paymentContext,
+            bookingId: resolvedBookingId,
+            matchId: resolvedMatchId,
+            currentBalance
+        }, 'Thanh toán bằng ví thành công');
+    } catch (err: any) {
+        if (tx._aborted !== true) {
+            await tx.rollback();
+        }
+        return serverError(res, 'Thanh toán bằng ví thất bại', err);
     }
 };
 

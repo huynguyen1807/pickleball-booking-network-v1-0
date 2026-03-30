@@ -470,7 +470,6 @@ export default function CourtDetail() {
                                     </div>
                                 )}
                             </div>
-
                             {/* Selection summary */}
                             {selectedSlots.length > 0 && (
                                 <div style={{
@@ -517,12 +516,11 @@ export default function CourtDetail() {
                             </button>
 
                             {/* Peak info */}
-                            {court.peak_price && court.peak_start_time && (
+                            {!!court.peak_price && court.peak_start_time && (
                                 <div style={{ marginTop: '10px', fontSize: '0.72rem', color: 'var(--text-muted)', textAlign: 'center' }}>
                                     🔥 Giờ vàng: {String(court.peak_start_time).slice(0, 5)} – {String(court.peak_end_time).slice(0, 5)} → {formatPrice(court.peak_price)}/h
                                 </div>
                             )}
-
                             {/* Owner info */}
                             <div className={styles.ownerInfo}>
                                 {court.owner_id ? (

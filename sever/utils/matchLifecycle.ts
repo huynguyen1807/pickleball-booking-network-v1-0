@@ -18,6 +18,11 @@ const ACTIVE_BOOKING_STATUSES = "'pending','payment_pending','confirmed'";
 const ACTIVE_MATCH_STATUSES = "'pending_host_payment','open','full','confirmed','waiting'";
 const ACTIVE_PLAYER_STATUSES = "'payment_pending','joined','waitlist'";
 
+type ScheduleConflictOptions = {
+    includeBookingConflicts?: boolean;
+    includeMatchConflicts?: boolean;
+};
+
 const getRequest = (executor?: DbExecutor) => (executor ? executor.request() : poolPromise.then(pool => pool.request()));
 
 const pad2 = (value: number): string => String(value).padStart(2, '0');
@@ -156,8 +161,13 @@ export const getUserScheduleConflict = async (
     startTime: any,
     endTime: any,
     excludeMatchId?: number | null,
-    excludeBookingId?: number | null
+    excludeBookingId?: number | null,
+    options?: ScheduleConflictOptions
 ) => {
+    const includeBookingConflicts = options?.includeBookingConflicts !== false;
+    const includeMatchConflicts = options?.includeMatchConflicts !== false;
+    if (!includeBookingConflicts && !includeMatchConflicts) return null;
+
     const request = executor.request();
     request.input('user_id', sql.Int, userId);
     request.input('slot_date', sql.Date, toLocalDateOnly(dateValue));
@@ -166,9 +176,10 @@ export const getUserScheduleConflict = async (
     request.input('exclude_match_id', sql.Int, excludeMatchId || null);
     request.input('exclude_booking_id', sql.Int, excludeBookingId || null);
 
-    const result = await request.query(`
-        SELECT TOP 1 *
-        FROM (
+    const conflictParts: string[] = [];
+
+    if (includeBookingConflicts) {
+        conflictParts.push(`
             SELECT
                 'booking' AS conflict_type,
                 b.id AS reference_id,
@@ -182,9 +193,11 @@ export const getUserScheduleConflict = async (
               AND b.start_time < CAST(@end_time AS TIME)
               AND b.end_time > CAST(@start_time AS TIME)
               AND (@exclude_booking_id IS NULL OR b.id <> @exclude_booking_id)
+        `);
+    }
 
-            UNION ALL
-
+    if (includeMatchConflicts) {
+        conflictParts.push(`
             SELECT
                 'hosted_match' AS conflict_type,
                 m.id AS reference_id,
@@ -216,6 +229,13 @@ export const getUserScheduleConflict = async (
               AND m.start_time < CAST(@end_time AS TIME)
               AND m.end_time > CAST(@start_time AS TIME)
               AND (@exclude_match_id IS NULL OR m.id <> @exclude_match_id)
+        `);
+    }
+
+    const result = await request.query(`
+        SELECT TOP 1 *
+        FROM (
+            ${conflictParts.join('\nUNION ALL\n')}
         ) conflicts
         ORDER BY event_date, start_time
     `);

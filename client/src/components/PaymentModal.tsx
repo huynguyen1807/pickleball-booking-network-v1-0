@@ -19,6 +19,22 @@ export default function PaymentModal({
 }: PaymentModalProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [balance, setBalance] = useState<number>(0);
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+
+    const loadBalance = async () => {
+      try {
+        const res = await api.get('/users/me/balance');
+        setBalance(Number(res.data?.balance || 0));
+      } catch {
+        setBalance(0);
+      }
+    };
+
+    loadBalance();
+  }, [isOpen]);
 
   const handlePayWithPayOS = async () => {
     setLoading(true);
@@ -56,6 +72,35 @@ export default function PaymentModal({
     }
   };
 
+  const handlePayWithBalance = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await api.post('/payments/balance-pay', {
+        booking_id: bookingId
+      });
+
+      const payload = response.data?.data || response.data;
+      onSuccess({
+        method: 'balance',
+        amount,
+        currentBalance: Number(payload?.currentBalance || 0)
+      });
+      onClose();
+    } catch (err: any) {
+      const msg = err.response?.data?.message || 'Không thể thanh toán bằng ví';
+      const currentBalance = Number(err.response?.data?.currentBalance || 0);
+      const requiredAmount = Number(err.response?.data?.requiredAmount || amount);
+
+      if (msg.includes('Số dư ví không đủ')) {
+        setError(`${msg}. Số dư hiện tại: ${currentBalance.toLocaleString('vi-VN')}đ, cần: ${requiredAmount.toLocaleString('vi-VN')}đ`);
+      } else {
+        setError(msg);
+      }
+      setLoading(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -77,6 +122,10 @@ export default function PaymentModal({
             Số tiền: <strong>{amount.toLocaleString('vi-VN')} VND</strong>
           </p>
 
+          <p style={{ textAlign: 'center', margin: '0 0 12px', color: '#14532d', fontWeight: 600 }}>
+            Số dư ví: {balance.toLocaleString('vi-VN')}đ
+          </p>
+
           {error && (
             <div className={styles.errorMessage}>
               ⚠️ {error}
@@ -84,6 +133,24 @@ export default function PaymentModal({
           )}
 
           <div className={styles.paymentOptions}>
+            <button
+              className={`${styles.paymentOption} ${styles.balance}`}
+              onClick={handlePayWithBalance}
+              disabled={loading || balance < amount}
+            >
+              <div className={styles.icon}>
+                <span>₫</span>
+              </div>
+              <div className={styles.info}>
+                <span className={styles.title}>Ví người dùng</span>
+                <span className={styles.subtitle}>Trừ trực tiếp từ số dư ví</span>
+                <span className={styles.description}>
+                  {balance >= amount ? 'Thanh toán tức thì, không cần quét QR' : 'Số dư ví không đủ'}
+                </span>
+              </div>
+              {loading && <div className={styles.spinner}></div>}
+            </button>
+
             {/* PayOS Option */}
             <button
               className={`${styles.paymentOption} ${styles.payos}`}

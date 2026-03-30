@@ -121,6 +121,15 @@ export default function Booking() {
     const handlePaymentSuccess = (data) => {
         if (data.method === 'payos') {
             setPaymentData(data)
+            return
+        }
+
+        if (data.method === 'balance') {
+            setStep(3)
+            const balanceMsg = data.currentBalance !== undefined
+                ? `\nSố dư ví còn lại: ${Number(data.currentBalance).toLocaleString('vi-VN')}đ`
+                : ''
+            showAlert('Thanh toán thành công', `Đã thanh toán bằng ví.${balanceMsg}`)
         }
     }
 
