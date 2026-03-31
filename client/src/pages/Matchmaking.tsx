@@ -12,7 +12,8 @@ import {
     getMaxAdvanceDateYMD,
     getTodayYMD,
     isAtLeastAdvanceHours,
-    isWithinAdvanceDays
+    isWithinAdvanceDays,
+    getMaxBookingDateYMD
 } from '../utils/dateTime'
 
 const FORMATS = [
@@ -308,7 +309,7 @@ export default function Matchmaking() {
                                         <label>Ngày chơi</label>
                                         <input type="date" className="input-field" value={createForm.date}
                                             min={getTodayYMD()}
-                                            max={getMaxAdvanceDateYMD()}
+                                            max={getMaxBookingDateYMD(30)}
                                             onChange={e => setCreateForm(p => ({
                                                 ...p,
                                                 date: e.target.value,

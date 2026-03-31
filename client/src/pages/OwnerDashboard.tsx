@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import api from '../api/axios'
 import styles from '../styles/Dashboard.module.css'
 import pageStyles from '../styles/OwnerDashboardPage.module.css'
+import { useDialog } from '../context/DialogContext'
 import { formatDateVN, formatDateTimeVN, formatTimeHHmm } from '../utils/dateTime'
 
 type ActiveTab = 'bookings' | 'payments' | 'matches' | 'owner'
@@ -14,6 +15,7 @@ const BOOKING_STATUS: Record<string, BadgeConfig> = {
     confirmed: { label: 'Đã xác nhận', className: pageStyles.bookingConfirmed },
     completed: { label: 'Hoàn thành', className: pageStyles.bookingCompleted },
     cancelled: { label: 'Đã hủy', className: pageStyles.bookingCancelled },
+    transferred: { label: 'Chuyển nhượng', className: pageStyles.bookingTransferred || pageStyles.bookingCompleted },
 }
 
 const PAYMENT_STATUS: Record<string, BadgeConfig> = {
@@ -50,6 +52,7 @@ function StatusBadge({ status, map }: { status: string; map: Record<string, Badg
 
 export default function OwnerDashboard() {
     const navigate = useNavigate()
+    const { showAlert } = useDialog()
     const [ownerStats, setOwnerStats] = useState<any>(null)
     const [ownerBookings, setOwnerBookings] = useState<any[]>([])
     const [userStats, setUserStats] = useState<any>(null)
@@ -65,16 +68,32 @@ export default function OwnerDashboard() {
     const [showAllOwnerBookings, setShowAllOwnerBookings] = useState(false)
     const [redirectingPaymentId, setRedirectingPaymentId] = useState<number | null>(null)
 
+    // New states for Booking Actions
+    const [cancelModal, setCancelModal] = useState<{ open: boolean; booking: any | null; hoursLeft: number }>({ open: false, booking: null, hoursLeft: 0 })
+    
+    // Enhanced Transfer Modal State
+    const [transferModal, setTransferModal] = useState<{
+        open: boolean;
+        booking: any | null;
+        step: 1 | 2;
+        email: string;
+        targetUser: any | null;
+        checking: boolean;
+    }>({ open: false, booking: null, step: 1, email: '', targetUser: null, checking: false })
+
+    const [transferRequests, setTransferRequests] = useState<{ sent: any[], received: any[] }>({ sent: [], received: [] })
+
     useEffect(() => {
         const loadData = async () => {
-            const [ownerStatsRes, ownerBookingsRes, userStatsRes, myBookingsRes, paymentsRes, matchesRes, balanceRes] = await Promise.allSettled([
+            const [ownerStatsRes, ownerBookingsRes, userStatsRes, myBookingsRes, paymentsRes, matchesRes, balanceRes, transfersRes] = await Promise.allSettled([
                     api.get('/stats/owner'),
                     api.get('/bookings/owner'),
                     api.get('/stats/user'),
                     api.get('/bookings/my'),
                     api.get('/payments/history'),
                     api.get('/matches/my-history'),
-                    api.get('/users/me/balance')
+                    api.get('/users/me/balance'),
+                    api.get('/transfers/my-requests')
             ])
 
             if (ownerStatsRes.status === 'fulfilled') setOwnerStats(ownerStatsRes.value.data)
@@ -91,6 +110,8 @@ export default function OwnerDashboard() {
             else console.warn('Match history failed:', (matchesRes as PromiseRejectedResult).reason)
             if (balanceRes.status === 'fulfilled') setWalletBalance(Number(balanceRes.value.data?.balance || 0))
             else console.warn('Balance failed:', (balanceRes as PromiseRejectedResult).reason)
+            if (transfersRes.status === 'fulfilled') setTransferRequests(transfersRes.value.data || { sent: [], received: [] })
+            else console.warn('Transfers failed:', (transfersRes as PromiseRejectedResult).reason)
 
             setLoading(false)
         }
@@ -123,6 +144,86 @@ export default function OwnerDashboard() {
             console.error('Failed to redirect payment:', err)
             alert(err?.response?.data?.message || 'Không thể chuyển đến trang thanh toán')
             setRedirectingPaymentId(null)
+        }
+    }
+
+    const handleOpenCancel = (booking: any) => {
+        const matchDate = new Date(booking.booking_date);
+        const [h, m] = booking.start_time.split(':').map(Number);
+        matchDate.setHours(h, m, 0, 0);
+        const diffHours = (matchDate.getTime() - new Date().getTime()) / (1000 * 60 * 60);
+        setCancelModal({ open: true, booking, hoursLeft: diffHours });
+    }
+
+    const confirmCancel = async () => {
+        if (!cancelModal.booking) return;
+        try {
+            const res = await api.put(`/bookings/${cancelModal.booking.id}/cancel`);
+            alert(res.data.message || 'Hủy thành công');
+            setCancelModal({ open: false, booking: null, hoursLeft: 0 });
+            window.location.reload();
+        } catch (err: any) {
+            await showAlert(err?.response?.data?.message || 'Lỗi khi hủy');
+        }
+    }
+
+    const handleCheckEmail = async () => {
+        if (!transferModal.email.trim()) {
+            await showAlert('Vui lòng nhập email');
+            return;
+        }
+        setTransferModal(p => ({ ...p, checking: true }));
+        try {
+            const res = await api.get(`/users/by-email/${transferModal.email.trim()}`);
+            setTransferModal(p => ({ ...p, step: 2, targetUser: res.data, checking: false }));
+        } catch (err: any) {
+            setTransferModal(p => ({ ...p, checking: false }));
+            await showAlert(err?.response?.data?.message || 'Không tìm thấy người dùng');
+        }
+    }
+
+    const confirmTransfer = async () => {
+        if (!transferModal.booking || !transferModal.targetUser) return;
+        try {
+            const res = await api.post(`/transfers/request`, { 
+                bookingId: transferModal.booking.id, 
+                receiverEmail: transferModal.targetUser.email 
+            });
+            await showAlert(res.data.message || 'Đã gửi lời mời chuyển nhượng');
+            setTransferModal({ open: false, booking: null, step: 1, email: '', targetUser: null, checking: false });
+            window.location.reload();
+        } catch (err: any) {
+            await showAlert(err?.response?.data?.message || 'Lỗi khi yêu cầu chuyển nhượng');
+        }
+    }
+
+    const handleAcceptTransfer = async (id: number) => {
+        try {
+            const res = await api.post(`/transfers/${id}/accept`);
+            await showAlert(res.data.message || 'Chấp nhận thành công');
+            window.location.reload();
+        } catch (err: any) {
+            await showAlert(err?.response?.data?.message || 'Lỗi xử lý');
+        }
+    }
+
+    const handleRejectTransfer = async (id: number) => {
+        try {
+            const res = await api.post(`/transfers/${id}/reject`);
+            await showAlert(res.data.message || 'Đã từ chối lời mời');
+            window.location.reload();
+        } catch (err: any) {
+            await showAlert(err?.response?.data?.message || 'Lỗi xử lý');
+        }
+    }
+
+    const handleCancelTransfer = async (id: number) => {
+        try {
+            const res = await api.patch(`/transfers/${id}/cancel`);
+            await showAlert(res.data.message || 'Đã thu hồi lời mời');
+            window.location.reload();
+        } catch (err: any) {
+            await showAlert(err?.response?.data?.message || 'Lỗi xử lý');
         }
     }
 
@@ -224,6 +325,67 @@ export default function OwnerDashboard() {
                 {activeTab === 'bookings' && (
                     <div className={`glass-card ${styles.tabPanel}`}>
                         <h3 className={styles.sectionTitle}>🏟️ Lịch đặt sân</h3>
+                        
+                        {/* Chính sách hoàn vé */}
+                        <div style={{ padding: '12px 16px', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: '8px', marginBottom: '16px' }}>
+                            <h4 style={{ margin: '0 0 8px 0', fontSize: '0.95rem', color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span style={{ fontSize: '1.2rem' }}>📜</span> Chính sách hoàn vé & Chuyển nhượng
+                            </h4>
+                            <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '0.85rem', color: 'rgba(255,255,255,0.7)' }}>
+                                <li style={{ marginBottom: '4px' }}>🟢 <b>Hủy trước 4 giờ</b> → Hoàn tiền 100%</li>
+                                <li style={{ marginBottom: '4px' }}>🔴 <b>Hủy trong vòng 4 giờ</b> trước trận → Không hoàn tiền</li>
+                                <li>🔄 <b>Chuyển nhượng</b> → Dành cho các lịch Đã xác nhận, trước trận ít nhất 2h.</li>
+                            </ul>
+                        </div>
+                        {/* Rendering Pending Transfers Section */}
+                        {(transferRequests.received.filter(t => t.status === 'pending').length > 0 || transferRequests.sent.filter(t => t.status === 'pending').length > 0) && (
+                            <div style={{ marginBottom: 24 }}>
+                                {transferRequests.received.filter(t => t.status === 'pending').length > 0 && (
+                                    <div style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 12, padding: 16, marginBottom: 16 }}>
+                                        <h4 style={{ margin: '0 0 12px 0', color: '#f59e0b', fontSize: '1rem' }}>📥 Lời mời nhận sân đang chờ</h4>
+                                        {transferRequests.received.filter(t => t.status === 'pending').map(t => (
+                                            <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.2)', padding: 12, borderRadius: 8, marginBottom: 8 }}>
+                                                <div>
+                                                    <div style={{ fontWeight: 600 }}>{t.court_name}</div>
+                                                    <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.7)' }}>
+                                                        Ngày: {formatDate(t.booking_date)} • {formatTime(t.start_time)} - {formatTime(t.end_time)}
+                                                    </div>
+                                                    <div style={{ fontSize: '0.8rem', color: '#3b82f6', marginTop: 4 }}>
+                                                        Từ: {t.sender_name} ({t.sender_email})
+                                                    </div>
+                                                </div>
+                                                <div style={{ display: 'flex', gap: 8 }}>
+                                                    <button className="btn btn-primary btn-sm" onClick={() => handleAcceptTransfer(t.id)}>✅ Nhận</button>
+                                                    <button className="btn btn-secondary btn-sm" style={{ color: '#ef4444', borderColor: '#ef4444' }} onClick={() => handleRejectTransfer(t.id)}>Từ chối</button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                                {transferRequests.sent.filter(t => t.status === 'pending').length > 0 && (
+                                    <div style={{ background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 12, padding: 16 }}>
+                                        <h4 style={{ margin: '0 0 12px 0', color: '#3b82f6', fontSize: '1rem' }}>📤 Lời mời chuyển sân đã gửi</h4>
+                                        {transferRequests.sent.filter(t => t.status === 'pending').map(t => (
+                                            <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.2)', padding: 12, borderRadius: 8, marginBottom: 8 }}>
+                                                <div>
+                                                    <div style={{ fontWeight: 600 }}>{t.court_name}</div>
+                                                    <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.7)' }}>
+                                                        Ngày: {formatDate(t.booking_date)} • {formatTime(t.start_time)} - {formatTime(t.end_time)}
+                                                    </div>
+                                                    <div style={{ fontSize: '0.8rem', color: '#10b981', marginTop: 4 }}>
+                                                        Gửi tới: {t.receiver_name} ({t.receiver_email})
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <button className="btn btn-secondary btn-sm" onClick={() => handleCancelTransfer(t.id)}>Thu hồi (Cancel)</button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         {confirmedBookings.length === 0 ? (
                             <div className={pageStyles.emptyState}>
                                 <div className={pageStyles.emptyIcon}>🏟️</div>
@@ -242,6 +404,7 @@ export default function OwnerDashboard() {
                                                 <th>Khung giờ</th>
                                                 <th>Tổng tiền</th>
                                                 <th>Trạng thái</th>
+                                                <th>Thao tác</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -263,6 +426,17 @@ export default function OwnerDashboard() {
                                                             <span className={`${pageStyles.statusBadge} ${st.className}`}>
                                                                 {st.label}
                                                             </span>
+                                                        </td>
+                                                        <td style={{ display: 'flex', gap: '8px' }}>
+                                                            {b.status === 'confirmed' && (
+                                                                <>
+                                                                    <button className="btn btn-primary btn-sm" style={{ padding: '4px 8px', fontSize: '0.75rem' }} onClick={() => setTransferModal({ open: true, booking: b, step: 1, email: '', targetUser: null, checking: false })}>🔄 Nhượng</button>
+                                                                    <button className="btn btn-secondary btn-sm" style={{ padding: '4px 8px', fontSize: '0.75rem', borderColor: '#ef4444', color: '#ef4444', background: 'transparent' }} onClick={() => handleOpenCancel(b)}>❌ Hủy</button>
+                                                                </>
+                                                            )}
+                                                            {b.status === 'pending' && (
+                                                                <button className="btn btn-secondary btn-sm" style={{ padding: '4px 8px', fontSize: '0.75rem', borderColor: '#ef4444', color: '#ef4444', background: 'transparent' }} onClick={() => handleOpenCancel(b)}>❌ Hủy</button>
+                                                            )}
                                                         </td>
                                                     </tr>
                                                 )
@@ -534,6 +708,89 @@ export default function OwnerDashboard() {
                     </div>
                 )}
             </div>
+
+            {/* Cancel Modal */}
+            {cancelModal.open && (
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div className="glass-card" style={{ width: '100%', maxWidth: 450, padding: 24, border: '1px solid rgba(255,255,255,0.1)' }}>
+                        <h3 style={{ marginTop: 0, marginBottom: 16, color: '#fff' }}>Xác nhận hủy đặt sân</h3>
+                        {cancelModal.booking?.status === 'confirmed' && (
+                            <div style={{ padding: 16, borderRadius: 8, background: cancelModal.hoursLeft > 4 ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)', color: cancelModal.hoursLeft > 4 ? '#10b981' : '#ef4444', marginBottom: 16, fontSize: '0.9rem' }}>
+                                <strong>Lưu ý quan trọng:</strong><br />
+                                {cancelModal.hoursLeft > 4 
+                                    ? "Bạn đang hủy sân trước 4 giờ. Bạn sẽ ĐƯỢC HOÀN TIỀN 100% về ví/tài khoản." 
+                                    : "Bạn đang hủy sân TRONG VÒNG 4 GIỜ trước khi diễn ra trận đấu. Theo chính sách, bạn KHÔNG ĐƯỢC HOÀN TIỀN."}
+                            </div>
+                        )}
+                        {cancelModal.booking?.status === 'pending' && (
+                            <div style={{ padding: 16, borderRadius: 8, background: 'rgba(245,158,11,0.15)', color: '#f59e0b', marginBottom: 16, fontSize: '0.9rem' }}>
+                                Booking chưa thanh toán. Bạn có thể an tâm hủy mà không mất phí.
+                            </div>
+                        )}
+                        <p style={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>Bạn có chắc chắn muốn hủy đặt sân <strong>{cancelModal.booking?.court_name}</strong> lúc {formatTime(cancelModal.booking?.start_time)} ngày {formatDate(cancelModal.booking?.booking_date)} không?</p>
+                        
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 24 }}>
+                            <button className="btn btn-secondary" onClick={() => setCancelModal({ open: false, booking: null, hoursLeft: 0 })}>Quay lại</button>
+                            <button className="btn btn-primary" style={{ background: '#ef4444', border: 'none' }} onClick={confirmCancel}>Xác nhận hủy</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Enhanced Transfer Modal */}
+            {transferModal.open && (
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div className="glass-card" style={{ width: '100%', maxWidth: 450, padding: 24, border: '1px solid rgba(255,255,255,0.1)' }}>
+                        <h3 style={{ marginTop: 0, marginBottom: 16, color: '#fff' }}>🔄 Chuyển nhượng lịch đặt</h3>
+                        <div style={{ padding: 16, borderRadius: 8, background: 'rgba(59,130,246,0.15)', color: '#3b82f6', marginBottom: 16, fontSize: '0.85rem' }}>
+                            Email người nhận phải là tài khoản hợp lệ trong hệ thống. Lời mời sẽ có hiệu lực trong 15 phút.
+                        </div>
+                        
+                        {transferModal.step === 1 ? (
+                            <>
+                                <div style={{ marginBottom: 16 }}>
+                                    <label style={{ display: 'block', marginBottom: 8, fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)' }}>Email người nhận</label>
+                                    <input 
+                                        type="email" 
+                                        className="input-field" 
+                                        style={{ width: '100%', padding: '10px', borderRadius: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white' }}
+                                        placeholder="nguyenvana@gmail.com" 
+                                        value={transferModal.email}
+                                        onChange={e => setTransferModal(p => ({ ...p, email: e.target.value }))}
+                                        disabled={transferModal.checking}
+                                    />
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 24 }}>
+                                    <button className="btn btn-secondary" disabled={transferModal.checking} onClick={() => setTransferModal({ open: false, booking: null, step: 1, email: '', targetUser: null, checking: false })}>Hủy thao tác</button>
+                                    <button className="btn btn-primary" disabled={transferModal.checking} onClick={handleCheckEmail}>
+                                        {transferModal.checking ? 'Đang kiểm tra...' : 'Tiếp tục ➔'}
+                                    </button>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div style={{ background: 'rgba(255,255,255,0.05)', padding: 16, borderRadius: 12, display: 'flex', alignItems: 'center', gap: 12, margin: '16px 0' }}>
+                                    <img 
+                                        src={transferModal.targetUser?.avatar || `https://ui-avatars.com/api/?name=${transferModal.targetUser?.full_name || 'User'}`} 
+                                        alt="avatar" 
+                                        style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover' }}
+                                    />
+                                    <div>
+                                        <div style={{ fontWeight: 700, color: '#fff' }}>{transferModal.targetUser?.full_name}</div>
+                                        <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)' }}>{transferModal.targetUser?.email}</div>
+                                    </div>
+                                </div>
+                                <p style={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.7)' }}>Bạn sẽ gửi lời mời nhượng sân <strong>{transferModal.booking?.court_name}</strong> cho người này?</p>
+                                
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 24 }}>
+                                    <button className="btn btn-secondary" onClick={() => setTransferModal(p => ({ ...p, step: 1, targetUser: null }))}>⬅ Quay lại</button>
+                                    <button className="btn btn-primary" onClick={confirmTransfer}>Gửi lời mời</button>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
