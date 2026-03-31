@@ -17,7 +17,7 @@ export function PayOSPayment({
   orderCode,
   paymentLinkId,
   amount,
-  expiresInSeconds = 900,
+  expiresInSeconds = 300,
   onSuccess,
   onCancel
 }: PayOSPaymentProps) {
@@ -28,6 +28,13 @@ export function PayOSPayment({
   const [polling, setPolling] = useState(true);
   const payosWindow = useRef<Window | null>(null);
   const hasOpenedWindow = useRef(false);
+
+  const closePayOSWindowAndFocusMain = () => {
+    if (payosWindow.current && !payosWindow.current.closed) {
+      payosWindow.current.close();
+    }
+    window.focus();
+  };
 
   // Countdown timer
   useEffect(() => {
@@ -79,11 +86,7 @@ export function PayOSPayment({
           
           // Đóng tab PayOS sau khi thanh toán thành công
           setTimeout(() => {
-            if (payosWindow.current && !payosWindow.current.closed) {
-              payosWindow.current.close();
-            }
-            // Focus về tab gốc
-            window.focus();
+            closePayOSWindowAndFocusMain();
           }, 100);
           
           // Delay thêm 2s để ensure webhook processed
@@ -96,6 +99,14 @@ export function PayOSPayment({
         } else if (currentStatus === 'cancelled') {
           setStatus('cancelled');
           setPolling(false);
+
+          // Hủy thanh toán: đóng tab PayOS và quay về màn hình trước đó
+          setTimeout(() => {
+            closePayOSWindowAndFocusMain();
+          }, 100);
+          setTimeout(() => {
+            if (onCancel) onCancel();
+          }, 600);
         } else if (currentStatus === 'expired') {
           setStatus('expired');
           setPolling(false);
@@ -252,7 +263,10 @@ export function PayOSPayment({
           <h2>Thanh toán đã bị hủy</h2>
           <p>Giao dịch đã bị hủy. Vui lòng thử lại nếu muốn tiếp tục.</p>
           <button 
-            onClick={() => window.location.reload()}
+            onClick={() => {
+              closePayOSWindowAndFocusMain();
+              if (onCancel) onCancel();
+            }}
             className={styles.btnRetry}
           >
             Quay lại

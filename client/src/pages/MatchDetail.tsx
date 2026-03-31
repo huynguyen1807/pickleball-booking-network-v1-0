@@ -100,6 +100,28 @@ export default function MatchDetail() {
         }
     }
 
+    const handleBalancePayment = async () => {
+        setInitiatingPayment(true)
+        try {
+            const res = await api.post('/payments/balance-pay', { match_id: parseInt(id!) })
+            const data = res.data?.data || res.data
+            const currentBalance = Number(data?.currentBalance || 0)
+            await showAlert(`✅ Thanh toán bằng ví thành công\nSố dư hiện tại: ${currentBalance.toLocaleString('vi-VN')}đ`)
+            loadMatch()
+        } catch (err: any) {
+            const msg = err.response?.data?.message || 'Không thể thanh toán bằng ví'
+            const bal = Number(err.response?.data?.currentBalance || 0)
+            const need = Number(err.response?.data?.requiredAmount || costPerPerson)
+            if (msg.includes('Số dư ví không đủ')) {
+                await showAlert(`${msg}\nSố dư hiện tại: ${bal.toLocaleString('vi-VN')}đ\nCần: ${need.toLocaleString('vi-VN')}đ`)
+            } else {
+                await showAlert(msg)
+            }
+        } finally {
+            setInitiatingPayment(false)
+        }
+    }
+
     const handleLeave = async () => {
         const isConfirm = await showConfirm('Bạn có chắc muốn rời trận này?')
         if (!isConfirm) return
@@ -263,9 +285,13 @@ export default function MatchDetail() {
                             <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0 0 12px' }}>
                                 Số tiền: <strong>{costPerPerson.toLocaleString('vi-VN')}đ</strong>
                             </p>
-                            <button className="btn btn-primary" style={{ width: '100%' }}
+                            <button className="btn btn-primary" style={{ width: '100%', marginBottom: '8px' }}
                                 onClick={handlePayment} disabled={initiatingPayment}>
                                 {initiatingPayment ? '⏳ Đang khởi tạo...' : canPayAsHost ? '💳 Host thanh toán để mở trận' : '💳 Thanh toán ngay'}
+                            </button>
+                            <button className="btn btn-secondary" style={{ width: '100%' }}
+                                onClick={handleBalancePayment} disabled={initiatingPayment}>
+                                {initiatingPayment ? '⏳ Đang xử lý...' : '👛 Thanh toán bằng ví'}
                             </button>
                         </div>
                     )}
