@@ -11,7 +11,6 @@
         "migrate:payment-status": "ts-node database/run-migration-payment-status.ts"
     },
     "dependencies": {
-        "@types/node-cron": "^3.0.11",
         "axios": "^1.13.6",
         "bcryptjs": "^2.4.3",
         "cors": "^2.8.5",
@@ -33,6 +32,7 @@
         "@types/ms": "^2.1.0",
         "@types/multer": "^2.1.0",
         "@types/node": "^25.3.0",
+        "@types/node-cron": "^3.0.11",
         "@types/nodemailer": "^7.0.11",
         "nodemon": "^3.1.14",
         "ts-node": "^10.9.2",

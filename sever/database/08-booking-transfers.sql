@@ -6,6 +6,16 @@
 USE pickleball_danang;
 GO
 
+-- 0. Drop old-schema booking_transfers if it was created by an earlier version of 07-booking-policy-logs.sql
+--    (old schema had from_user_id/to_user_id/transfer_time but no status/sender_id/receiver_id)
+IF OBJECT_ID('dbo.booking_transfers', 'U') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('booking_transfers') AND name = 'status')
+BEGIN
+    DROP TABLE booking_transfers;
+    PRINT '✅ Old booking_transfers table removed for schema upgrade';
+END
+GO
+
 -- 1. Create booking_transfers table
 IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='booking_transfers' AND xtype='U')
 BEGIN
@@ -32,6 +42,10 @@ GO
 
 -- 2. Create Unique Index for Pending Transfers
 -- Ensures only 1 pending transfer per booking
+-- Filtered indexes require QUOTED_IDENTIFIER ON
+SET QUOTED_IDENTIFIER ON;
+GO
+
 IF NOT EXISTS (
     SELECT * FROM sys.indexes
     WHERE name = 'unique_pending_transfer' AND object_id = OBJECT_ID('booking_transfers')

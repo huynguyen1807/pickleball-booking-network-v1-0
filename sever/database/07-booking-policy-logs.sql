@@ -12,16 +12,6 @@ CREATE TABLE booking_cancellations (
 );
 GO
 
-IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='booking_transfers' AND xtype='U')
-CREATE TABLE booking_transfers (
-  id INT IDENTITY(1,1) PRIMARY KEY,
-  booking_id INT NOT NULL FOREIGN KEY REFERENCES bookings(id),
-  from_user_id INT NOT NULL FOREIGN KEY REFERENCES users(id),
-  to_user_id INT NOT NULL FOREIGN KEY REFERENCES users(id),
-  transfer_time DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
-);
-GO
-
 -- Update Check Constraint for bookings.status
 WHILE EXISTS (SELECT 1 FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID('bookings') AND name LIKE '%status%')
 BEGIN
@@ -48,6 +38,6 @@ END
 GO
 ALTER TABLE payments
 ADD CONSTRAINT CHK_Payment_Status 
-CHECK (status IN ('pending','completed','failed','refunded','refund_pending','cancelled','expired'));
+CHECK (status IN ('pending','completed','failed','refunded','partial_refunded','refund_pending','cancelled','expired'));
 GO
 
