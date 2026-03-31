@@ -96,26 +96,7 @@ export default function Booking() {
             await showAlert('Khung giờ không hợp lệ', getAdvanceValidationMessage())
             return
         }
-        setSubmitting(true)
-        try {
-            const res = await api.post('/bookings', {
-                court_id: parseInt(id),
-                sub_court_id: subCourtId ? parseInt(subCourtId) : null,
-                booking_date: bookingDate,
-                start_time: startTime,
-                end_time: endTime,
-                payment_method: 'payos'
-            })
-            setBookingId(res.data.bookingId)  // ← Fix: Đọc bookingId thay vì id
-            setBookingResult(res.data)
-            setStep(2)
-        } catch (err) {
-            const errData = err.response?.data
-            const msg = errData?.message || errData?.error || 'Đặt sân thất bại'
-            await showAlert('Lỗi đặt sân', msg)
-        } finally {
-            setSubmitting(false)
-        }
+        setStep(2)
     }
 
     const handlePaymentSuccess = (data) => {

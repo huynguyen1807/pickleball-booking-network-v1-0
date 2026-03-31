@@ -85,19 +85,27 @@ export default function PaymentModal({
     setLoading(true);
     setError(null);
     try {
+      let newBookingId = bookingId;
+      if (!newBookingId) {
+          // Create booking first
+          const bookingRes = await api.post('/bookings', bookingPayload);
+          newBookingId = bookingRes.data.bookingId || bookingRes.data.id;
+      }
+
       const response = await api.post('/payments/balance-pay', {
-        booking_id: bookingId
+        booking_id: newBookingId
       });
 
       const payload = response.data?.data || response.data;
       onSuccess({
+        bookingId: newBookingId,
         method: 'balance',
         amount,
         currentBalance: Number(payload?.currentBalance || 0)
       });
       onClose();
     } catch (err: any) {
-      const msg = err.response?.data?.message || 'Không thể thanh toán bằng ví';
+      const msg = err.response?.data?.message || err.response?.data?.error || 'Không thể thanh toán bằng ví';
       const currentBalance = Number(err.response?.data?.currentBalance || 0);
       const requiredAmount = Number(err.response?.data?.requiredAmount || amount);
 

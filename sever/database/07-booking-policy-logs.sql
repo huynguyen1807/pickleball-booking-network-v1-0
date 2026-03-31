@@ -23,29 +23,31 @@ CREATE TABLE booking_transfers (
 GO
 
 -- Update Check Constraint for bookings.status
-DECLARE @SQL VARCHAR(MAX)='';
-SELECT @SQL = 'ALTER TABLE bookings DROP CONSTRAINT ' + name 
-FROM sys.check_constraints 
-WHERE parent_object_id = OBJECT_ID('bookings') AND definition LIKE '%pending%confirmed%cancelled%completed%';
-
-IF LEN(@SQL) > 0 EXEC(@SQL);
+WHILE EXISTS (SELECT 1 FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID('bookings') AND name LIKE '%status%')
+BEGIN
+    DECLARE @ConstraintName NVARCHAR(200);
+    SELECT TOP 1 @ConstraintName = name FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID('bookings') AND name LIKE '%status%';
+    EXEC('ALTER TABLE bookings DROP CONSTRAINT ' + @ConstraintName);
+END
 GO
+
 -- Add back if not exists explicitly or we just leave it without constraint to run.
 -- It's safer to just drop and add again.
 ALTER TABLE bookings
 ADD CONSTRAINT CHK_Booking_Status 
-CHECK (status IN ('pending','confirmed','cancelled','completed','transferred'));
+CHECK (status IN ('pending','payment_pending','confirmed','cancelled','completed','expired','transferred'));
 GO
 
 -- Update Check Constraint for payments.status
-DECLARE @SQL2 VARCHAR(MAX)='';
-SELECT @SQL2 = 'ALTER TABLE payments DROP CONSTRAINT ' + name 
-FROM sys.check_constraints 
-WHERE parent_object_id = OBJECT_ID('payments') AND definition LIKE '%pending%completed%failed%refunded%cancelled%expired%';
-
-IF LEN(@SQL2) > 0 EXEC(@SQL2);
+WHILE EXISTS (SELECT 1 FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID('payments') AND name LIKE '%status%')
+BEGIN
+    DECLARE @ConstraintName2 NVARCHAR(200);
+    SELECT TOP 1 @ConstraintName2 = name FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID('payments') AND name LIKE '%status%';
+    EXEC('ALTER TABLE payments DROP CONSTRAINT ' + @ConstraintName2);
+END
 GO
 ALTER TABLE payments
 ADD CONSTRAINT CHK_Payment_Status 
 CHECK (status IN ('pending','completed','failed','refunded','refund_pending','cancelled','expired'));
 GO
+
