@@ -9,7 +9,8 @@ import {
     getUserBrief,
     getMyBalance,
     getMyWalletTransactions,
-    updateAvatar
+    updateAvatar,
+    getUserByEmail
 } from '../controllers/user.controller';
 import role from '../middleware/role';
 import { uploadLicense, uploadAvatar } from '../middleware/upload.middleware';
@@ -18,6 +19,7 @@ router.get('/me/balance', auth, getMyBalance);
 router.get('/me/wallet-transactions', auth, getMyWalletTransactions);
 router.get('/profile/:id', auth, getUserProfile);
 router.get('/brief/:id', auth, getUserBrief);
+router.get('/by-email/:email', auth, getUserByEmail);
 router.put('/profile', auth, updateProfile);
 router.put('/avatar', auth, uploadAvatar.single('avatar'), updateAvatar);
 router.post('/upgrade-request', auth, role('user'), uploadLicense.single('license'), requestUpgrade);

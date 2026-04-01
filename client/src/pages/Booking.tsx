@@ -96,26 +96,7 @@ export default function Booking() {
             await showAlert('Khung giờ không hợp lệ', getAdvanceValidationMessage())
             return
         }
-        setSubmitting(true)
-        try {
-            const res = await api.post('/bookings', {
-                court_id: parseInt(id),
-                sub_court_id: subCourtId ? parseInt(subCourtId) : null,
-                booking_date: bookingDate,
-                start_time: startTime,
-                end_time: endTime,
-                payment_method: 'payos'
-            })
-            setBookingId(res.data.bookingId)  // ← Fix: Đọc bookingId thay vì id
-            setBookingResult(res.data)
-            setStep(2)
-        } catch (err) {
-            const errData = err.response?.data
-            const msg = errData?.message || errData?.error || 'Đặt sân thất bại'
-            await showAlert('Lỗi đặt sân', msg)
-        } finally {
-            setSubmitting(false)
-        }
+        setStep(2)
     }
 
     const handlePaymentSuccess = (data) => {
@@ -182,9 +163,14 @@ export default function Booking() {
                         )}
                         <div className={`${styles.summaryRow} ${styles.summaryTotal}`}><span>Tổng cộng</span><span>{formatPrice(total)}</span></div>
                     </div>
-                    <button className="btn btn-primary btn-lg" style={{ width: '100%' }} disabled={submitting || !isStartTimeValid} onClick={handleConfirmBooking}>
-                        {submitting ? '⏳ Đang tạo booking...' : 'Tiếp tục →'}
-                    </button>
+                    <div style={{ display: 'flex', gap: '12px', width: '100%' }}>
+                        <button className="btn btn-secondary btn-lg" style={{ flex: 1 }} disabled={submitting} onClick={() => navigate(-1)}>
+                            ← Quay lại sân
+                        </button>
+                        <button className="btn btn-primary btn-lg" style={{ flex: 2 }} disabled={submitting} onClick={handleConfirmBooking}>
+                            {submitting ? '⏳ Đang tạo booking...' : 'Tiếp tục →'}
+                        </button>
+                    </div>
                 </div>
             )}
 
@@ -205,7 +191,7 @@ export default function Booking() {
                     </div>
                     <div style={{ display: 'flex', gap: '12px' }}>
                         <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setStep(1)}>← Quay lại</button>
-                        <button className="btn btn-primary" style={{ flex: 2 }} disabled={submitting || !bookingId}
+                        <button className="btn btn-primary" style={{ flex: 2 }} disabled={submitting}
                             onClick={() => setShowPaymentModal(true)}>
                             {submitting ? '⏳ Đang xử lý...' : '💳 Tiến hành thanh toán'}
                         </button>
@@ -232,10 +218,21 @@ export default function Booking() {
             {/* Payment Modal */}
             <PaymentModal
                 isOpen={showPaymentModal && step === 2}
+                bookingPayload={{
+                    court_id: parseInt(id),
+                    sub_court_id: subCourtId ? parseInt(subCourtId) : null,
+                    booking_date: bookingDate,
+                    start_time: startTime,
+                    end_time: endTime,
+                    payment_method: 'payos'
+                }}
                 bookingId={bookingId}
                 amount={total}
                 onClose={() => setShowPaymentModal(false)}
-                onSuccess={handlePaymentSuccess}
+                onSuccess={(data) => {
+                    if (data.bookingId) setBookingId(data.bookingId);
+                    handlePaymentSuccess(data);
+                }}
             />
 
             {/* PayOS QR Code Display Modal */}

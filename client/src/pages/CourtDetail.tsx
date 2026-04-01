@@ -5,7 +5,7 @@ import api from '../api/axios'
 import UserProfileCard from '../components/UserProfileCard'
 import { useDialog } from '../context/DialogContext'
 import styles from '../styles/Booking.module.css'
-import { getAdvanceValidationMessage, getTodayYMD, isAtLeastAdvanceHours } from '../utils/dateTime'
+import { getAdvanceValidationMessage, getTodayYMD, isAtLeastAdvanceHours, getMaxBookingDateYMD } from '../utils/dateTime'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -170,8 +170,8 @@ export default function CourtDetail() {
     }
 
     const priceInfo = calcPrice()
-    const startTime = selectedSlots.length > 0 ? selectedSlots[0].start_time : ''
-    const endTime   = selectedSlots.length > 0 ? selectedSlots[selectedSlots.length - 1].end_time : ''
+    const startTimeResult = selectedSlots.length > 0 ? selectedSlots[0].start_time : ''
+    const endTimeResult   = selectedSlots.length > 0 ? selectedSlots[selectedSlots.length - 1].end_time : ''
 
     // ─── Review ────────────────────────────────────────────────────────────────
 
@@ -209,7 +209,7 @@ export default function CourtDetail() {
     const allTimeOptions = generateTimeOptions()
 
     // Kiểm tra xem một khoảng thời gian cụ thể có bị trùng với giờ đã book không
-    const isSlotBooked = (start, end) => {
+    const isSlotBooked = (start: string, end: string) => {
         return bookedSlots.some(slot => {
             return (start < slot.end_time && end > slot.start_time)
         })
@@ -231,50 +231,12 @@ export default function CourtDetail() {
         return true
     })
 
-    // Các option giờ kết thúc hợp lệ dựa vào startTime đã chọn
-    const availableEndTimes = startTime ? allTimeOptions.filter(time => {
-        if (time <= startTime) return false
-        // Kiểm tra từ startTime đến time có bị vướng booked slot không
-        if (isSlotBooked(startTime, time)) return false
-        return true
-    }) : []
-
     const extractTimeH = (timeStr: string) => {
         if (!timeStr) return null;
         const match = timeStr.match(/\d{2}:\d{2}/);
         if (!match) return null;
         const [h, m] = match[0].split(':').map(Number);
         return h + m / 60;
-    }
-
-    let regularHours = 0;
-    let peakHours = 0;
-    let totalPrice = 0;
-    let regularPrice = 0;
-    let peakPriceTotal = 0;
-
-    if (startTime && endTime) {
-        const startH = parseFloat(startTime.split(':')[0]) + parseFloat(startTime.split(':')[1]) / 60
-        const endH = parseFloat(endTime.split(':')[0]) + parseFloat(endTime.split(':')[1]) / 60
-
-        const peakStartH = extractTimeH(court.peak_start_time);
-        const peakEndH = extractTimeH(court.peak_end_time);
-
-        if (court.peak_price && peakStartH !== null && peakEndH !== null) {
-            // Find overlap between booking [startH, endH] and peak time [peakStartH, peakEndH]
-            const overlapStart = Math.max(startH, peakStartH);
-            const overlapEnd = Math.min(endH, peakEndH);
-
-            if (overlapStart < overlapEnd) {
-                peakHours = overlapEnd - overlapStart;
-            }
-        }
-
-        regularHours = (endH - startH) - peakHours;
-
-        regularPrice = regularHours * court.price_per_hour;
-        peakPriceTotal = peakHours * (court.peak_price || court.price_per_hour);
-        totalPrice = regularPrice + peakPriceTotal;
     }
 
     return (
@@ -377,6 +339,7 @@ export default function CourtDetail() {
                                 <label>Chọn ngày</label>
                                 <input type="date" className="input-field" value={selectedDate}
                                     min={todayStr}
+                                    max={getMaxBookingDateYMD(30)}
                                     onChange={e => setSelectedDate(e.target.value)} />
                             </div>
 
@@ -481,7 +444,7 @@ export default function CourtDetail() {
                                     fontSize: '0.85rem',
                                 }}>
                                     <div style={{ fontWeight: 700, marginBottom: '6px', color: '#10b981' }}>
-                                        ✅ {startTime} → {endTime}
+                                        ✅ {startTimeResult} → {endTimeResult}
                                         <span style={{ marginLeft: 8, fontWeight: 400, color: 'var(--text-muted)' }}>
                                             ({selectedSlots.length * 30} phút)
                                         </span>
@@ -510,7 +473,7 @@ export default function CourtDetail() {
                                 className="btn btn-primary btn-lg"
                                 style={{ width: '100%' }}
                                 disabled={selectedSlots.length === 0}
-                                onClick={() => navigate(`/booking/${court.id}?date=${selectedDate}&start=${startTime}&end=${endTime}`)}
+                                onClick={() => navigate(`/booking/${court.id}?date=${selectedDate}&start=${startTimeResult}&end=${endTimeResult}`)}
                             >
                                 {selectedSlots.length > 0 ? '💳 Đặt sân & Thanh toán' : 'Chọn khung giờ để đặt'}
                             </button>

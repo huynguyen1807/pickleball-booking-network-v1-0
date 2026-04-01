@@ -67,6 +67,12 @@ export const generateHalfHourOptions = (startHour = 5, endHour = 23): string[] =
     return options;
 };
 
+export const getMaxBookingDateYMD = (days = 30): string => {
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+};
+
 export const formatDateVN = (value: any, fallback = '--'): string => {
     if (!value) return fallback;
 
