@@ -52,11 +52,15 @@ GO
 
 DECLARE @constraintName NVARCHAR(200);
 
+IF EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CHK_Booking_Status' AND parent_object_id = OBJECT_ID('bookings'))
+    ALTER TABLE bookings DROP CONSTRAINT CHK_Booking_Status;
+
 IF EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CK_bookings_status_v2' AND parent_object_id = OBJECT_ID('bookings'))
     ALTER TABLE bookings DROP CONSTRAINT CK_bookings_status_v2;
 
 WHILE 1 = 1
 BEGIN
+        SET @constraintName = NULL;
         SELECT TOP 1 @constraintName = cc.name
         FROM sys.check_constraints cc
         WHERE cc.parent_object_id = OBJECT_ID('bookings')
@@ -69,7 +73,7 @@ GO
 
 ALTER TABLE bookings
 ADD CONSTRAINT CK_bookings_status_v2
-CHECK (status IN ('pending','payment_pending','confirmed','cancelled','completed','expired'));
+CHECK (status IN ('pending','payment_pending','confirmed','cancelled','completed','expired','transferred'));
 GO
 
 DECLARE @constraintName NVARCHAR(200);
@@ -77,8 +81,15 @@ DECLARE @constraintName NVARCHAR(200);
 IF EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CK_matches_status_v3' AND parent_object_id = OBJECT_ID('matches'))
     ALTER TABLE matches DROP CONSTRAINT CK_matches_status_v3;
 
+IF EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CK_matches_status_v2' AND parent_object_id = OBJECT_ID('matches'))
+    ALTER TABLE matches DROP CONSTRAINT CK_matches_status_v2;
+
+IF EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CK_matches_status' AND parent_object_id = OBJECT_ID('matches'))
+    ALTER TABLE matches DROP CONSTRAINT CK_matches_status;
+
 WHILE 1 = 1
 BEGIN
+        SET @constraintName = NULL;
         SELECT TOP 1 @constraintName = cc.name
         FROM sys.check_constraints cc
         WHERE cc.parent_object_id = OBJECT_ID('matches')
@@ -99,12 +110,20 @@ DECLARE @constraintName NVARCHAR(200);
 IF EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CK_match_players_payment_status_v3' AND parent_object_id = OBJECT_ID('match_players'))
     ALTER TABLE match_players DROP CONSTRAINT CK_match_players_payment_status_v3;
 
+IF EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CK_match_players_payment_status_v2' AND parent_object_id = OBJECT_ID('match_players'))
+    ALTER TABLE match_players DROP CONSTRAINT CK_match_players_payment_status_v2;
+
 WHILE 1 = 1
 BEGIN
+        SET @constraintName = NULL;
         SELECT TOP 1 @constraintName = cc.name
         FROM sys.check_constraints cc
         WHERE cc.parent_object_id = OBJECT_ID('match_players')
-            AND cc.definition LIKE '%[[]payment_status[]]%';
+            AND (
+                cc.parent_column_id = COLUMNPROPERTY(OBJECT_ID('match_players'), 'payment_status', 'ColumnId')
+                OR cc.definition LIKE '%[[]payment_status[]]%'
+                OR cc.definition LIKE '%payment_status%'
+            );
 
         IF @constraintName IS NULL BREAK;
         EXEC('ALTER TABLE match_players DROP CONSTRAINT [' + @constraintName + ']');
@@ -124,8 +143,12 @@ IF EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CK_match_players_st
 IF EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CK_match_players_status_v3' AND parent_object_id = OBJECT_ID('match_players'))
     ALTER TABLE match_players DROP CONSTRAINT CK_match_players_status_v3;
 
+IF EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CK_match_players_status_v2' AND parent_object_id = OBJECT_ID('match_players'))
+    ALTER TABLE match_players DROP CONSTRAINT CK_match_players_status_v2;
+
 WHILE 1 = 1
 BEGIN
+        SET @constraintName = NULL;
         SELECT TOP 1 @constraintName = cc.name
         FROM sys.check_constraints cc
         WHERE cc.parent_object_id = OBJECT_ID('match_players')
@@ -147,8 +170,18 @@ DECLARE @constraintName NVARCHAR(200);
 IF EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CK_payments_status_v3' AND parent_object_id = OBJECT_ID('payments'))
     ALTER TABLE payments DROP CONSTRAINT CK_payments_status_v3;
 
+IF EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CK_payments_status_v2' AND parent_object_id = OBJECT_ID('payments'))
+    ALTER TABLE payments DROP CONSTRAINT CK_payments_status_v2;
+
+IF EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CK_payments_status' AND parent_object_id = OBJECT_ID('payments'))
+    ALTER TABLE payments DROP CONSTRAINT CK_payments_status;
+
+IF EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CHK_Payment_Status' AND parent_object_id = OBJECT_ID('payments'))
+    ALTER TABLE payments DROP CONSTRAINT CHK_Payment_Status;
+
 WHILE 1 = 1
 BEGIN
+        SET @constraintName = NULL;
         SELECT TOP 1 @constraintName = cc.name
         FROM sys.check_constraints cc
         WHERE cc.parent_object_id = OBJECT_ID('payments')
@@ -161,5 +194,5 @@ GO
 
 ALTER TABLE payments
 ADD CONSTRAINT CK_payments_status_v3
-CHECK (status IN ('pending','completed','failed','refunded','partial_refunded','cancelled','expired'));
+CHECK (status IN ('pending','completed','failed','refunded','partial_refunded','refund_pending','cancelled','expired'));
 GO

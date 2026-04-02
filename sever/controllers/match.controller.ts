@@ -422,8 +422,12 @@ export const createMatch = async (req, res) => {
                 return res.status(500).json({ message: paymentErr.message || 'Không thể tạo phiên thanh toán cho host' });
             }
         } catch (innerErr) {
-            if (tx._aborted !== true) {
-                await tx.rollback();
+            if (tx._aborted !== true && tx._state?.transaction?.begin) {
+                try {
+                    await tx.rollback();
+                } catch (rollbackErr: any) {
+                    console.warn('[createMatch] Rollback error (likely post-commit):', rollbackErr?.code);
+                }
             }
             throw innerErr;
         }
