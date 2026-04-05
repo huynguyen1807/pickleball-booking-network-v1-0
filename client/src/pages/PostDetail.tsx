@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
@@ -32,7 +32,12 @@ export default function PostDetail() {
             }
         }
 
+        document.body.style.overflow = 'hidden'
         loadPost()
+
+        return () => {
+            document.body.style.overflow = 'unset'
+        }
     }, [id])
 
     if (loading) {

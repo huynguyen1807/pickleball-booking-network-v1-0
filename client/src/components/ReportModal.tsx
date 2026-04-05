@@ -32,7 +32,8 @@ export default function ReportModal({
 }: ReportModalProps) {
   const [reportType, setReportType] = useState<ReportType>('account');
   const [description, setDescription] = useState('');
-  const [evidenceUrl, setEvidenceUrl] = useState('');
+  const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
+  const [evidenceFileName, setEvidenceFileName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -60,19 +61,23 @@ export default function ReportModal({
         return;
       }
 
-      const evidenceUrls = evidenceUrl.trim() ? [evidenceUrl] : [];
+      const formData = new FormData();
+      formData.append('report_type', reportType);
+      formData.append('report_target_id', String(targetId || ''));
+      formData.append('report_target_type', targetType || '');
+      formData.append('description', description.trim());
+      
+      // Add file if exists
+      if (evidenceFile) {
+        formData.append('evidence', evidenceFile);
+      }
 
-      const response = await api.post('/reports', {
-        report_type: reportType,
-        report_target_id: targetId || null,
-        report_target_type: targetType || null,
-        description: description.trim(),
-        evidence_urls: evidenceUrls
-      });
+      const response = await api.post('/reports', formData);
 
       setSuccess(true);
       setDescription('');
-      setEvidenceUrl('');
+      setEvidenceFile(null);
+      setEvidenceFileName('');
       setReportType('account');
 
       setTimeout(() => {
@@ -210,28 +215,56 @@ export default function ReportModal({
               />
             </div>
 
-            {/* Evidence URL */}
+            {/* Evidence File Upload */}
             <div style={{ marginBottom: '16px' }}>
               <label style={{ display: 'block', marginBottom: '6px', fontWeight: 600, fontSize: '0.95rem' }}>
-                Link chứng cứ (không bắt buộc)
+                Tệp chứng cứ (không bắt buộc)
               </label>
-              <input
-                type="url"
-                value={evidenceUrl}
-                onChange={(e) => setEvidenceUrl(e.target.value)}
-                placeholder="https://example.com/evidence.png"
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: 'var(--radius-md)',
-                  fontFamily: 'inherit',
-                  fontSize: '0.95rem',
-                  color: 'var(--text-primary)',
-                  background: 'var(--bg-secondary)',
-                  boxSizing: 'border-box'
-                }}
-              />
+              <div style={{
+                border: '2px dashed var(--border-color)',
+                borderRadius: 'var(--radius-md)',
+                padding: '12px 16px',
+                textAlign: 'center',
+                cursor: 'pointer',
+                background: 'var(--bg-secondary)',
+                transition: 'all 0.2s',
+                position: 'relative'
+              }}>
+                <input
+                  type="file"
+                  accept="image/*,video/*,.pdf"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      if (file.size > 50 * 1024 * 1024) {
+                        setError('File không được vượt quá 50MB');
+                        return;
+                      }
+                      setEvidenceFile(file);
+                      setEvidenceFileName(file.name);
+                      setError(null);
+                    }
+                  }}
+                  style={{
+                    display: 'none'
+                  }}
+                  id="evidenceFileInput"
+                />
+                <label htmlFor="evidenceFileInput" style={{ cursor: 'pointer', display: 'block' }}>
+                  <div style={{ fontSize: '1.5rem', marginBottom: '6px' }}>📎</div>
+                  {evidenceFileName ? (
+                    <>
+                      <div style={{ fontWeight: 600, color: 'var(--accent-green)' }}>✓ {evidenceFileName}</div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Click để thay đổi</div>
+                    </>
+                  ) : (
+                    <>
+                      <div style={{ fontWeight: 600 }}>Click để chọn file</div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Ảnh, Video, PDF (tối đa 50MB)</div>
+                    </>
+                  )}
+                </label>
+              </div>
             </div>
 
             {/* Error Message */}

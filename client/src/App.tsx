@@ -33,6 +33,7 @@ import PostDetail from './pages/PostDetail'
 import PaymentCancel from './pages/PaymentCancel'
 import UserProfile from './pages/UserProfile'
 import Notifications from './pages/Notifications'
+import MyReports from './pages/MyReports'
 
 export default function App() {
     const { user } = useAuth()
@@ -87,6 +88,9 @@ export default function App() {
                 } />
                 <Route path="/notifications" element={
                     <ProtectedRoute><Notifications /></ProtectedRoute>
+                } />
+                <Route path="/reports" element={
+                    <ProtectedRoute><MyReports /></ProtectedRoute>
                 } />
                 <Route path="/dashboard" element={
                     <ProtectedRoute roles={['user']}><UserDashboard /></ProtectedRoute>
