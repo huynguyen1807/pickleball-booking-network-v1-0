@@ -1,5 +1,8 @@
 import { Request, Response } from 'express';
 import { sql, poolPromise } from '../config/db';
+import fs from 'fs';
+import path from 'path';
+import { getIO } from '../socket';
 
 interface AuthRequest extends Request {
     user?: {
@@ -7,6 +10,7 @@ interface AuthRequest extends Request {
         email: string;
         role: string;
     };
+    file?: Express.Multer.File;
 }
 
 // Create a report
@@ -69,7 +73,22 @@ export const createReport = async (req: AuthRequest, res: Response) => {
             `);
 
         if (duplicateCheck.recordset.length > 0) {
+            // Delete uploaded file if exists
+            if (req.file) {
+                try {
+                    fs.unlinkSync(req.file.path);
+                } catch (err) {
+                    console.error('Failed to delete file:', err);
+                }
+            }
             return res.status(400).json({ message: 'Bạn đã báo cáo đối tượng này trong 24 giờ qua' });
+        }
+
+        // Get file path if exists
+        let evidencePath = null;
+        if (req.file) {
+            evidencePath = req.file.path.replace(/\\/g, '/').replace(/^uploads\//, '');
+            console.log(`📎 Evidence file saved: ${evidencePath}`);
         }
 
         // Create report
@@ -79,7 +98,7 @@ export const createReport = async (req: AuthRequest, res: Response) => {
             .input('report_target_id', sql.Int, report_target_id || null)
             .input('report_target_type', sql.NVarChar, report_target_type || null)
             .input('description', sql.NVarChar, description)
-            .input('evidence_urls', sql.NVarChar, evidence_urls ? JSON.stringify(evidence_urls) : null)
+            .input('evidence_urls', sql.NVarChar(sql.MAX), evidencePath || null)
             .query(`
                 INSERT INTO reports (reporter_id, report_type, report_target_id, report_target_type, description, evidence_urls, status)
                 OUTPUT INSERTED.id
@@ -106,6 +125,14 @@ export const createReport = async (req: AuthRequest, res: Response) => {
 
         res.status(201).json({ message: 'Báo cáo đã được gửi', reportId });
     } catch (err) {
+        // Delete uploaded file if error
+        if (req.file) {
+            try {
+                fs.unlinkSync(req.file.path);
+            } catch (delErr) {
+                console.error('Failed to delete file:', delErr);
+            }
+        }
         console.error("Error in createReport:", err);
         res.status(500).json({ message: 'Lỗi server' });
     }
@@ -217,7 +244,7 @@ export const getReportById = async (req: AuthRequest, res: Response) => {
 export const updateReportStatus = async (req: AuthRequest, res: Response) => {
     try {
         const pool = await poolPromise;
-        const { id } = req.params;
+        const id = String(req.params.id);
         const { status, admin_note } = req.body;
 
         if (!['pending', 'investigating', 'resolved', 'rejected'].includes(status)) {
@@ -274,6 +301,20 @@ export const updateReportStatus = async (req: AuthRequest, res: Response) => {
                 VALUES (@user_id, @title, @message, @type, @reference_id)
             `);
 
+        // Emit real-time update via socket
+        const io = getIO();
+        if (io) {
+            console.log(`📡 Broadcasting report update to reports_${reportData.reporter_id}`);
+            io.to(`reports_${reportData.reporter_id}`).emit('report_status_updated', {
+                id: parseInt(id),
+                status: status,
+                admin_note: admin_note || null,
+                updated_at: new Date().toISOString()
+            });
+        } else {
+            console.warn('⚠️  Socket.io not initialized');
+        }
+
         res.json({ message: 'Cập nhật báo cáo thành công' });
     } catch (err) {
         console.error("Error in updateReportStatus:", err);
@@ -291,14 +332,22 @@ export const getMyReports = async (req: AuthRequest, res: Response) => {
             .query(`
                 SELECT 
                     id, report_type, report_target_id, report_target_type,
-                    description, status, admin_note,
+                    description, evidence_urls, status, admin_note,
                     created_at, updated_at
                 FROM reports
                 WHERE reporter_id = @reporter_id
                 ORDER BY created_at DESC
             `);
 
-        res.json(result.recordset);
+        // Format response with evidence URL
+        const reports = result.recordset.map(r => ({
+            ...r,
+            evidence_url: r.evidence_urls ? r.evidence_urls : null,
+            created_at: r.created_at ? new Date(r.created_at).toISOString() : null,
+            updated_at: r.updated_at ? new Date(r.updated_at).toISOString() : null
+        }));
+
+        res.json(reports);
     } catch (err) {
         console.error("Error in getMyReports:", err);
         res.status(500).json({ message: 'Lỗi server' });

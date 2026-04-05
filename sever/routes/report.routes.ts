@@ -1,6 +1,7 @@
 import express from 'express';
 import auth from '../middleware/auth';
 import role from '../middleware/role';
+import { uploadReportEvidence } from '../middleware/upload.middleware';
 import {
     createReport,
     getAllReports,
@@ -13,8 +14,8 @@ import {
 const router = express.Router();
 
 // User routes
-router.post('/', auth, createReport);                    // Create report
-router.get('/my-reports', auth, getMyReports);           // Get my reports
+router.post('/', auth, uploadReportEvidence.single('evidence'), createReport);  // Create report with file
+router.get('/my-reports', auth, getMyReports);                                   // Get my reports
 
 // Admin only
 router.get('/', auth, role('admin'), getAllReports);              // Get all reports

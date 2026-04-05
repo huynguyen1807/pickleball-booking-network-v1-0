@@ -11,6 +11,8 @@ const initSocket = (io: Server) => {
     _io = io;
     io.on('connection', (socket) => {
         console.log('🔌 User connected:', socket.id);
+        console.log('📍 Socket URL:', socket.handshake.url);
+        console.log('📍 Socket origin:', socket.handshake.headers.origin);
 
         // User goes online
         socket.on('user_online', (userId: number) => {
@@ -81,6 +83,17 @@ const initSocket = (io: Server) => {
 
         socket.on('leave_post', (postId) => {
             socket.leave(`post_${postId}`);
+        });
+
+        // Report updates
+        socket.on('join_reports', (userId) => {
+            console.log(`👤 User ${userId} joined reports room: reports_${userId}`);
+            socket.join(`reports_${userId}`);
+        });
+
+        socket.on('leave_reports', (userId) => {
+            console.log(`👤 User ${userId} left reports room: reports_${userId}`);
+            socket.leave(`reports_${userId}`);
         });
 
         socket.on('disconnect', () => {
