@@ -4,7 +4,10 @@ export const HOST_MIN_ADVANCE_HOURS = 1;
 export const HOST_MAX_ADVANCE_DAYS = 30;
 export const HOST_PAYMENT_WINDOW_MINUTES = 5;
 export const JOIN_PAYMENT_WINDOW_MINUTES = 5;
-export const MATCH_UNDERFILLED_CANCEL_WINDOW_MINUTES = Number(process.env.MATCH_UNDERFILLED_CANCEL_WINDOW_MINUTES);
+// Hàm getter để đọc runtime (sau khi dotenv.config() ở index.ts đã chạy)
+export const getUnderfilledCancelWindowMinutes = (): number =>
+    Number(process.env.MATCH_UNDERFILLED_CANCEL_WINDOW_MINUTES) || 30;
+export const MATCH_UNDERFILLED_CANCEL_WINDOW_MINUTES = 30; // fallback tĩnh, dùng hàm trên ở runtime
 
 type DbExecutor = any;
 

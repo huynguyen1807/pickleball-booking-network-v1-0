@@ -1,6 +1,7 @@
 import { sql, poolPromise } from '../config/db';
 import dotenv from 'dotenv';
 import { getHoursUntilStart, getScheduleConflictMessage, getUserScheduleConflict } from '../utils/matchLifecycle';
+import { applyRefundFinancialReversal } from '../utils/refundFinancials';
 dotenv.config();
 const COMMISSION = parseFloat(process.env.COMMISSION_RATE) || 0.05;
 const MIN_ADVANCE_HOURS = 1;
@@ -311,7 +312,7 @@ export const cancelBooking = async (req, res) => {
                 paymentStatusQuery = "UPDATE payments SET status = 'cancelled' WHERE booking_id = @id";
             } else if (b.status === 'confirmed') {
                 if (diffHours > 4) {
-                    paymentStatusQuery = "UPDATE payments SET status = 'refunded' WHERE booking_id = @id AND status = 'completed'";
+                    paymentStatusQuery = "UPDATE payments SET status = 'refunded', refunded_amount = amount WHERE booking_id = @id AND status = 'completed'";
                     refundPercent = 100;
                     refundAmount = b.total_price;
                 } else {
@@ -346,6 +347,24 @@ export const cancelBooking = async (req, res) => {
                         INSERT INTO wallet_transactions (user_id, amount, type, description, status)
                         VALUES (@user_id, @amount, 'refund', @desc, 'completed')
                     `);
+
+                const refundedPayments = await transaction.request()
+                    .input('booking_id', sql.Int, req.params.id)
+                    .query(`
+                        SELECT id AS payment_id, ISNULL(refunded_amount, 0) AS refunded_amount
+                        FROM payments
+                        WHERE booking_id = @booking_id
+                          AND status = 'refunded'
+                          AND ISNULL(refunded_amount, 0) > 0
+                    `);
+
+                for (const row of refundedPayments.recordset) {
+                    await applyRefundFinancialReversal(transaction, {
+                        paymentId: Number(row.payment_id),
+                        refundAmount: Number(row.refunded_amount),
+                        note: 'Booking cancellation refund'
+                    });
+                }
             }
 
             await transaction.request()

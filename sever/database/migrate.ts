@@ -9,7 +9,8 @@ const DB_NAME = process.env.DB_NAME || 'pickleball_danang';
 const MIGRATION_FILES = [
     'schema.sql',
     '07-match-payment-locking.sql',
-    '08-normalize-court-pricing-columns.sql'
+    '08-normalize-court-pricing-columns.sql',
+    '09-refund-financial-reversal.sql'
 ];
 
 const masterConfig = {
