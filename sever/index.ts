@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import http from 'http';
+import path from 'path';
 import { Server } from 'socket.io';
 import dotenv from 'dotenv';
 import authRoutes from './routes/auth.routes';
@@ -15,9 +16,12 @@ import chatRoutes from './routes/chat.routes';
 import adminRoutes from './routes/admin.routes';
 import statsRoutes from './routes/stats.routes';
 import facilityRoutes from './routes/facility.routes';
+import reportRoutes from './routes/report.routes';
+import transferRoutes from './routes/transfer.routes';
 import initSocket from './socket/index';
 import { cancelExpiredPayments } from './controllers/payment.controller';
 import { autoCheckMatches } from './controllers/match.controller';
+import { initSlotScheduler } from './utils/slot-scheduler';
 
 dotenv.config();
 
@@ -33,7 +37,7 @@ app.use(express.json({ limit: '15mb' }));
 app.use(express.urlencoded({ limit: '15mb', extended: true }));
 
 // serve uploaded files
-app.use('/uploads', express.static('uploads'));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -48,6 +52,8 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/facilities', facilityRoutes);
+app.use('/api/reports', reportRoutes);
+app.use('/api/transfers', transferRoutes);
 
 // Health check
 app.get('/api/health', (req: Request, res: Response) => {
@@ -65,6 +71,9 @@ setTimeout(cancelExpiredPayments, 5000);
 // Auto-cancel matches with insufficient players 30 min before start (every 10 min)
 setInterval(autoCheckMatches, 10 * 60 * 1000);
 setTimeout(autoCheckMatches, 15 * 1000);
+
+// Khởi tạo scheduler sinh court_slots hàng ngày (cho 30 ngày tới)
+initSlotScheduler();
 
 // Start server
 const PORT = process.env.PORT || 5000;

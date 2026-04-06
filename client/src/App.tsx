@@ -30,8 +30,11 @@ import AdminReports from './pages/AdminReports'
 import AdminChat from './pages/AdminChat'
 import AdminNotifications from './pages/AdminNotifications'
 import PostPhoto from './pages/PostPhoto'
+import PostDetail from './pages/PostDetail'
 import PaymentCancel from './pages/PaymentCancel'
 import UserProfile from './pages/UserProfile'
+import Notifications from './pages/Notifications'
+import MyReports from './pages/MyReports'
 
 export default function App() {
     const { user } = useAuth()
@@ -42,13 +45,18 @@ export default function App() {
         <>
             {user && !isAdminPage && <Navbar />}
             {user && !isAdminPage && <AIChatWidget />}
-            <Routes>
+            <main className={user && !isAdminPage ? 'appContentWithNavbar' : ''}>
+                <Routes>
                 {/* Public */}
                 <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
                 <Route path="/register" element={user ? <Navigate to="/" /> : <Register />} />
                 <Route path="/forgot-password" element={user ? <Navigate to="/" /> : <ForgotPassword />} />
                 {/* Photo permalink — accessible without login */}
                 <Route path="/post/:id/photo" element={<PostPhoto />} />
+                {/* Post detail — show in modal */}
+                <Route path="/post/:id" element={
+                    <ProtectedRoute><PostDetail /></ProtectedRoute>
+                } />
 
                 {/* Protected - All authenticated users */}
                 <Route path="/" element={
@@ -80,6 +88,12 @@ export default function App() {
                 } />
                 <Route path="/settings" element={
                     <ProtectedRoute><Settings /></ProtectedRoute>
+                } />
+                <Route path="/notifications" element={
+                    <ProtectedRoute><Notifications /></ProtectedRoute>
+                } />
+                <Route path="/reports" element={
+                    <ProtectedRoute><MyReports /></ProtectedRoute>
                 } />
                 <Route path="/dashboard" element={
                     <ProtectedRoute roles={['user']}><UserDashboard /></ProtectedRoute>
@@ -118,7 +132,8 @@ export default function App() {
 
                 {/* Fallback */}
                 <Route path="*" element={<Navigate to="/" />} />
-            </Routes>
+                </Routes>
+            </main>
         </>
     )
 }

@@ -6,7 +6,7 @@ export const getAllFacilities = async (req, res) => {
         const pool = await poolPromise;
         const result = await pool.request().query(`
             SELECT 
-                f.id, f.name, f.address, f.image, f.is_active,
+                f.id, f.name, f.address, f.is_active,
                 f.phone, f.open_time, f.close_time, f.avatar, f.cover_image, f.amenities,
                 (SELECT MIN(price_per_hour) FROM courts WHERE facility_id = f.id AND is_active = 1) AS min_price,
                 (SELECT COUNT(*) FROM courts WHERE facility_id = f.id AND is_active = 1) AS court_count,

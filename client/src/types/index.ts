@@ -33,7 +33,7 @@ export interface Booking {
   start_time: string;
   end_time: string;
   total_price: number;
-  status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
+  status: 'pending' | 'payment_pending' | 'confirmed' | 'cancelled' | 'completed' | 'expired';
   created_at: string;
   court?: Court;
   user?: User;
@@ -48,7 +48,7 @@ export interface Match {
   current_players: number;
   skill_level?: string;
   description?: string;
-  status: 'open' | 'full' | 'completed' | 'cancelled';
+  status: 'pending_host_payment' | 'waiting' | 'open' | 'full' | 'confirmed' | 'completed' | 'finished' | 'cancelled' | 'expired';
   created_at: string;
   creator?: User;
   court?: Court;

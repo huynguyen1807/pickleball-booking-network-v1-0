@@ -1,0 +1,84 @@
+.page {
+    padding: 20px 20px 40px;
+    min-height: 100vh;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.centerState {
+  text-align: center;
+  padding: 100px;
+}
+
+.backButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  min-height: 40px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.facilityCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background-color: var(--surface);
+  padding: 30px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.title {
+  margin: 0;
+}
+
+.address {
+  font-size: 1.2rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.description {
+  margin: 10px 0 0;
+}
+
+.statsRow {
+  display: flex;
+  gap: 15px;
+  margin-top: 15px;
+  flex-wrap: wrap;
+}
+
+.pill {
+  padding: 6px 14px;
+  background-color: var(--surface-hover);
+  border-radius: 20px;
+  font-size: 0.9rem;
+}
+
+.ratingPill {
+  background-color: var(--primary-dark);
+  color: #fff;
+  font-weight: 700;
+}
+
+.sectionTitle {
+  margin-top: 40px;
+  margin-bottom: 20px;
+}
+
+.courtsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 24px;
+}
+
+.emptyState {
+  text-align: center;
+  padding: 40px;
+  background-color: var(--surface);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}

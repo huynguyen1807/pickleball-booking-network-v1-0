@@ -1,13 +1,26 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { useDialog } from '../context/DialogContext'
 import api from '../api/axios'
 import MatchCard from '../components/MatchCard'
+import { PayOSPayment } from '../components/PayOSPayment'
 import styles from '../styles/Matchmaking.module.css'
-import { getTodayYMD } from '../utils/dateTime'
+import {
+    generateHalfHourOptions,
+    getAdvanceDayLimitMessage,
+    getAdvanceValidationMessage,
+    getMaxAdvanceDateYMD,
+    getTodayYMD,
+    isAtLeastAdvanceHours,
+    isWithinAdvanceDays,
+    getMaxBookingDateYMD
+} from '../utils/dateTime'
+import { sortMatchesNewestFirst } from '../utils/matchSort'
 
 const FORMATS = [
     { key: '1v1', label: '1 vs 1', players: 2, icon: '⚔️' },
-    { key: '2v2', label: '2 vs 2', players: 4, icon: '🤝' }
+    { key: '2v2', label: '2 vs 2', players: 4, icon: '🤝' },
+    { key: 'open', label: 'Open Match', players: 4, icon: '🎾' }
 ]
 const SKILL_OPTIONS = [
     { value: 'all', label: '🎯 Mọi trình độ' },
@@ -15,9 +28,11 @@ const SKILL_OPTIONS = [
     { value: 'intermediate', label: '🟡 Trung bình' },
     { value: 'advanced', label: '🔴 Nâng cao' }
 ]
+const MATCHES_PER_PAGE = 10
 
 export default function Matchmaking() {
     const { user } = useAuth()
+    const { showAlert } = useDialog()
     const [tab, setTab] = useState('all')
     const [filterSkill, setFilterSkill] = useState('all')
     const [showCreate, setShowCreate] = useState(false)
@@ -34,7 +49,20 @@ export default function Matchmaking() {
     const [selectedCourt, setSelectedCourt] = useState<any | null>(null)
     const [courtPage, setCourtPage] = useState(1)
     const [cardsPerPage, setCardsPerPage] = useState(4)
+    const [pendingPayment, setPendingPayment] = useState<any>(null)
+    const [matchPage, setMatchPage] = useState(1)
     const courtSliderRef = useRef<HTMLDivElement | null>(null)
+    const allTimeOptions = generateHalfHourOptions()
+    const isMatchStartValid = isAtLeastAdvanceHours(createForm.date, createForm.start_time)
+    const isMatchDateValid = !createForm.date || isWithinAdvanceDays(createForm.date)
+    const availableStartTimes = allTimeOptions.filter(time => {
+        if (!createForm.date) return true
+        return isAtLeastAdvanceHours(createForm.date, time)
+    })
+    const availableEndTimes = allTimeOptions.filter(time => {
+        if (!createForm.start_time) return false
+        return time > createForm.start_time
+    })
 
     useEffect(() => { loadData() }, [])
 
@@ -60,11 +88,19 @@ export default function Matchmaking() {
 
     const handleSearchCourts = async () => {
         if (!createForm.date || !createForm.start_time || !createForm.end_time) {
-            alert('Vui lòng chọn ngày và khoảng thời gian')
+            await showAlert('Vui lòng chọn ngày và khoảng thời gian')
             return
         }
         if (createForm.start_time >= createForm.end_time) {
-            alert('Giờ kết thúc phải sau giờ bắt đầu')
+            await showAlert('Giờ kết thúc phải sau giờ bắt đầu')
+            return
+        }
+        if (!isMatchDateValid) {
+            await showAlert(getAdvanceDayLimitMessage())
+            return
+        }
+        if (!isMatchStartValid) {
+            await showAlert(getAdvanceValidationMessage())
             return
         }
         setSearchingCourts(true)
@@ -78,7 +114,7 @@ export default function Matchmaking() {
             setModalStep(2)
         } catch (err) {
             console.error('Lỗi tìm sân:', err)
-            alert('Không thể tải danh sách sân. Vui lòng thử lại.')
+            await showAlert('Không thể tải danh sách sân. Vui lòng thử lại.')
         } finally {
             setSearchingCourts(false)
         }
@@ -86,40 +122,61 @@ export default function Matchmaking() {
 
     const handleCreateMatch = async () => {
         if (!selectedCourt) {
-            alert('Vui lòng chọn sân')
+            await showAlert('Vui lòng chọn sân')
             return
         }
         setCreating(true)
         try {
             const fmt = FORMATS.find(f => f.key === createForm.format)
-            await api.post('/matches', {
+            if (!isMatchDateValid) {
+                await showAlert(getAdvanceDayLimitMessage())
+                return
+            }
+            if (!isMatchStartValid) {
+                await showAlert(getAdvanceValidationMessage())
+                return
+            }
+            const res = await api.post('/matches', {
                 court_id: selectedCourt.id,
                 match_date: createForm.date,
                 start_time: createForm.start_time,
                 end_time: createForm.end_time,
                 format: createForm.format,
                 max_players: fmt?.players ?? 4,
+                min_players: createForm.format === 'open' ? 2 : undefined,
                 skill_level: createForm.skill_level,
                 description: createForm.description || undefined
             })
             resetModal()
-            loadData()
+            if (res.data?.payment) {
+                setPendingPayment({ ...res.data.payment, matchId: res.data.matchId })
+            }
         } catch (err: any) {
-            alert(err.response?.data?.message || 'Tạo trận thất bại')
+            await showAlert(err.response?.data?.message || 'Tạo trận thất bại')
         } finally {
             setCreating(false)
         }
     }
 
     const filtered = (matches as any[]).filter(m => {
-        if (tab === 'all' && ['cancelled', 'completed', 'finished'].includes(m.status)) return false
-        if (tab === 'waiting' && !['waiting', 'open', 'full'].includes(m.status)) return false
+        if (tab === 'all' && ['cancelled', 'completed', 'finished', 'expired'].includes(m.status)) return false
+        if (tab === 'waiting' && !['waiting', 'open', 'full', 'confirmed'].includes(m.status)) return false
         if (tab === 'mine' && !(m.is_creator || m.is_joined)) return false
         if (tab === 'completed' && !['completed', 'finished'].includes(m.status)) return false
         if (tab === 'cancelled' && m.status !== 'cancelled') return false
         if (tab !== 'cancelled' && filterSkill !== 'all' && m.skill_level && m.skill_level !== filterSkill && m.skill_level !== 'all') return false
         return true
     })
+
+    const sortedMatches = useMemo(() => {
+        return sortMatchesNewestFirst(filtered)
+    }, [filtered])
+
+    const totalMatchPages = Math.max(1, Math.ceil(sortedMatches.length / MATCHES_PER_PAGE))
+    const pagedMatches = sortedMatches.slice(
+        (matchPage - 1) * MATCHES_PER_PAGE,
+        matchPage * MATCHES_PER_PAGE
+    )
 
     const totalCourtPages = Math.max(1, Math.ceil(availableCourts.length / cardsPerPage))
 
@@ -167,6 +224,16 @@ export default function Matchmaking() {
         if (el) el.scrollTo({ left: 0, behavior: 'auto' })
     }, [cardsPerPage])
 
+    useEffect(() => {
+        setMatchPage(1)
+    }, [tab, filterSkill])
+
+    useEffect(() => {
+        if (matchPage > totalMatchPages) {
+            setMatchPage(totalMatchPages)
+        }
+    }, [matchPage, totalMatchPages])
+
     const formatPrice = (p: number) => new Intl.NumberFormat('vi-VN').format(p) + 'đ'
 
     if (loading) return <div className={styles.matchPage} style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-secondary)' }}>⏳ Đang tải...</div>
@@ -206,7 +273,7 @@ export default function Matchmaking() {
             </div>
 
             <div className={styles.matchGrid}>
-                {filtered.length > 0 ? filtered.map((match: any) => (
+                {pagedMatches.length > 0 ? pagedMatches.map((match: any) => (
                     <MatchCard key={match.id} match={{
                         ...match,
                         date: match.match_date,
@@ -219,6 +286,28 @@ export default function Matchmaking() {
                     </div>
                 )}
             </div>
+
+            {sortedMatches.length > MATCHES_PER_PAGE && (
+                <div className={styles.matchPager}>
+                    <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => setMatchPage(p => Math.max(1, p - 1))}
+                        disabled={matchPage <= 1}
+                    >
+                        ← Trang trước
+                    </button>
+                    <span className={styles.matchPagerText}>Trang {matchPage}/{totalMatchPages}</span>
+                    <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => setMatchPage(p => Math.min(totalMatchPages, p + 1))}
+                        disabled={matchPage >= totalMatchPages}
+                    >
+                        Trang sau →
+                    </button>
+                </div>
+            )}
 
             {/* Create Match Modal */}
             {showCreate && (
@@ -254,7 +343,7 @@ export default function Matchmaking() {
                                     {/* Skill level */}
                                     <div className="input-group">
                                         <label>Yêu cầu trình độ</label>
-                                        <select className="input-field" value={createForm.skill_level}
+                                        <select className={`input-field ${styles.timeSelect}`} value={createForm.skill_level}
                                             onChange={e => setCreateForm(p => ({ ...p, skill_level: e.target.value }))}>
                                             {SKILL_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                                         </select>
@@ -265,21 +354,42 @@ export default function Matchmaking() {
                                         <label>Ngày chơi</label>
                                         <input type="date" className="input-field" value={createForm.date}
                                             min={getTodayYMD()}
-                                            onChange={e => setCreateForm(p => ({ ...p, date: e.target.value }))} />
+                                            max={getMaxBookingDateYMD(30)}
+                                            onChange={e => setCreateForm(p => ({
+                                                ...p,
+                                                date: e.target.value,
+                                                start_time: isAtLeastAdvanceHours(e.target.value, p.start_time) ? p.start_time : '',
+                                                end_time: ''
+                                            }))} />
                                     </div>
+
+                                    {createForm.date && (
+                                        <div style={{ marginBottom: '12px', padding: '12px', borderRadius: '10px', background: 'rgba(245,158,11,0.14)', color: '#9a6700', fontSize: '0.85rem' }}>
+                                            {getAdvanceValidationMessage()}
+                                            <br />
+                                            {getAdvanceDayLimitMessage()}
+                                        </div>
+                                    )}
 
                                     {/* Time range */}
                                     <div className={styles.timeRangeGrid}>
                                         <div className="input-group">
                                             <label>Giờ bắt đầu</label>
                                             <select className={`input-field ${styles.timeSelect}`} value={createForm.start_time}
-                                                onChange={e => setCreateForm(p => ({ ...p, start_time: e.target.value }))}>
+                                                onChange={e => setCreateForm(p => ({ ...p, start_time: e.target.value, end_time: '' }))}>
                                                 <option value="">-- Chọn giờ --</option>
-                                                {Array.from({ length: 36 }, (_, i) => {
-                                                    const h = Math.floor(i / 2) + 5
-                                                    const m = i % 2 === 0 ? '00' : '30'
-                                                    const val = `${String(h).padStart(2, '0')}:${m}`
-                                                    return <option key={val} value={val}>{val}</option>
+                                                {allTimeOptions.map(val => {
+                                                    const isDisabled = !!createForm.date && !availableStartTimes.includes(val)
+                                                    return (
+                                                        <option
+                                                            key={val}
+                                                            value={val}
+                                                            disabled={isDisabled}
+                                                            style={{ color: isDisabled ? '#9ca3af' : '#000000b1' }}
+                                                        >
+                                                            {val}
+                                                        </option>
+                                                    )
                                                 })}
                                             </select>
                                         </div>
@@ -288,11 +398,8 @@ export default function Matchmaking() {
                                             <select className={`input-field ${styles.timeSelect}`} value={createForm.end_time}
                                                 onChange={e => setCreateForm(p => ({ ...p, end_time: e.target.value }))}>
                                                 <option value="">-- Chọn giờ --</option>
-                                                {Array.from({ length: 36 }, (_, i) => {
-                                                    const h = Math.floor(i / 2) + 5
-                                                    const m = i % 2 === 0 ? '00' : '30'
-                                                    const val = `${String(h).padStart(2, '0')}:${m}`
-                                                    const isDisabled = !!createForm.start_time && val <= createForm.start_time
+                                                {allTimeOptions.map(val => {
+                                                    const isDisabled = !availableEndTimes.includes(val)
                                                     return (
                                                         <option
                                                             key={val}
@@ -319,7 +426,7 @@ export default function Matchmaking() {
                                     </div>
 
                                     <button className="btn btn-primary btn-lg" style={{ width: '100%' }}
-                                        onClick={handleSearchCourts} disabled={searchingCourts}>
+                                        onClick={handleSearchCourts} disabled={searchingCourts || !isMatchStartValid || !isMatchDateValid}>
                                         {searchingCourts ? '⏳ Đang tìm sân...' : '🔍 Tìm sân khả dụng'}
                                     </button>
                                 </>
@@ -430,6 +537,34 @@ export default function Matchmaking() {
                                 </>
                             )}
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {pendingPayment && (
+                <div style={{
+                    position: 'fixed', inset: 0, zIndex: 3000,
+                    background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
+                }}>
+                    <div style={{ position: 'relative', width: '100%', maxWidth: '480px' }}>
+                        <button onClick={() => setPendingPayment(null)} style={{
+                            position: 'absolute', top: '-12px', right: '-12px',
+                            background: 'none', border: 'none', fontSize: '28px',
+                            cursor: 'pointer', color: '#aaa', zIndex: 10
+                        }}>×</button>
+                        <PayOSPayment
+                            checkoutUrl={pendingPayment.checkoutUrl}
+                            orderCode={pendingPayment.orderCode}
+                            paymentLinkId={pendingPayment.paymentLinkId}
+                            amount={pendingPayment.amount}
+                            expiresInSeconds={pendingPayment.expiresInSeconds}
+                            onSuccess={() => {
+                                setPendingPayment(null)
+                                loadData()
+                            }}
+                            onCancel={() => setPendingPayment(null)}
+                        />
                     </div>
                 </div>
             )}

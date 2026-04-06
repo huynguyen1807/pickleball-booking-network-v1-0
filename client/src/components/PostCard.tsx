@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import api from '../api/axios'
 import { io as socketIO } from 'socket.io-client'
 import UserProfileCard from './UserProfileCard'
+import ReportModal from './ReportModal'
 import { useDialog } from '../context/DialogContext'
 import styles from '../styles/Cards.module.css'
 
@@ -15,6 +16,44 @@ interface PostCardProps {
     isHidden?: boolean
     onDeleted?: (id: number) => void
     onHide?: (id: number) => void
+}
+
+const HOME_SCROLL_KEY = 'home_feed_scroll_y'
+
+const parseFindPlayerPost = (content?: string) => {
+    if (!content) return null
+
+    const lines = content
+        .split('\n')
+        .map(l => l.trim())
+        .filter(Boolean)
+
+    const titleLine = lines.find(l => l.includes('Tìm người chơi')) || ''
+    const dateLine = lines.find(l => l.includes('🗓️') || l.includes('📅')) || ''
+    const priceLine = lines.find(l => l.includes('💰')) || ''
+    const noteLine = lines.find(l => l.toLowerCase().startsWith('ghi chú:')) || ''
+
+    const formatMatch = titleLine.match(/\b(1v1|2v2)\b/i)
+    const courtMatch = titleLine.match(/tại\s+(.+?)\s*\((.+?)\)/i)
+    const dateTimeMatch = dateLine.match(/(\d{1,2}\/\d{1,2}\/\d{4}).*?(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/)
+    const priceMatch = priceLine.match(/([\d.,]+)\s*đ?\s*\/\s*người/i)
+    const skillMatch = dateLine.match(/trình độ\s+(.+)$/i)
+    const matchIdMatch = content.match(/(?:Trận|Match)\s*#(\d+)/i)
+
+    if (!formatMatch && !courtMatch && !dateTimeMatch && !priceMatch) return null
+
+    return {
+        format: formatMatch?.[1]?.toUpperCase() || null,
+        courtName: courtMatch?.[1]?.trim() || null,
+        facilityName: courtMatch?.[2]?.trim() || null,
+        dateText: dateTimeMatch?.[1] || null,
+        startTime: dateTimeMatch?.[2] || null,
+        endTime: dateTimeMatch?.[3] || null,
+        pricePerPlayer: priceMatch?.[1] || null,
+        skillLevel: skillMatch?.[1]?.trim() || null,
+        note: noteLine ? noteLine.replace(/^ghi chú:\s*/i, '') : null,
+        matchId: matchIdMatch ? Number(matchIdMatch[1]) : null
+    }
 }
 
 export default function PostCard({ post, isHidden = false, onDeleted, onHide }: PostCardProps) {
@@ -112,6 +151,7 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
         event: { text: '🎉 Sự kiện', class: 'purple' }
     }
     const typeInfo = (typeLabels[(data.post_type as string) || 'share'] || typeLabels.share)
+    const findPlayerMeta = data.post_type === 'find_player' ? parseFindPlayerPost(data.content) : null
 
     const handleLike = async () => {
         if (!user) return await showAlert('Thông báo', 'Vui lòng đăng nhập để tương tác')
@@ -173,6 +213,7 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
 
     const canDelete = user && (user.id === data.user_id || user.role === 'admin')
     const [showMenu, setShowMenu] = useState(false)
+    const [showReportModal, setShowReportModal] = useState(false)
 
     const toggleMenu = () => setShowMenu(prev => !prev)
 
@@ -192,6 +233,11 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
             await showAlert('Lỗi', err.response?.data?.message || 'Lỗi khi xóa bài viết')
         }
         setShowMenu(false)
+    }
+
+    const handleOpenPhoto = (mediaIndex: number = 0) => {
+        sessionStorage.setItem(HOME_SCROLL_KEY, String(window.scrollY || 0))
+        navigate(`/post/${data.id}/photo?index=${mediaIndex}`)
     }
 
     // show minimal card when hidden
@@ -232,6 +278,15 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
                             <button className={styles.menuItem} onClick={handleActionHide}>Bỏ ẩn bài viết</button>
                         )}
                         {canDelete && <button className={styles.menuItem} onClick={handleActionDelete}>Xóa bài viết</button>}
+                        {user?.id !== data.user_id && (
+                            <button 
+                                className={styles.menuItem} 
+                                style={{ color: 'var(--accent-red)' }}
+                                onClick={() => { setShowReportModal(true); setShowMenu(false) }}
+                            >
+                                🚩 Báo cáo bài viết
+                            </button>
+                        )}
                     </div>
                 )}
             </div>
@@ -262,12 +317,55 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
                 <span className={`badge badge-${typeInfo.class}`}>{typeInfo.text}</span>
             </div>
 
-            <div className={styles.postContent}>{data.content}</div>
+            {findPlayerMeta ? (
+                <div className={styles.findPlayerCard}>
+                    {findPlayerMeta.format && (
+                        <div className={styles.findPlayerTopRow}>
+                            <span className={styles.findPlayerFormatBadge}>⚔️ {findPlayerMeta.format}</span>
+                            {findPlayerMeta.skillLevel && (
+                                <span className={styles.findPlayerSkill}>Trình độ: {findPlayerMeta.skillLevel}</span>
+                            )}
+                        </div>
+                    )}
+
+                    <div className={styles.findPlayerMainInfo}>
+                        <div className={styles.findPlayerLine}>🏟️ {findPlayerMeta.courtName || 'Sân đang cập nhật'}</div>
+                        {findPlayerMeta.facilityName && (
+                            <div className={styles.findPlayerSubLine}>📍 {findPlayerMeta.facilityName}</div>
+                        )}
+                        {(findPlayerMeta.dateText || findPlayerMeta.startTime || findPlayerMeta.endTime) && (
+                            <div className={styles.findPlayerLine}>
+                                📅 {findPlayerMeta.dateText || '--/--/----'} | {findPlayerMeta.startTime || '--:--'} - {findPlayerMeta.endTime || '--:--'}
+                            </div>
+                        )}
+                        {findPlayerMeta.pricePerPlayer && (
+                            <div className={styles.findPlayerLine}>💰 {findPlayerMeta.pricePerPlayer}đ / người</div>
+                        )}
+                        {findPlayerMeta.note && (
+                            <div className={styles.findPlayerNote}>📝 {findPlayerMeta.note}</div>
+                        )}
+                    </div>
+
+                    {findPlayerMeta.matchId && (
+                        <div className={styles.findPlayerFooter}>
+                            <button
+                                type="button"
+                                className="btn btn-primary btn-sm"
+                                onClick={() => navigate(`/matches/${findPlayerMeta.matchId}`)}
+                            >
+                                Xem trận #{findPlayerMeta.matchId}
+                            </button>
+                        </div>
+                    )}
+                </div>
+            ) : (
+                <div className={styles.postContent}>{data.content}</div>
+            )}
 
             {data.image && (
                 <>
                     <button
-                        onClick={() => navigate(`/post/${data.id}/photo`)}
+                        onClick={handleOpenPhoto}
                         style={{ display: 'block', width: '100%', padding: 0, border: 'none', background: 'none', cursor: 'zoom-in' }}
                         title="Click để xem ảnh phóng to"
                     >
@@ -275,6 +373,104 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
                     </button>
                     <div className={styles.imageHint}>🔍 Click ảnh để xem toàn màn hình</div>
                 </>
+            )}
+
+            {/* Media Gallery - Multiple images and videos */}
+            {data.media && data.media.length > 0 && (
+                <div style={{ marginTop: '12px' }}>
+                    {data.media.length === 1 ? (
+                        // Single media display
+                        data.media[0].type === 'video' ? (
+                            <video
+                                src={data.media[0].url}
+                                controls
+                                style={{
+                                    width: '100%',
+                                    borderRadius: 'var(--radius-md)',
+                                    background: '#000',
+                                    maxHeight: '400px'
+                                }}
+                            />
+                        ) : (
+                            <button
+                                onClick={handleOpenPhoto}
+                                style={{ display: 'block', width: '100%', padding: 0, border: 'none', background: 'none', cursor: 'zoom-in' }}
+                                title="Click để xem ảnh phóng to"
+                            >
+                                <img
+                                    src={data.media[0].url}
+                                    alt=""
+                                    className={styles.postImage}
+                                    style={{ pointerEvents: 'none' }}
+                                />
+                            </button>
+                        )
+                    ) : (
+                        // Multiple media gallery
+                        <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: data.media.length === 2 ? '1fr 1fr' : '1fr 1fr 1fr',
+                            gap: '4px',
+                            borderRadius: 'var(--radius-md)',
+                            overflow: 'hidden'
+                        }}>
+                            {data.media.map((media, idx) => (
+                                <div
+                                    key={media.id}
+                                    style={{
+                                        aspectRatio: '1',
+                                        background: '#000',
+                                        position: 'relative',
+                                        overflow: 'hidden',
+                                        cursor: 'pointer'
+                                    }}
+                                    onClick={() => handleOpenPhoto(idx)}
+                                >
+                                    {media.type === 'video' ? (
+                                        <div style={{
+                                            width: '100%',
+                                            height: '100%',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            fontSize: '32px'
+                                        }}>
+                                            🎥
+                                        </div>
+                                    ) : (
+                                        <img
+                                            src={media.url}
+                                            alt={`media-${idx}`}
+                                            style={{
+                                                width: '100%',
+                                                height: '100%',
+                                                objectFit: 'cover'
+                                            }}
+                                        />
+                                    )}
+                                    {idx === 3 && data.media.length > 4 && (
+                                        <div style={{
+                                            position: 'absolute',
+                                            top: 0,
+                                            left: 0,
+                                            right: 0,
+                                            bottom: 0,
+                                            background: 'rgba(0,0,0,0.6)',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            fontSize: '24px',
+                                            fontWeight: 'bold',
+                                            color: 'white'
+                                        }}>
+                                            +{data.media.length - 4}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
             )}
 
             {/* Like / Comment / Share Actions */}
@@ -404,6 +600,14 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
                     </form>
                 </div>
             )}
+
+            <ReportModal
+                isOpen={showReportModal}
+                targetId={data.id}
+                targetType="post"
+                targetName={`Bài viết của ${data.user_name}`}
+                onClose={() => setShowReportModal(false)}
+            />
         </div>
     )
 }

@@ -2,9 +2,9 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 
-const uploadDir = 'uploads';
+const uploadDir = path.join(__dirname, '..', 'uploads');
 if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir);
+    fs.mkdirSync(uploadDir, { recursive: true });
 }
 
 const storage = multer.diskStorage({
@@ -61,4 +61,73 @@ export const uploadAvatar = multer({
     storage: avatarStorage,
     fileFilter: imageOnlyFilter,
     limits: { fileSize: 3 * 1024 * 1024 } // Giới hạn 3MB
+});
+
+// Post media upload config (images + videos)
+const postMediaDir = path.join(uploadDir, 'post_media');
+if (!fs.existsSync(postMediaDir)) {
+    fs.mkdirSync(postMediaDir, { recursive: true });
+}
+
+const postMediaStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, postMediaDir);
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, uniqueSuffix + path.extname(file.originalname));
+    }
+});
+
+const postMediaFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+    const allowedMimeTypes = [
+        'image/jpeg', 'image/png', 'image/webp', // Images
+        'video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm' // Videos
+    ];
+    if (allowedMimeTypes.includes(file.mimetype)) {
+        cb(null, true);
+    } else {
+        cb(new Error('Chỉ chấp nhận file ảnh (JPG, PNG, WEBP) hoặc video (MP4, MOV, AVI, WEBM)'));
+    }
+};
+
+export const uploadPostMedia = multer({
+    storage: postMediaStorage,
+    fileFilter: postMediaFilter,
+    limits: { fileSize: 100 * 1024 * 1024 } // Giới hạn 100MB cho video
+});
+
+// Report evidence upload config
+const reportEvidenceDir = path.join(uploadDir, 'report_evidence');
+if (!fs.existsSync(reportEvidenceDir)) {
+    fs.mkdirSync(reportEvidenceDir, { recursive: true });
+}
+
+const reportEvidenceStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, reportEvidenceDir);
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, uniqueSuffix + path.extname(file.originalname));
+    }
+});
+
+const reportEvidenceFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+    const allowedMimeTypes = [
+        'image/jpeg', 'image/png', 'image/webp', // Images
+        'video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm', // Videos
+        'application/pdf' // PDF
+    ];
+    if (allowedMimeTypes.includes(file.mimetype)) {
+        cb(null, true);
+    } else {
+        cb(new Error('Chỉ chấp nhận ảnh, video, hoặc PDF'));
+    }
+};
+
+export const uploadReportEvidence = multer({
+    storage: reportEvidenceStorage,
+    fileFilter: reportEvidenceFilter,
+    limits: { fileSize: 50 * 1024 * 1024 } // Giới hạn 50MB cho evidence
 });

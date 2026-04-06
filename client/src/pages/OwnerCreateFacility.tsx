@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api/axios'
+import BackButton from '../components/BackButton'
 import { useDialog } from '../context/DialogContext'
 import styles from '../styles/Dashboard.module.css'
 
@@ -69,7 +70,7 @@ export default function OwnerCreateFacility() {
                     <h1 className="page-title">🏭 Thêm cơ sở mới</h1>
                     <p className="page-subtitle">Cấu hình thông tin chung cho cụm sân của bạn</p>
                 </div>
-                <button className="btn btn-secondary" onClick={() => navigate('/owner/courts')}>Quay lại</button>
+                <BackButton to="/owner/courts" />
             </div>
 
             <form onSubmit={handleSubmit} className="glass-card" style={{ padding: '30px', maxWidth: '800px', margin: '0 auto' }}>

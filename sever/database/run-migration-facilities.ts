@@ -12,7 +12,7 @@ async function runMigration() {
     try {
         const pool = await poolPromise;
 
-        const migratePath = path.join(__dirname, '01-facilities-migration.sql');
+            const migratePath = path.join(__dirname, '01-facilities-migration.sql');
         if (!fs.existsSync(migratePath)) {
             console.error('❌ File not found at:', migratePath);
             process.exit(1);

@@ -34,7 +34,31 @@ export const getOwnerStats = async (req, res) => {
         const pool = await poolPromise;
         const uid = req.user.id;
         const r1 = await pool.request().input('uid', sql.Int, uid).query('SELECT COUNT(*) AS total_bookings FROM bookings b JOIN courts c ON b.court_id = c.id JOIN facilities f ON c.facility_id = f.id WHERE f.owner_id = @uid');
-        const r2 = await pool.request().input('uid', sql.Int, uid).query("SELECT ISNULL(SUM(b.total_price - b.commission_amount),0) AS revenue FROM bookings b JOIN courts c ON b.court_id = c.id JOIN facilities f ON c.facility_id = f.id WHERE f.owner_id = @uid AND b.status IN ('confirmed','completed')");
+        const r2 = await pool.request().input('uid', sql.Int, uid).query(`
+            SELECT ISNULL(SUM(ROUND((p.amount - ISNULL(p.refunded_amount, 0)) * 0.95, 0)), 0) AS revenue
+            FROM payments p
+            OUTER APPLY (
+                SELECT TOP 1 owner_id
+                FROM (
+                    SELECT fb.owner_id, 1 AS priority_order
+                    FROM bookings b
+                    JOIN courts cb ON cb.id = b.court_id
+                    JOIN facilities fb ON fb.id = cb.facility_id
+                    WHERE b.id = p.booking_id
+
+                    UNION ALL
+
+                    SELECT fm.owner_id, 2 AS priority_order
+                    FROM matches m
+                    JOIN courts cm ON cm.id = m.court_id
+                    JOIN facilities fm ON fm.id = cm.facility_id
+                    WHERE m.id = p.match_id
+                ) owner_candidates
+                ORDER BY priority_order
+            ) owner_map
+            WHERE owner_map.owner_id = @uid
+              AND p.status IN ('completed', 'refunded', 'partial_refunded')
+        `);
         const r3 = await pool.request().input('uid', sql.Int, uid).query('SELECT COUNT(*) AS match_count FROM matches m JOIN courts c ON m.court_id = c.id JOIN facilities f ON c.facility_id = f.id WHERE f.owner_id = @uid');
         const r4 = await pool.request().input('uid', sql.Int, uid).query('SELECT COUNT(*) AS court_count FROM courts c JOIN facilities f ON c.facility_id = f.id WHERE f.owner_id = @uid');
         const tb = r1.recordset[0].total_bookings;
@@ -50,7 +74,11 @@ export const getAdminStats = async (req, res) => {
         const pool = await poolPromise;
         const r1 = await pool.request().query('SELECT COUNT(*) AS total_users FROM users');
         const r2 = await pool.request().query('SELECT COUNT(*) AS total_courts FROM courts WHERE is_active = 1');
-        const r3 = await pool.request().query("SELECT ISNULL(SUM(commission),0) AS total_revenue FROM payments WHERE status='completed'");
+        const r3 = await pool.request().query(`
+            SELECT ISNULL(SUM(ROUND((amount - ISNULL(refunded_amount, 0)) * 0.05, 0)), 0) AS total_revenue
+            FROM payments
+            WHERE status IN ('completed', 'refunded', 'partial_refunded')
+        `);
         const r4 = await pool.request().query('SELECT COUNT(*) AS today_matches FROM matches WHERE match_date = CAST(GETDATE() AS DATE)');
         const r5 = await pool.request().query("SELECT COUNT(*) AS pending_requests FROM upgrade_requests WHERE status='pending'");
         const r6 = await pool.request().query('SELECT COUNT(*) AS today_bookings FROM bookings WHERE booking_date = CAST(GETDATE() AS DATE)');

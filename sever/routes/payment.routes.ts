@@ -2,6 +2,7 @@ import { Router } from 'express';
 import auth from '../middleware/auth';
 import {
     getPaymentHistory,
+    payByBalance,
     // PayOS
     payosInit,
     payosWebhook,
@@ -17,6 +18,9 @@ const router = Router();
 
 // ===== Payment History =====
 router.get('/history', auth, getPaymentHistory);
+
+// ===== Wallet Balance Payment =====
+router.post('/balance-pay', auth, payByBalance);
 
 // ===== PayOS Payment Routes =====
 /**

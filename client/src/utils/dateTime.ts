@@ -1,8 +1,76 @@
 const pad2 = (n: number): string => String(n).padStart(2, '0');
 
+const toLocalYmd = (date: Date): string => {
+    return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+};
+
+export const MIN_ADVANCE_BOOKING_HOURS = 1;
+export const MAX_ADVANCE_BOOKING_DAYS = 30;
+
 export const getTodayYMD = (): string => {
     const now = new Date();
-    return `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
+    return toLocalYmd(now);
+};
+
+export const getMaxAdvanceDateYMD = (advanceDays = MAX_ADVANCE_BOOKING_DAYS): string => {
+    const maxDate = new Date();
+    maxDate.setDate(maxDate.getDate() + advanceDays);
+    return toLocalYmd(maxDate);
+};
+
+export const getMinimumAdvanceDateTime = (advanceHours = MIN_ADVANCE_BOOKING_HOURS): Date => {
+    return new Date(Date.now() + advanceHours * 60 * 60 * 1000);
+};
+
+export const combineLocalDateTime = (date: string, time: string): Date => {
+    return new Date(`${date}T${time.length === 5 ? `${time}:00` : time}`);
+};
+
+export const isAtLeastAdvanceHours = (date: string, time: string, advanceHours = MIN_ADVANCE_BOOKING_HOURS): boolean => {
+    if (!date || !time) return false;
+    const selected = combineLocalDateTime(date, time);
+    if (Number.isNaN(selected.getTime())) return false;
+    return selected.getTime() >= getMinimumAdvanceDateTime(advanceHours).getTime();
+};
+
+export const getAdvanceValidationMessage = (advanceHours = MIN_ADVANCE_BOOKING_HOURS): string => {
+    return `Thời gian bắt đầu phải cách hiện tại ít nhất ${advanceHours} tiếng`;
+};
+
+export const isWithinAdvanceDays = (date: string, advanceDays = MAX_ADVANCE_BOOKING_DAYS): boolean => {
+    if (!date) return false;
+
+    const selected = new Date(`${date}T00:00:00`);
+    if (Number.isNaN(selected.getTime())) return false;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const maxDate = new Date(today);
+    maxDate.setDate(maxDate.getDate() + advanceDays);
+
+    return selected >= today && selected <= maxDate;
+};
+
+export const getAdvanceDayLimitMessage = (advanceDays = MAX_ADVANCE_BOOKING_DAYS): string => {
+    return `Chỉ được đặt trong vòng ${advanceDays} ngày tới`;
+};
+
+export const generateHalfHourOptions = (startHour = 5, endHour = 23): string[] => {
+    const options: string[] = [];
+    for (let hour = startHour; hour <= endHour; hour++) {
+        for (let minute = 0; minute < 60; minute += 30) {
+            if (hour === endHour && minute === 30) continue;
+            options.push(`${pad2(hour)}:${pad2(minute)}`);
+        }
+    }
+    return options;
+};
+
+export const getMaxBookingDateYMD = (days = 30): string => {
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 };
 
 export const formatDateVN = (value: any, fallback = '--'): string => {

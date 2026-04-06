@@ -1,4 +1,5 @@
 import { sql, poolPromise } from '../config/db';
+import { getHoursUntilStart, getMatchWindowError } from '../utils/matchLifecycle';
 
 // Get available courts for a given date + time range (used by match creation)
 export const getAvailableCourts = async (req, res) => {
@@ -6,6 +7,11 @@ export const getAvailableCourts = async (req, res) => {
         const { date, start_time, end_time } = req.query;
         if (!date || !start_time || !end_time)
             return res.status(400).json({ message: 'Cần truyền date, start_time, end_time' });
+        const matchWindowError = getMatchWindowError(date, start_time);
+        if (matchWindowError)
+            return res.status(400).json({ message: matchWindowError });
+        if (getHoursUntilStart(date, start_time) < 1)
+            return res.status(400).json({ message: 'Giờ bắt đầu phải cách hiện tại ít nhất 1 giờ' });
 
         const pool = await poolPromise;
         // Courts that are active and have no conflicting booking or match in the slot
@@ -25,14 +31,14 @@ export const getAvailableCourts = async (req, res) => {
                       SELECT 1 FROM bookings b
                       WHERE b.court_id = c.id
                         AND b.booking_date = @date
-                        AND b.status IN ('confirmed','pending')
+                                                AND b.status IN ('confirmed','pending','payment_pending')
                         AND b.start_time < @end AND b.end_time > @start
                   )
                   AND NOT EXISTS (
                       SELECT 1 FROM matches m
                       WHERE m.court_id = c.id
                         AND m.match_date = @date
-                        AND m.status NOT IN ('cancelled','completed','finished')
+                                                AND m.status NOT IN ('cancelled','completed','finished','expired')
                         AND m.start_time < @end AND m.end_time > @start
                   )
                 ORDER BY c.price_per_hour ASC
@@ -267,7 +273,7 @@ export const getCourtSlots = async (req, res) => {
                 FROM bookings
                 WHERE court_id     = @court_id
                   AND booking_date = @booking_date
-                  AND status IN ('confirmed', 'pending')
+                  AND status IN ('confirmed', 'pending', 'payment_pending')
             `);
             
         const bookedRanges = bookingsResult.recordset;
@@ -281,9 +287,8 @@ export const getCourtSlots = async (req, res) => {
         const day = String(now.getDate()).padStart(2, '0');
         const todayStr = `${year}-${month}-${day}`;
         
-        const currentHour = now.getHours();
-        const currentMinute = now.getMinutes();
-        const currentTimeString = `${String(currentHour).padStart(2, '0')}:${String(currentMinute).padStart(2, '0')}`;
+        const minStart = new Date(now.getTime() + 60 * 60 * 1000);
+        const minStartMinutes = minStart.getHours() * 60 + minStart.getMinutes();
 
         const isToday = queryDateStr === todayStr;
         const isPastDate = queryDateStr < todayStr;
@@ -309,7 +314,7 @@ export const getCourtSlots = async (req, res) => {
             if (isPastDate) {
                  isPastSlot = true;
             } else if (isToday) {
-                 isPastSlot = st <= currentTimeString;
+                  isPastSlot = curMin < minStartMinutes;
             }
 
             slots.push({ 

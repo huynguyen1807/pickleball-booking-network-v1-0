@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { useDialog } from '../context/DialogContext'
 import api from '../api/axios'
+import BackButton from '../components/BackButton'
 import styles from '../styles/UserProfile.module.css'
 
 type AvatarMode = null | 'choose' | 'camera' | 'preview'
@@ -10,6 +12,7 @@ export default function UserProfile() {
     const { id } = useParams()
     const navigate = useNavigate()
     const { user: currentUser, updateUser } = useAuth()
+    const { showAlert } = useDialog()
     const [profile, setProfile] = useState<any>(null)
     const [loading, setLoading] = useState(true)
 
@@ -50,7 +53,7 @@ export default function UserProfile() {
             const res = await api.post('/chat/dm', { targetUserId: parseInt(id!) })
             navigate(`/chat?room=${res.data.roomId}`)
         } catch (err: any) {
-            alert(err.response?.data?.message || 'Không thể tạo cuộc trò chuyện')
+            await showAlert(err.response?.data?.message || 'Không thể tạo cuộc trò chuyện')
         }
     }
 
@@ -174,8 +177,7 @@ export default function UserProfile() {
 
     return (
         <div className={styles.profilePage}>
-            <button className="btn btn-secondary btn-sm" onClick={() => navigate(-1)}
-                style={{ marginBottom: '20px' }}>← Quay lại</button>
+            <BackButton size="sm" style={{ marginBottom: '20px' }} />
 
             <div className={styles.profileCard}>
                 <div className={styles.coverBg} />

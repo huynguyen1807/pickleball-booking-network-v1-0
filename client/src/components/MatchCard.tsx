@@ -19,13 +19,15 @@ export default function MatchCard({ match }) {
     }
 
     const statusLabels: Record<string, { text: string; class: string }> = {
+        pending_host_payment: { text: 'Chờ host thanh toán', class: 'yellow' },
         waiting:   { text: 'Đang tìm người', class: 'yellow' },
         open:      { text: 'Đang tìm người', class: 'yellow' },
         full:      { text: 'Đã đủ người',    class: 'blue' },
         confirmed: { text: 'Đã xác nhận',   class: 'green' },
         completed: { text: 'Hoàn thành',    class: 'blue' },
         finished:  { text: 'Hoàn thành',    class: 'blue' },
-        cancelled: { text: 'Đã hủy',        class: 'red' }
+        cancelled: { text: 'Đã hủy',        class: 'red' },
+        expired:   { text: 'Hết hạn',       class: 'red' }
     }
 
     const statusInfo = statusLabels[data.status] || statusLabels.waiting
@@ -65,7 +67,7 @@ export default function MatchCard({ match }) {
                         padding: '3px 10px', borderRadius: '999px', fontSize: '0.72rem', fontWeight: 700,
                         background: 'rgba(0,230,118,0.12)', border: '1px solid rgba(0,230,118,0.3)', color: 'var(--accent-green)'
                     }}>
-                        {data.format === '1v1' ? '⚔️' : '🤝'} {data.format?.toUpperCase()}
+                        {data.format === '1v1' ? '⚔️' : data.format === 'open' ? '🎾' : '🤝'} {data.format?.toUpperCase()}
                     </span>
                 </div>
             )}

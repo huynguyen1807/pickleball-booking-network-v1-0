@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import api from '../api/axios';
+import BackButton from './BackButton';
 import styles from '../styles/Payment.module.css';
 
 interface PayOSPaymentProps {
@@ -7,6 +8,7 @@ interface PayOSPaymentProps {
   orderCode: number;
   paymentLinkId: string;
   amount: number;
+  expiresInSeconds?: number;
   onSuccess: () => void;
   onCancel?: () => void;
 }
@@ -16,16 +18,24 @@ export function PayOSPayment({
   orderCode,
   paymentLinkId,
   amount,
+  expiresInSeconds = 300,
   onSuccess,
   onCancel
 }: PayOSPaymentProps) {
   const [status, setStatus] = useState<
     'pending' | 'completed' | 'failed' | 'expired' | 'cancelled'
   >('pending');
-  const [timeLeft, setTimeLeft] = useState(900); // 15 minutes
+  const [timeLeft, setTimeLeft] = useState(expiresInSeconds);
   const [polling, setPolling] = useState(true);
   const payosWindow = useRef<Window | null>(null);
   const hasOpenedWindow = useRef(false);
+
+  const closePayOSWindowAndFocusMain = () => {
+    if (payosWindow.current && !payosWindow.current.closed) {
+      payosWindow.current.close();
+    }
+    window.focus();
+  };
 
   // Countdown timer
   useEffect(() => {
@@ -41,7 +51,7 @@ export function PayOSPayment({
     }, 1000);
 
     return () => clearInterval(timer);
-  }, []);
+  }, [expiresInSeconds]);
 
   // Auto-open checkout URL in new tab (only once on mount)
   useEffect(() => {
@@ -77,11 +87,7 @@ export function PayOSPayment({
           
           // Đóng tab PayOS sau khi thanh toán thành công
           setTimeout(() => {
-            if (payosWindow.current && !payosWindow.current.closed) {
-              payosWindow.current.close();
-            }
-            // Focus về tab gốc
-            window.focus();
+            closePayOSWindowAndFocusMain();
           }, 100);
           
           // Delay thêm 2s để ensure webhook processed
@@ -94,6 +100,14 @@ export function PayOSPayment({
         } else if (currentStatus === 'cancelled') {
           setStatus('cancelled');
           setPolling(false);
+
+          // Hủy thanh toán: đóng tab PayOS và quay về màn hình trước đó
+          setTimeout(() => {
+            closePayOSWindowAndFocusMain();
+          }, 100);
+          setTimeout(() => {
+            if (onCancel) onCancel();
+          }, 600);
         } else if (currentStatus === 'expired') {
           setStatus('expired');
           setPolling(false);
@@ -234,13 +248,8 @@ export function PayOSPayment({
         <div className={styles.paymentExpired}>
           <div className={styles.warningIcon}>⏳</div>
           <h2>⏰ Giao dịch đã hết hạn</h2>
-          <p>Thời gian thanh toán đã hết (15 phút). Đơn đặt sân sẽ được hủy tự động.</p>
-          <button 
-            onClick={onCancel}
-            className={styles.btnNewQR}
-          >
-            Quay lại
-          </button>
+          <p>Thời gian thanh toán đã hết. Slot giữ chỗ đã được giải phóng tự động.</p>
+          <BackButton onClick={onCancel} className={styles.btnNewQR} withBaseClass={false} />
         </div>
       )}
 
@@ -249,12 +258,14 @@ export function PayOSPayment({
           <div className={styles.cancelIcon}>⊘</div>
           <h2>Thanh toán đã bị hủy</h2>
           <p>Giao dịch đã bị hủy. Vui lòng thử lại nếu muốn tiếp tục.</p>
-          <button 
-            onClick={() => window.location.reload()}
+          <BackButton
+            onClick={() => {
+              closePayOSWindowAndFocusMain();
+              if (onCancel) onCancel();
+            }}
             className={styles.btnRetry}
-          >
-            Quay lại
-          </button>
+            withBaseClass={false}
+          />
         </div>
       )}
     </div>

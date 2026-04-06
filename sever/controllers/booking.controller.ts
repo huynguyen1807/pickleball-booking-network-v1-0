@@ -1,7 +1,10 @@
 import { sql, poolPromise } from '../config/db';
 import dotenv from 'dotenv';
+import { getHoursUntilStart, getScheduleConflictMessage, getUserScheduleConflict } from '../utils/matchLifecycle';
+import { applyRefundFinancialReversal } from '../utils/refundFinancials';
 dotenv.config();
 const COMMISSION = parseFloat(process.env.COMMISSION_RATE) || 0.05;
+const MIN_ADVANCE_HOURS = 1;
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -24,8 +27,44 @@ export const createBooking = async (req, res) => {
             return res.status(400).json({ message: 'Thiếu thông tin đặt sân' });
         }
 
+        const inputDate = new Date(booking_date);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const maxDate = new Date(today);
+        maxDate.setDate(today.getDate() + 30);
+
+        if (inputDate < today) {
+            return res.status(400).json({ message: 'Không thể đặt sân trong quá khứ' });
+        }
+
+        if (inputDate > maxDate) {
+            return res.status(400).json({ message: 'Chỉ có thể đặt sân tối đa 30 ngày kể từ hôm nay' });
+        }
+
+        if (getHoursUntilStart(booking_date, start_time) < MIN_ADVANCE_HOURS) {
+            return res.status(400).json({ message: `Thời gian bắt đầu booking phải cách hiện tại ít nhất ${MIN_ADVANCE_HOURS} giờ` });
+        }
+
         const pool = await poolPromise;
         const isPayOS = payment_method === 'payos';
+
+        const scheduleConflict = await getUserScheduleConflict(
+            pool,
+            Number(req.user.id),
+            booking_date,
+            start_time,
+            end_time,
+            null,
+            null,
+            {
+                includeBookingConflicts: false,
+                includeMatchConflicts: true
+            }
+        );
+        if (scheduleConflict) {
+            return res.status(409).json({ message: getScheduleConflictMessage(scheduleConflict) });
+        }
 
         // 1. Lấy thông tin sân
         const courtQuery = await pool.request()
@@ -39,6 +78,9 @@ export const createBooking = async (req, res) => {
         // 2. Tính giá
         const startH = parseFloat(start_time.split(':')[0]) + parseFloat(start_time.split(':')[1]) / 60;
         const endH = parseFloat(end_time.split(':')[0]) + parseFloat(end_time.split(':')[1]) / 60;
+        if (endH <= startH) {
+            return res.status(400).json({ message: 'Giờ kết thúc phải sau giờ bắt đầu' });
+        }
         const peakStartH = extractTimeH(court.peak_start_time);
         const peakEndH = extractTimeH(court.peak_end_time);
 
@@ -52,7 +94,7 @@ export const createBooking = async (req, res) => {
         const regularHours = (endH - startH) - peakHours;
         const total = Math.round(regularHours * court.price_per_hour + peakHours * (court.peak_price || court.price_per_hour));
         const commission = Math.round(total * COMMISSION);
-        const bookingStatus = isPayOS ? 'pending' : 'confirmed';
+        const bookingStatus = isPayOS ? 'payment_pending' : 'confirmed';
 
         // 3. Transaction + lock để chống race condition
         const transaction = pool.transaction();
@@ -70,7 +112,7 @@ export const createBooking = async (req, res) => {
                     FROM bookings WITH (UPDLOCK, HOLDLOCK)
                     WHERE court_id     = @court_id
                       AND booking_date = @booking_date
-                      AND status IN ('confirmed', 'pending')
+                        AND status IN ('confirmed', 'pending', 'payment_pending')
                       AND start_time   < @end_time
                       AND end_time     > @start_time
                 `);
@@ -116,8 +158,8 @@ export const createBooking = async (req, res) => {
                     .input('commission', sql.Decimal(12, 2), commission)
                     .input('payment_method', sql.NVarChar, payment_method || 'mock')
                     .query(`
-                        INSERT INTO payments (user_id, booking_id, amount, commission, payment_method, status)
-                        VALUES (@user_id, @booking_id, @amount, @commission, @payment_method, 'completed')
+                        INSERT INTO payments (user_id, booking_id, amount, commission, payment_context, payment_method, status)
+                        VALUES (@user_id, @booking_id, @amount, @commission, 'booking', @payment_method, 'completed')
                     `);
             }
 
@@ -209,26 +251,161 @@ export const getOwnerBookings = async (req, res) => {
 export const cancelBooking = async (req, res) => {
     try {
         const pool = await poolPromise;
-        const booking = await pool.request()
-            .input('id', sql.Int, req.params.id)
-            .query('SELECT user_id, court_id, booking_date, start_time, end_time, status FROM bookings WHERE id = @id');
+        const transaction = pool.transaction();
+        await transaction.begin();
 
-        if (booking.recordset.length === 0)
-            return res.status(404).json({ message: 'Không tìm thấy booking' });
+        try {
+            // UPDLOCK to prevent race condition
+            const checkQuery = await transaction.request()
+                .input('id', sql.Int, req.params.id)
+                .query(`
+                    SELECT b.user_id, b.court_id, b.booking_date, b.start_time, b.end_time, b.status, b.total_price, c.name as court_name
+                    FROM bookings b WITH (UPDLOCK) 
+                    JOIN courts c ON b.court_id = c.id
+                    WHERE b.id = @id
+                `);
 
-        const b = booking.recordset[0];
-        if (b.user_id !== req.user.id)
-            return res.status(403).json({ message: 'Không có quyền' });
-        if (b.status !== 'pending' && b.status !== 'confirmed')
-            return res.status(400).json({ message: 'Không thể hủy booking này' });
+            if (checkQuery.recordset.length === 0) {
+                await transaction.rollback();
+                return res.status(404).json({ message: 'Không tìm thấy booking' });
+            }
 
-        await pool.request()
-            .input('id', sql.Int, req.params.id)
-            .query("UPDATE bookings SET status = 'cancelled' WHERE id = @id");
+            const b = checkQuery.recordset[0];
+            if (b.user_id !== req.user.id) {
+                await transaction.rollback();
+                return res.status(403).json({ message: 'Không có quyền' });
+            }
+            if (b.status === 'cancelled' || b.status === 'expired' || b.status === 'transferred') {
+                await transaction.rollback();
+                return res.status(400).json({ message: 'Booking này đã không còn khả dụng để hủy' });
+            }
+            if (b.status !== 'pending' && b.status !== 'confirmed') {
+                await transaction.rollback();
+                return res.status(400).json({ message: 'Trạng thái hiện tại không thể hủy' });
+            }
 
-        res.json({ message: 'Đã hủy booking thành công' });
+            // Múi giờ máy chủ và Database có thể cần khớp, lấy từ CSDL cho an toàn
+            const matchDate = new Date(b.booking_date);
+            let startH = 0, startM = 0;
+
+            if (typeof b.start_time === 'string') {
+                startH = parseInt(b.start_time.substring(0, 2), 10);
+                startM = parseInt(b.start_time.substring(3, 5), 10);
+            } else if (b.start_time instanceof Date) {
+                // SQL Server TIME type via mssql often returns a Date object
+                startH = b.start_time.getUTCHours();
+                startM = b.start_time.getUTCMinutes();
+            }
+
+            matchDate.setHours(startH, startM, 0, 0);
+
+            const now = new Date();
+            const diffMs = matchDate.getTime() - now.getTime();
+            const diffHours = diffMs / (1000 * 60 * 60);
+
+            let paymentStatusQuery = '';
+            let refundPercent = 0;
+            let refundAmount = 0;
+
+            if (b.status === 'pending') {
+                // Hủy trực tiếp, không hoàn tiền, payment = cancelled
+                paymentStatusQuery = "UPDATE payments SET status = 'cancelled' WHERE booking_id = @id";
+            } else if (b.status === 'confirmed') {
+                if (diffHours > 4) {
+                    paymentStatusQuery = "UPDATE payments SET status = 'refunded', refunded_amount = amount WHERE booking_id = @id AND status = 'completed'";
+                    refundPercent = 100;
+                    refundAmount = b.total_price;
+                } else {
+                    // <= 4 hours: không cập nhật payment (giữ 'completed'), mất tiền
+                    paymentStatusQuery = "";
+                }
+            }
+
+            await transaction.request()
+                .input('id', sql.Int, req.params.id)
+                .query("UPDATE bookings SET status = 'cancelled' WHERE id = @id");
+
+            if (paymentStatusQuery) {
+                await transaction.request()
+                    .input('id', sql.Int, req.params.id)
+                    .query(paymentStatusQuery);
+            }
+
+            if (refundPercent === 100 && refundAmount > 0) {
+                // Add amount to user's wallet
+                await transaction.request()
+                    .input('user_id', sql.Int, b.user_id)
+                    .input('amount', sql.Decimal(12, 2), refundAmount)
+                    .query("UPDATE users SET balance = ISNULL(balance, 0) + @amount WHERE id = @user_id");
+
+                // Log wallet transaction
+                await transaction.request()
+                    .input('user_id', sql.Int, b.user_id)
+                    .input('amount', sql.Decimal(12, 2), refundAmount)
+                    .input('desc', sql.NVarChar, `Hoàn tiền hủy sân ${b.court_name}`)
+                    .query(`
+                        INSERT INTO wallet_transactions (user_id, amount, type, description, status)
+                        VALUES (@user_id, @amount, 'refund', @desc, 'completed')
+                    `);
+
+                const refundedPayments = await transaction.request()
+                    .input('booking_id', sql.Int, req.params.id)
+                    .query(`
+                        SELECT id AS payment_id, ISNULL(refunded_amount, 0) AS refunded_amount
+                        FROM payments
+                        WHERE booking_id = @booking_id
+                          AND status = 'refunded'
+                          AND ISNULL(refunded_amount, 0) > 0
+                    `);
+
+                for (const row of refundedPayments.recordset) {
+                    await applyRefundFinancialReversal(transaction, {
+                        paymentId: Number(row.payment_id),
+                        refundAmount: Number(row.refunded_amount),
+                        note: 'Booking cancellation refund'
+                    });
+                }
+            }
+
+            await transaction.request()
+                .input('id', sql.Int, req.params.id)
+                .input('refund_percent', sql.Int, refundPercent)
+                .input('refund_amount', sql.Decimal(12, 2), refundAmount)
+                .query(`
+                    INSERT INTO booking_cancellations (booking_id, refund_percent, refund_amount)
+                    VALUES (@id, @refund_percent, @refund_amount)
+                `);
+
+            const formatTimeStr = (t) => {
+                if (typeof t === 'string') return t;
+                if (t instanceof Date) return `${t.getUTCHours().toString().padStart(2, '0')}:${t.getUTCMinutes().toString().padStart(2, '0')}:00`;
+                return String(t);
+            };
+
+            await transaction.request()
+                .input('court_id', sql.Int, b.court_id)
+                .input('date', sql.Date, b.booking_date)
+                .input('startT', sql.NVarChar, formatTimeStr(b.start_time))
+                .input('endT', sql.NVarChar, formatTimeStr(b.end_time))
+                .query(`
+                    UPDATE court_slots
+                    SET is_available = 1
+                    WHERE court_id = @court_id
+                      AND slot_date = @date
+                      AND start_time >= @startT
+                      AND start_time < @endT
+                `);
+
+            await transaction.commit();
+            res.json({ message: 'Đã hủy booking thành công', isRefundable: refundPercent > 0 });
+
+        } catch (innerErr) {
+            await transaction.rollback();
+            throw innerErr;
+        }
+
     } catch (err) {
-        console.error(err);
+        console.error('Lỗi khi hủy booking:', err);
         res.status(500).json({ message: 'Lỗi server' });
     }
 };
@@ -249,7 +426,7 @@ export const getBookedSlots = async (req, res) => {
                 FROM bookings
                 WHERE court_id     = @court_id
                   AND booking_date = @booking_date
-                  AND status IN ('confirmed', 'pending')
+                  AND status IN ('confirmed', 'pending', 'payment_pending')
             `);
         res.json(result.recordset);
     } catch (err) {

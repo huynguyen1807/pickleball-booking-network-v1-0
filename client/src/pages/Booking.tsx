@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../api/axios'
+import BackButton from '../components/BackButton'
 import PaymentModal from '../components/PaymentModal'
 import { PayOSPayment } from '../components/PayOSPayment'
 import { useDialog } from '../context/DialogContext'
 import styles from '../styles/Booking.module.css'
-import { formatDateVN, getTodayYMD } from '../utils/dateTime'
+import { formatDateVN, getAdvanceValidationMessage, getTodayYMD, isAtLeastAdvanceHours } from '../utils/dateTime'
 
 export default function Booking() {
     const { id } = useParams()
@@ -27,6 +28,7 @@ export default function Booking() {
     const startTime = searchParams.get('start') || '18:00'
     const endTime = searchParams.get('end') || '20:00'
     const subCourtId = searchParams.get('subCourt')
+    const isStartTimeValid = isAtLeastAdvanceHours(bookingDate, startTime)
 
     useEffect(() => {
         const loadCourt = async () => {
@@ -91,31 +93,25 @@ export default function Booking() {
     const formatDate = (d) => formatDateVN(d)
 
     const handleConfirmBooking = async () => {
-        setSubmitting(true)
-        try {
-            const res = await api.post('/bookings', {
-                court_id: parseInt(id),
-                sub_court_id: subCourtId ? parseInt(subCourtId) : null,
-                booking_date: bookingDate,
-                start_time: startTime,
-                end_time: endTime,
-                payment_method: 'payos'
-            })
-            setBookingId(res.data.bookingId)  // ← Fix: Đọc bookingId thay vì id
-            setBookingResult(res.data)
-            setStep(2)
-        } catch (err) {
-            const errData = err.response?.data
-            const msg = errData?.message || errData?.error || 'Đặt sân thất bại'
-            await showAlert('Lỗi đặt sân', msg)
-        } finally {
-            setSubmitting(false)
+        if (!isStartTimeValid) {
+            await showAlert('Khung giờ không hợp lệ', getAdvanceValidationMessage())
+            return
         }
+        setStep(2)
     }
 
     const handlePaymentSuccess = (data) => {
         if (data.method === 'payos') {
             setPaymentData(data)
+            return
+        }
+
+        if (data.method === 'balance') {
+            setStep(3)
+            const balanceMsg = data.currentBalance !== undefined
+                ? `\nSố dư ví còn lại: ${Number(data.currentBalance).toLocaleString('vi-VN')}đ`
+                : ''
+            showAlert('Thanh toán thành công', `Đã thanh toán bằng ví.${balanceMsg}`)
         }
     }
 
@@ -155,6 +151,11 @@ export default function Booking() {
                         <div className={styles.summaryRow}><span>Sân</span><span style={{ fontWeight: 600 }}>{court.name}</span></div>
                         <div className={styles.summaryRow}><span>Ngày</span><span>{formatDate(bookingDate)}</span></div>
                         <div className={styles.summaryRow}><span>Khung giờ</span><span>{startTime} - {endTime}</span></div>
+                        {!isStartTimeValid && (
+                            <div style={{ marginTop: '12px', padding: '12px', borderRadius: '10px', background: 'rgba(239,68,68,0.12)', color: '#b91c1c', fontSize: '0.9rem' }}>
+                                {getAdvanceValidationMessage()}
+                            </div>
+                        )}
                         {regularHours > 0 && (
                             <div className={styles.summaryRow}><span>Giá thường ({regularHours.toFixed(1)}h)</span><span>{formatPrice(regularPrice)}</span></div>
                         )}
@@ -163,9 +164,17 @@ export default function Booking() {
                         )}
                         <div className={`${styles.summaryRow} ${styles.summaryTotal}`}><span>Tổng cộng</span><span>{formatPrice(total)}</span></div>
                     </div>
-                    <button className="btn btn-primary btn-lg" style={{ width: '100%' }} disabled={submitting} onClick={handleConfirmBooking}>
-                        {submitting ? '⏳ Đang tạo booking...' : 'Tiếp tục →'}
-                    </button>
+                    <div style={{ display: 'flex', gap: '12px', width: '100%' }}>
+                        <BackButton
+                            label="Quay lại sân"
+                            size="lg"
+                            style={{ flex: 1 }}
+                            disabled={submitting}
+                        />
+                        <button className="btn btn-primary btn-lg" style={{ flex: 2 }} disabled={submitting} onClick={handleConfirmBooking}>
+                            {submitting ? '⏳ Đang tạo booking...' : 'Tiếp tục →'}
+                        </button>
+                    </div>
                 </div>
             )}
 
@@ -185,8 +194,8 @@ export default function Booking() {
                         </p>
                     </div>
                     <div style={{ display: 'flex', gap: '12px' }}>
-                        <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setStep(1)}>← Quay lại</button>
-                        <button className="btn btn-primary" style={{ flex: 2 }} disabled={submitting || !bookingId}
+                        <BackButton style={{ flex: 1 }} onClick={() => setStep(1)} />
+                        <button className="btn btn-primary" style={{ flex: 2 }} disabled={submitting}
                             onClick={() => setShowPaymentModal(true)}>
                             {submitting ? '⏳ Đang xử lý...' : '💳 Tiến hành thanh toán'}
                         </button>
@@ -213,10 +222,21 @@ export default function Booking() {
             {/* Payment Modal */}
             <PaymentModal
                 isOpen={showPaymentModal && step === 2}
+                bookingPayload={{
+                    court_id: parseInt(id),
+                    sub_court_id: subCourtId ? parseInt(subCourtId) : null,
+                    booking_date: bookingDate,
+                    start_time: startTime,
+                    end_time: endTime,
+                    payment_method: 'payos'
+                }}
                 bookingId={bookingId}
                 amount={total}
                 onClose={() => setShowPaymentModal(false)}
-                onSuccess={handlePaymentSuccess}
+                onSuccess={(data) => {
+                    if (data.bookingId) setBookingId(data.bookingId);
+                    handlePaymentSuccess(data);
+                }}
             />
 
             {/* PayOS QR Code Display Modal */}
@@ -264,6 +284,7 @@ export default function Booking() {
                             orderCode={paymentData.orderCode}
                             paymentLinkId={paymentData.paymentLinkId}
                             amount={paymentData.amount}
+                            expiresInSeconds={paymentData.expiresInSeconds}
                             onSuccess={handlePayOSSuccess}
                             onCancel={() => setPaymentData(null)}
                         />

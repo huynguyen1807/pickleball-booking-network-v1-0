@@ -1,14 +1,19 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { useDialog } from '../context/DialogContext'
 import api from '../api/axios'
+import { io as socketIO } from 'socket.io-client'
 import PostCard from '../components/PostCard'
 import CameraModal from '../components/CameraModal'
 import styles from '../styles/Home.module.css'
 import { formatDateVN, formatTimeHHmm } from '../utils/dateTime'
 
+const HOME_SCROLL_KEY = 'home_feed_scroll_y'
+
 export default function Home() {
     const { user } = useAuth()
+    const { showAlert } = useDialog()
     const navigate = useNavigate()
     const [filter, setFilter] = useState('latest')
     const [posts, setPosts] = useState([])
@@ -22,13 +27,59 @@ export default function Home() {
     const [postContent, setPostContent] = useState('')
     const [postType, setPostType] = useState('share')
     const [posting, setPosting] = useState(false)
-    const [postImage, setPostImage] = useState<string | null>(null)
+    const [postFiles, setPostFiles] = useState<File[]>([])
+    const [filePreviewUrls, setFilePreviewUrls] = useState<string[]>([])
     const [showCamera, setShowCamera] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     useEffect(() => {
         loadData()
     }, [])
+
+    useEffect(() => {
+        const socket = socketIO('http://localhost:5000', { transports: ['websocket'] })
+
+        socket.on('post_created', (newPost: any) => {
+            if (!newPost?.id) return
+            setPosts(prev => {
+                if (prev.some((p: any) => p.id === newPost.id)) return prev
+                return [newPost, ...prev]
+            })
+        })
+
+        socket.on('post_deleted', ({ postId }: { postId: number }) => {
+            if (!postId) return
+            setPosts(prev => prev.filter((p: any) => p.id !== postId))
+        })
+
+        socket.on('post_liked', ({ postId, likes }: { postId: number; likes: number }) => {
+            if (!postId) return
+            setPosts(prev => prev.map((p: any) => p.id === postId ? { ...p, likes } : p))
+        })
+
+        socket.on('post_commented', ({ postId, comments }: { postId: number; comments: number }) => {
+            if (!postId) return
+            setPosts(prev => prev.map((p: any) => p.id === postId ? { ...p, comments } : p))
+        })
+
+        return () => {
+            socket.disconnect()
+        }
+    }, [])
+
+    useEffect(() => {
+        if (loading) return
+        const savedY = sessionStorage.getItem(HOME_SCROLL_KEY)
+        if (!savedY) return
+
+        const y = Number(savedY)
+        if (!Number.isNaN(y)) {
+            requestAnimationFrame(() => {
+                window.scrollTo({ top: y, behavior: 'auto' })
+            })
+        }
+        sessionStorage.removeItem(HOME_SCROLL_KEY)
+    }, [loading, posts.length])
 
    const loadData = async () => {
         try {
@@ -63,40 +114,97 @@ export default function Home() {
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (!file) return
-        if (file.size > 5 * 1024 * 1024) {
-            alert('Ảnh quá lớn! Vui lòng chọn ảnh nhỏ hơn 5MB.')
+        if (file.size > 100 * 1024 * 1024) {
+            void showAlert('File quá lớn! Vui lòng chọn file nhỏ hơn 100MB.')
             return
         }
-        const reader = new FileReader()
-        reader.onload = (ev) => setPostImage(ev.target?.result as string)
-        reader.readAsDataURL(file)
+        
+        // Add to postFiles array
+        setPostFiles(prev => [...prev, file])
+        
+        // Create preview URL
+        const previewUrl = URL.createObjectURL(file)
+        setFilePreviewUrls(prev => [...prev, previewUrl])
+        
         // reset input value so same file can be re-selected
         e.target.value = ''
     }
 
     const handleCaptured = (base64: string) => {
-        setPostImage(base64)
+        // Convert base64 to File and add to files
+        const arr = base64.split(',')
+        const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg'
+        const str = atob(arr[1])
+        const n = str.length
+        const u8arr = new Uint8Array(n)
+        for (let i = 0; i < n; i++) {
+            u8arr[i] = str.charCodeAt(i)
+        }
+        const file = new File([u8arr], `photo-${Date.now()}.jpg`, { type: mime })
+        setPostFiles(prev => [...prev, file])
+        setFilePreviewUrls(prev => [...prev, base64])
         setShowCamera(false)
     }
 
     const handleCreatePost = async () => {
-        if (!postContent.trim() && !postImage) return
+        if (!postContent.trim() && postFiles.length === 0) return
         setPosting(true)
         try {
-            await api.post('/posts', {
-                content: postContent,
-                post_type: postType,
-                image: postImage || null
+            const formData = new FormData()
+            formData.append('content', postContent)
+            formData.append('post_type', postType)
+            
+            // Add files
+            console.log('📤 Uploading', postFiles.length, 'files:', postFiles.map(f => `${f.name}(${f.type})`))
+            postFiles.forEach(file => {
+                formData.append('files', file)
             })
+
+            const res = await api.post('/posts', formData)
+
+            console.log('✅ Post created:', res.data.post?.id, 'with media:', res.data.post?.media?.length)
+            
+            if (res.data?.post?.id) {
+                setPosts(prev => {
+                    const post = res.data.post
+                    if (prev.some((p: any) => p.id === post.id)) return prev
+                    return [post, ...prev]
+                })
+            }
+
             setPostContent('')
             setPostType('share')
-            setPostImage(null)
-            loadData()
+            setPostFiles([])
+            setFilePreviewUrls([])
         } catch (err: any) {
-            alert(err.response?.data?.message || 'Lỗi khi đăng bài')
+            console.error('❌ Upload failed:', err.response?.data || err.message)
+            await showAlert(err.response?.data?.message || 'Lỗi khi đăng bài: ' + (err.message || 'Unknown error'))
         } finally {
             setPosting(false)
         }
+    }
+
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(e.target.files || [])
+        if (postFiles.length + files.length > 10) {
+            showAlert('Thông báo', 'Tối đa 10 file')
+            return
+        }
+
+        const newFiles = [...postFiles, ...files]
+        setPostFiles(newFiles)
+
+        // Create preview URLs
+        const newUrls = files.map(file => URL.createObjectURL(file))
+        setFilePreviewUrls(prev => [...prev, ...newUrls])
+
+        if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+
+    const removeFile = (index: number) => {
+        URL.revokeObjectURL(filePreviewUrls[index])
+        setPostFiles(prev => prev.filter((_, i) => i !== index))
+        setFilePreviewUrls(prev => prev.filter((_, i) => i !== index))
     }
 
     // filter out hidden posts and optionally by type
@@ -181,35 +289,66 @@ export default function Home() {
                         style={{ width: '100%', resize: 'vertical', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '10px 14px', color: 'var(--text-primary)', fontSize: '0.875rem' }}
                     />
 
-                    {/* Image Preview */}
-                    {postImage && (
-                        <div className={styles.imagePreview}>
-                            <img src={postImage} alt="preview" className={styles.previewImg} />
-                            <button
-                                className={styles.removeImageBtn}
-                                onClick={() => setPostImage(null)}
-                                title="Xóa ảnh"
-                            >✕</button>
+                    {/* Multiple File Preview */}
+                    {filePreviewUrls.length > 0 && (
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '10px' }}>
+                            {filePreviewUrls.map((url, idx) => {
+                                const isVideo = postFiles[idx]?.type.startsWith('video')
+                                return (
+                                    <div key={idx} style={{ position: 'relative', width: '80px', height: '80px', borderRadius: '8px', overflow: 'hidden' }}>
+                                        {isVideo ? (
+                                            <div style={{ width: '100%', height: '100%', background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>
+                                                🎥
+                                            </div>
+                                        ) : (
+                                            <img src={url} alt={`preview-${idx}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                        )}
+                                        <button
+                                            type="button"
+                                            onClick={() => removeFile(idx)}
+                                            style={{
+                                                position: 'absolute',
+                                                top: '0',
+                                                right: '0',
+                                                background: 'rgba(0,0,0,0.6)',
+                                                border: 'none',
+                                                color: 'white',
+                                                width: '24px',
+                                                height: '24px',
+                                                borderRadius: '50%',
+                                                cursor: 'pointer',
+                                                fontSize: '12px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                            }}
+                                        >
+                                            ✕
+                                        </button>
+                                    </div>
+                                )
+                            })}
                         </div>
                     )}
 
                     <div className={styles.createPostActions}>
-                        {/* Image tools */}
+                        {/* File tools */}
                         <div className={styles.imageTools}>
                             <input
                                 ref={fileInputRef}
                                 type="file"
-                                accept="image/*"
+                                accept="image/*,video/*"
+                                multiple
                                 style={{ display: 'none' }}
-                                onChange={handleImageChange}
+                                onChange={handleFileSelect}
                             />
                             <button
                                 type="button"
                                 className={styles.imageTool}
                                 onClick={() => fileInputRef.current?.click()}
-                                title="Chọn ảnh từ thư mục"
+                                title="Chọn ảnh hoặc video"
                             >
-                                🖼️ Ảnh
+                                🖼️ Thêm media
                             </button>
                             <button
                                 type="button"
@@ -228,7 +367,7 @@ export default function Home() {
                             <option value="ad">📢 Quảng cáo</option>
                         </select>
                         <button className="btn btn-primary btn-sm" onClick={handleCreatePost}
-                            disabled={posting || (!postContent.trim() && !postImage)}>
+                            disabled={posting || (!postContent.trim() && postFiles.length === 0)}>
                             {posting ? '⏳...' : '📤 Đăng'}
                         </button>
                     </div>

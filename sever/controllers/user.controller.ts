@@ -31,6 +31,27 @@ export const getUserProfile = async (req, res) => {
     }
 };
 
+// Get user by email (For Transfer Lookup)
+export const getUserByEmail = async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request()
+            .input('email', sql.NVarChar, req.params.email)
+            .query(`
+                SELECT id, full_name, avatar, email 
+                FROM users 
+                WHERE email = @email AND status = 'active'
+            `);
+            
+        if (result.recordset.length === 0) {
+            return res.status(404).json({ message: 'Không tìm thấy người dùng này' });
+        }
+        res.json(result.recordset[0]);
+    } catch (err) {
+        res.status(500).json({ message: 'Lỗi server' });
+    }
+};
+
 // Get brief user info (for hover card)
 export const getUserBrief = async (req, res) => {
     try {

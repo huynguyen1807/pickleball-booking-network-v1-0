@@ -1,15 +1,19 @@
 import { useEffect, useState, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { useDialog } from '../context/DialogContext'
 import api from '../api/axios'
 import { io as socketIO } from 'socket.io-client'
+import BackButton from '../components/BackButton'
 import UserProfileCard from '../components/UserProfileCard'
 import styles from '../styles/PostPhoto.module.css'
 
 export default function PostPhoto() {
     const { id } = useParams<{ id: string }>()
     const navigate = useNavigate()
+    const [searchParams] = useSearchParams()
     const { user } = useAuth()
+    const { showAlert } = useDialog()
 
     const [post, setPost] = useState<any>(null)
     const [loading, setLoading] = useState(true)
@@ -24,6 +28,10 @@ export default function PostPhoto() {
     const [showShare, setShowShare] = useState(false)
     const [zoomed, setZoomed] = useState(false)
     const [loadingComments, setLoadingComments] = useState(true)
+    const [currentMediaIndex, setCurrentMediaIndex] = useState(() => {
+        const index = searchParams.get('index')
+        return index ? parseInt(index) : 0
+    })
     const commentsEndRef = useRef<HTMLDivElement>(null)
 
     // Load post
@@ -70,13 +78,17 @@ export default function PostPhoto() {
         return () => { socket.emit('leave_post', parseInt(id)); socket.disconnect() }
     }, [id])
 
-    // ESC to go home
+    // ESC to go home, Arrow keys for media navigation
     useEffect(() => {
-        const h = (e: KeyboardEvent) => { if (e.key === 'Escape') navigate('/') }
+        const h = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') navigate(-1 as any)
+            if (e.key === 'ArrowLeft') handlePrevMedia()
+            if (e.key === 'ArrowRight') handleNextMedia()
+        }
         document.addEventListener('keydown', h)
         document.body.style.overflow = 'hidden'
         return () => { document.removeEventListener('keydown', h); document.body.style.overflow = '' }
-    }, [navigate])
+    }, [navigate, currentMediaIndex, post])
 
     const handleLike = async () => {
         if (!user) return
@@ -105,9 +117,21 @@ export default function PostPhoto() {
         } catch { setCommentText(tmp) }
     }
 
+    const handlePrevMedia = () => {
+        if (!post?.media || post.media.length <= 1) return
+        setCurrentMediaIndex(idx => (idx - 1 + post.media.length) % post.media.length)
+        setZoomed(false)
+    }
+
+    const handleNextMedia = () => {
+        if (!post?.media || post.media.length <= 1) return
+        setCurrentMediaIndex(idx => (idx + 1) % post.media.length)
+        setZoomed(false)
+    }
+
     const handleCopyLink = () => {
         navigator.clipboard.writeText(window.location.href)
-        alert('Đã sao chép link ảnh!')
+        void showAlert('Đã sao chép link ảnh!')
         setShowShare(false)
     }
     const handleShareFb = () => {
@@ -143,13 +167,13 @@ export default function PostPhoto() {
         </div>
     )
 
-    if (notFound || !post?.image) return (
+    if (notFound || !post?.media || post.media.length === 0) return (
         <div className={styles.loadingScreen}>
             <div style={{ fontSize: '4rem', marginBottom: 16 }}>🖼️</div>
             <p style={{ color: '#b0b3b8', marginBottom: 20 }}>
                 {notFound ? 'Không tìm thấy bài viết này.' : 'Bài viết này không có ảnh.'}
             </p>
-            <button className={styles.backBtn} onClick={() => navigate('/')}>← Về trang chủ</button>
+            <BackButton className={styles.backBtn} label="Về trang chủ" />
         </div>
     )
 
@@ -158,7 +182,7 @@ export default function PostPhoto() {
             {/* Close / Back to Home button */}
             <button
                 className={styles.closeBtn}
-                onClick={() => navigate('/')}
+                onClick={() => navigate(-1 as any)}
                 title="Về trang chủ (ESC)"
             >
                 ✕
@@ -166,26 +190,58 @@ export default function PostPhoto() {
 
             {/* Left: Image */}
             <div className={styles.imageArea} onClick={e => { if (e.target === e.currentTarget) setZoomed(false) }}>
-                <img
-                    src={post.image}
-                    alt="Post photo"
-                    className={`${styles.image} ${zoomed ? styles.zoomed : ''}`}
-                    onClick={() => setZoomed(z => !z)}
-                    title={zoomed ? 'Click để thu nhỏ' : 'Click để phóng to'}
-                />
+                {post?.media?.[currentMediaIndex]?.media_type === 'video' ? (
+                    <video
+                        src={post.media[currentMediaIndex]?.url}
+                        className={`${styles.image} ${zoomed ? styles.zoomed : ''}`}
+                        controls
+                        autoPlay
+                        title={zoomed ? 'Click để thu nhỏ' : 'Click để phóng to'}
+                    />
+                ) : (
+                    <img
+                        src={post?.media?.[currentMediaIndex]?.url}
+                        alt="Post photo"
+                        className={`${styles.image} ${zoomed ? styles.zoomed : ''}`}
+                        onClick={() => setZoomed(z => !z)}
+                        title={zoomed ? 'Click để thu nhỏ' : 'Click để phóng to'}
+                    />
+                )}
                 <div className={styles.zoomHint}>
                     {zoomed ? '🔍 Click để thu nhỏ' : '🔍 Click để phóng to'}
                 </div>
+
+                {/* Navigation buttons */}
+                {post?.media && post.media.length > 1 && (
+                    <>
+                        <button
+                            className={styles.navBtn}
+                            style={{ left: 12 }}
+                            onClick={handlePrevMedia}
+                            title="Ảnh trước (← hoặc chuột trái)"
+                        >
+                            ❮
+                        </button>
+                        <button
+                            className={styles.navBtn}
+                            style={{ right: 12 }}
+                            onClick={handleNextMedia}
+                            title="Ảnh tiếp (→ hoặc chuột phải)"
+                        >
+                            ❯
+                        </button>
+                        <div className={styles.mediaCounter}>
+                            {currentMediaIndex + 1} / {post.media.length}
+                        </div>
+                    </>
+                )}
             </div>
 
             {/* Right: Panel */}
             <div className={styles.panel}>
                 <div className={styles.panelHeader}>
-                    <div className={styles.logo} onClick={() => navigate('/')}>🏓 PickleBall</div>
-                    <button className={styles.viewPostBtn} onClick={() => navigate('/')}
-                        title="Quay về trang chủ">
-                        ← Trang chủ
-                    </button>
+                    <div className={styles.logo} onClick={() => navigate(-1 as any)}>🏓 PickleBall</div>
+                    <BackButton className={styles.viewPostBtn} label="Trang chủ" />
                 </div>
 
                 {/* Author info */}
