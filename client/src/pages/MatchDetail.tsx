@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
 import UserProfileCard from '../components/UserProfileCard'
+import BackButton from '../components/BackButton'
 import { PayOSPayment } from '../components/PayOSPayment'
 import { useDialog } from '../context/DialogContext'
 import styles from '../styles/Matchmaking.module.css'
@@ -177,8 +178,7 @@ export default function MatchDetail() {
 
     return (
         <div className={styles.matchDetailPage}>
-            <button className="btn btn-secondary btn-sm" onClick={() => navigate(-1)}
-                style={{ marginBottom: '20px' }}>← Quay lại</button>
+            <BackButton size="sm" style={{ marginBottom: '20px' }} />
 
             <div className={styles.matchDetailCard}>
                 {/* Header */}

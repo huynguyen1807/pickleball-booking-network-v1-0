@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { useDialog } from '../context/DialogContext'
 import api from '../api/axios'
 import { io as socketIO } from 'socket.io-client'
+import BackButton from '../components/BackButton'
 import UserProfileCard from '../components/UserProfileCard'
 import styles from '../styles/PostPhoto.module.css'
 
@@ -172,7 +173,7 @@ export default function PostPhoto() {
             <p style={{ color: '#b0b3b8', marginBottom: 20 }}>
                 {notFound ? 'Không tìm thấy bài viết này.' : 'Bài viết này không có ảnh.'}
             </p>
-            <button className={styles.backBtn} onClick={() => navigate(-1 as any)}>← Về trang chủ</button>
+            <BackButton className={styles.backBtn} label="Về trang chủ" />
         </div>
     )
 
@@ -240,10 +241,7 @@ export default function PostPhoto() {
             <div className={styles.panel}>
                 <div className={styles.panelHeader}>
                     <div className={styles.logo} onClick={() => navigate(-1 as any)}>🏓 PickleBall</div>
-                    <button className={styles.viewPostBtn} onClick={() => navigate(-1 as any)}
-                        title="Quay về trang chủ">
-                        ← Trang chủ
-                    </button>
+                    <BackButton className={styles.viewPostBtn} label="Trang chủ" />
                 </div>
 
                 {/* Author info */}

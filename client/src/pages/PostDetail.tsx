@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
 import { X } from 'lucide-react'
+import BackButton from '../components/BackButton'
 import PostCard from '../components/PostCard'
 import styles from '../styles/PostDetail.module.css'
 
@@ -59,9 +60,7 @@ export default function PostDetail() {
                 </div>
                 <div className={styles.notFound}>
                     <p>😕 Không tìm thấy bài viết</p>
-                    <button className="btn btn-primary" onClick={handleClose}>
-                        Quay lại trang chủ
-                    </button>
+                    <BackButton label="Quay lại trang chủ" variant="primary" onClick={handleClose} />
                 </div>
             </div>
         )
