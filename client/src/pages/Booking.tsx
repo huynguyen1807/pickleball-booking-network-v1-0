@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../api/axios'
+import BackButton from '../components/BackButton'
 import PaymentModal from '../components/PaymentModal'
 import { PayOSPayment } from '../components/PayOSPayment'
 import { useDialog } from '../context/DialogContext'
@@ -164,9 +165,12 @@ export default function Booking() {
                         <div className={`${styles.summaryRow} ${styles.summaryTotal}`}><span>Tổng cộng</span><span>{formatPrice(total)}</span></div>
                     </div>
                     <div style={{ display: 'flex', gap: '12px', width: '100%' }}>
-                        <button className="btn btn-secondary btn-lg" style={{ flex: 1 }} disabled={submitting} onClick={() => navigate(-1)}>
-                            ← Quay lại sân
-                        </button>
+                        <BackButton
+                            label="Quay lại sân"
+                            size="lg"
+                            style={{ flex: 1 }}
+                            disabled={submitting}
+                        />
                         <button className="btn btn-primary btn-lg" style={{ flex: 2 }} disabled={submitting} onClick={handleConfirmBooking}>
                             {submitting ? '⏳ Đang tạo booking...' : 'Tiếp tục →'}
                         </button>
@@ -190,7 +194,7 @@ export default function Booking() {
                         </p>
                     </div>
                     <div style={{ display: 'flex', gap: '12px' }}>
-                        <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setStep(1)}>← Quay lại</button>
+                        <BackButton style={{ flex: 1 }} onClick={() => setStep(1)} />
                         <button className="btn btn-primary" style={{ flex: 2 }} disabled={submitting}
                             onClick={() => setShowPaymentModal(true)}>
                             {submitting ? '⏳ Đang xử lý...' : '💳 Tiến hành thanh toán'}

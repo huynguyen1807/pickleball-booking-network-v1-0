@@ -43,7 +43,8 @@ export default function App() {
     return (
         <>
             {user && !isAdminPage && <Navbar />}
-            <Routes>
+            <main className={user && !isAdminPage ? 'appContentWithNavbar' : ''}>
+                <Routes>
                 {/* Public */}
                 <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
                 <Route path="/register" element={user ? <Navigate to="/" /> : <Register />} />
@@ -129,7 +130,8 @@ export default function App() {
 
                 {/* Fallback */}
                 <Route path="*" element={<Navigate to="/" />} />
-            </Routes>
+                </Routes>
+            </main>
         </>
     )
 }

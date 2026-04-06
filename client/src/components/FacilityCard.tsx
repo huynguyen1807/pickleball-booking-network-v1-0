@@ -22,11 +22,13 @@ export default function FacilityCard({ facility }) {
                 <p className={styles.courtAddress}>📍 {data.address}</p>
 
                 <div className={styles.courtStats}>
-                    <span className={styles.courtRating}>⭐ {Number(data.avg_rating || 0).toFixed(1)}</span>
-                    <span className={styles.courtBookings}>
+                    <span className={`${styles.courtRating} ${styles.facilityStatLeft}`}>
+                        ⭐ {Number(data.avg_rating || 0).toFixed(1)}
+                    </span>
+                    <span className={`${styles.courtBookings} ${styles.facilityStatCenter}`}>
                         Sân: {data.court_count || 0}
                     </span>
-                    <span className={styles.courtBookings} style={{ marginLeft: 'auto' }}>
+                    <span className={`${styles.courtBookings} ${styles.facilityStatRight}`}>
                         {data.booking_count || 0} lượt đặt
                     </span>
                 </div>
