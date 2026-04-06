@@ -365,7 +365,7 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
             {data.image && (
                 <>
                     <button
-                        onClick={handleOpenPhoto}
+                        onClick={() => handleOpenPhoto()}
                         style={{ display: 'block', width: '100%', padding: 0, border: 'none', background: 'none', cursor: 'zoom-in' }}
                         title="Click để xem ảnh phóng to"
                     >
@@ -393,7 +393,7 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
                             />
                         ) : (
                             <button
-                                onClick={handleOpenPhoto}
+                                onClick={() => handleOpenPhoto()}
                                 style={{ display: 'block', width: '100%', padding: 0, border: 'none', background: 'none', cursor: 'zoom-in' }}
                                 title="Click để xem ảnh phóng to"
                             >
