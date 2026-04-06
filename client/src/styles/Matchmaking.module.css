@@ -134,6 +134,22 @@
     min-width: 0;
 }
 
+.matchPager {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 24px;
+}
+
+.matchPagerText {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    font-weight: 600;
+    min-width: 110px;
+    text-align: center;
+}
+
 /* Create Match Modal */
 .createModal {
     position: fixed;
@@ -368,6 +384,11 @@
     .createModal {
         align-items: flex-end;
         padding: 0;
+    }
+
+    .matchPager {
+        flex-wrap: wrap;
+        gap: 10px;
     }
 
     .modalContent {
