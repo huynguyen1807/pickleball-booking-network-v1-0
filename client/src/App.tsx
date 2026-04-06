@@ -3,6 +3,7 @@ import { useAuth } from './context/AuthContext'
 import Navbar from './components/Navbar'
 import ProtectedRoute from './components/ProtectedRoute'
 import AdminLayout from './components/AdminLayout'
+import AIChatWidget from './components/AIChatWidget'
 
 // Pages
 import Login from './pages/Login'
@@ -43,6 +44,7 @@ export default function App() {
     return (
         <>
             {user && !isAdminPage && <Navbar />}
+            {user && !isAdminPage && <AIChatWidget />}
             <main className={user && !isAdminPage ? 'appContentWithNavbar' : ''}>
                 <Routes>
                 {/* Public */}
