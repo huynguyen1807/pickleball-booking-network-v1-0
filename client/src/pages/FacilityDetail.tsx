@@ -33,7 +33,7 @@ export default function FacilityDetail() {
     if (!facility) return <div className={styles.centerState}>❌ Không tìm thấy cơ sở</div>
 
     return (
-        <div className={`container ${styles.page}`}>
+        <div className={styles.page}>
             <BackButton
                 to="/facilities"
                 label="Quay lại danh sách"
