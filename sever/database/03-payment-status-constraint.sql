@@ -8,6 +8,9 @@
 USE pickleball_danang;
 GO
 
+SET QUOTED_IDENTIFIER ON;
+GO
+
 -- ─────────────────────────────────────────────
 -- 1. Add transaction_id column (idempotent)
 -- ─────────────────────────────────────────────
