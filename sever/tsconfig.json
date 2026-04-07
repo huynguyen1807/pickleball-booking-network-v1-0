@@ -13,7 +13,7 @@
     "moduleResolution": "node16",
     "allowSyntheticDefaultImports": true,
     "sourceMap": true,
-    "types": ["node"],
+    "types": ["node", "express", "multer"],
     "typeRoots": ["./node_modules/@types"]
   },
   "include": [
