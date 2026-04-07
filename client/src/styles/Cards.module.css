@@ -513,7 +513,7 @@
 
 .courtStats {
     display: flex;
-    justify-content: space-between;
+    justify-content: space-evenly;
     align-items: center;
 }
 
@@ -526,6 +526,24 @@
 .courtBookings {
     font-size: 0.8rem;
     color: var(--text-muted);
+}
+
+.facilityStatLeft,
+.facilityStatCenter,
+.facilityStatRight {
+    flex: 1;
+}
+
+.facilityStatLeft {
+    text-align: left;
+}
+
+.facilityStatCenter {
+    text-align: center;
+}
+
+.facilityStatRight {
+    text-align: right;
 }
 
 /* ---- MatchCard ---- */

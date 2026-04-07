@@ -3,6 +3,7 @@ import { useAuth } from './context/AuthContext'
 import Navbar from './components/Navbar'
 import ProtectedRoute from './components/ProtectedRoute'
 import AdminLayout from './components/AdminLayout'
+import AIChatWidget from './components/AIChatWidget'
 
 // Pages
 import Login from './pages/Login'
@@ -33,6 +34,7 @@ import PostDetail from './pages/PostDetail'
 import PaymentCancel from './pages/PaymentCancel'
 import UserProfile from './pages/UserProfile'
 import Notifications from './pages/Notifications'
+import MyReports from './pages/MyReports'
 
 export default function App() {
     const { user } = useAuth()
@@ -42,7 +44,9 @@ export default function App() {
     return (
         <>
             {user && !isAdminPage && <Navbar />}
-            <Routes>
+            {user && !isAdminPage && <AIChatWidget />}
+            <main className={user && !isAdminPage ? 'appContentWithNavbar' : ''}>
+                <Routes>
                 {/* Public */}
                 <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
                 <Route path="/register" element={user ? <Navigate to="/" /> : <Register />} />
@@ -88,6 +92,9 @@ export default function App() {
                 <Route path="/notifications" element={
                     <ProtectedRoute><Notifications /></ProtectedRoute>
                 } />
+                <Route path="/reports" element={
+                    <ProtectedRoute><MyReports /></ProtectedRoute>
+                } />
                 <Route path="/dashboard" element={
                     <ProtectedRoute roles={['user']}><UserDashboard /></ProtectedRoute>
                 } />
@@ -125,7 +132,8 @@ export default function App() {
 
                 {/* Fallback */}
                 <Route path="*" element={<Navigate to="/" />} />
-            </Routes>
+                </Routes>
+            </main>
         </>
     )
 }

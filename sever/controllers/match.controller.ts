@@ -4,7 +4,7 @@ import { createNotification } from './notification.controller';
 import { createPayOSPaymentSession } from './payment.controller';
 import {
     JOIN_PAYMENT_WINDOW_MINUTES,
-    MATCH_UNDERFILLED_CANCEL_WINDOW_MINUTES,
+    getUnderfilledCancelWindowMinutes,
     getCourtAvailabilityConflict,
     getFormatConfig,
     getHoursUntilStart,
@@ -19,6 +19,7 @@ import {
     toLocalDateOnly
 } from '../utils/matchLifecycle';
 import dotenv from 'dotenv';
+import { applyRefundFinancialReversal } from '../utils/refundFinancials';
 
 dotenv.config();
 
@@ -124,13 +125,22 @@ const refundMatchPaymentsToBalance = async (params: {
                 THROW;
             END CATCH
 
-            SELECT COUNT(1) AS refunded_count, ISNULL(SUM(refund_amount), 0) AS refunded_total
+            SELECT payment_id, refund_amount
             FROM @refunded;
         `);
 
+    const refundedRows = result.recordset || [];
+    for (const row of refundedRows) {
+        await applyRefundFinancialReversal(pool, {
+            paymentId: Number(row.payment_id),
+            refundAmount: Number(row.refund_amount || 0),
+            note: 'Match refund flow'
+        });
+    }
+
     return {
-        refundedCount: Number(result.recordset?.[0]?.refunded_count || 0),
-        refundedTotal: Number(result.recordset?.[0]?.refunded_total || 0)
+        refundedCount: refundedRows.length,
+        refundedTotal: refundedRows.reduce((sum: number, row: any) => sum + Number(row.refund_amount || 0), 0)
     };
 };
 
@@ -422,8 +432,12 @@ export const createMatch = async (req, res) => {
                 return res.status(500).json({ message: paymentErr.message || 'Không thể tạo phiên thanh toán cho host' });
             }
         } catch (innerErr) {
-            if (tx._aborted !== true) {
-                await tx.rollback();
+            if (tx._aborted !== true && tx._state?.transaction?.begin) {
+                try {
+                    await tx.rollback();
+                } catch (rollbackErr: any) {
+                    console.warn('[createMatch] Rollback error (likely post-commit):', rollbackErr?.code);
+                }
             }
             throw innerErr;
         }
@@ -940,16 +954,25 @@ export const autoCheckMatches = async () => {
                 m.min_players,
                 m.match_date,
                 m.start_time,
+                DATEDIFF(
+                    MINUTE,
+                    GETDATE(),
+                    DATEADD(
+                        SECOND,
+                        DATEDIFF(SECOND, CAST('00:00:00' AS TIME), CAST(m.start_time AS TIME)),
+                        CAST(m.match_date AS DATETIME)
+                    )
+                ) AS minutes_until_start,
                 SUM(CASE WHEN mp.status = 'joined' THEN 1 ELSE 0 END) AS joined_players
             FROM matches m
             LEFT JOIN match_players mp ON mp.match_id = m.id
-            WHERE m.status IN ('open', 'full', 'confirmed')
+            WHERE m.status IN ('open', 'waiting', 'full', 'confirmed')
             GROUP BY m.id, m.booking_id, m.format, m.max_players, m.min_players, m.match_date, m.start_time
         `);
 
         for (const row of underfilled.recordset) {
-            const minutesUntilStart = getHoursUntilStart(row.match_date, row.start_time) * 60;
-            if (minutesUntilStart > MATCH_UNDERFILLED_CANCEL_WINDOW_MINUTES) {
+            const minutesUntilStart = Number(row.minutes_until_start);
+            if (minutesUntilStart > getUnderfilledCancelWindowMinutes()) {
                 continue;
             }
 

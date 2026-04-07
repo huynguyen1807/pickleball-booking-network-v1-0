@@ -137,6 +137,12 @@ export default function Navbar() {
                         {chatUnread > 0 && <span className={styles.chatBadge}>{chatUnread}</span>}
                     </NavLink>
                 </li>
+                <li>
+                    <NavLink to="/reports" className={({ isActive }) => `${styles.navLink} ${isActive ? styles.active : ''}`}
+                        onClick={() => setMobileOpen(false)}>
+                        📋 Báo cáo
+                    </NavLink>
+                </li>
                 {user.role === 'owner' && (
                     <li>
                         <NavLink to="/owner/courts" className={({ isActive }) => `${styles.navLink} ${isActive ? styles.active : ''}`}

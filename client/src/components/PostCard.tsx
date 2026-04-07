@@ -235,9 +235,9 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
         setShowMenu(false)
     }
 
-    const handleOpenPhoto = () => {
+    const handleOpenPhoto = (mediaIndex: number = 0) => {
         sessionStorage.setItem(HOME_SCROLL_KEY, String(window.scrollY || 0))
-        navigate(`/post/${data.id}/photo`)
+        navigate(`/post/${data.id}/photo?index=${mediaIndex}`)
     }
 
     // show minimal card when hidden
@@ -365,7 +365,7 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
             {data.image && (
                 <>
                     <button
-                        onClick={handleOpenPhoto}
+                        onClick={() => handleOpenPhoto()}
                         style={{ display: 'block', width: '100%', padding: 0, border: 'none', background: 'none', cursor: 'zoom-in' }}
                         title="Click để xem ảnh phóng to"
                     >
@@ -373,6 +373,104 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
                     </button>
                     <div className={styles.imageHint}>🔍 Click ảnh để xem toàn màn hình</div>
                 </>
+            )}
+
+            {/* Media Gallery - Multiple images and videos */}
+            {data.media && data.media.length > 0 && (
+                <div style={{ marginTop: '12px' }}>
+                    {data.media.length === 1 ? (
+                        // Single media display
+                        data.media[0].type === 'video' ? (
+                            <video
+                                src={data.media[0].url}
+                                controls
+                                style={{
+                                    width: '100%',
+                                    borderRadius: 'var(--radius-md)',
+                                    background: '#000',
+                                    maxHeight: '400px'
+                                }}
+                            />
+                        ) : (
+                            <button
+                                onClick={() => handleOpenPhoto()}
+                                style={{ display: 'block', width: '100%', padding: 0, border: 'none', background: 'none', cursor: 'zoom-in' }}
+                                title="Click để xem ảnh phóng to"
+                            >
+                                <img
+                                    src={data.media[0].url}
+                                    alt=""
+                                    className={styles.postImage}
+                                    style={{ pointerEvents: 'none' }}
+                                />
+                            </button>
+                        )
+                    ) : (
+                        // Multiple media gallery
+                        <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: data.media.length === 2 ? '1fr 1fr' : '1fr 1fr 1fr',
+                            gap: '4px',
+                            borderRadius: 'var(--radius-md)',
+                            overflow: 'hidden'
+                        }}>
+                            {data.media.map((media, idx) => (
+                                <div
+                                    key={media.id}
+                                    style={{
+                                        aspectRatio: '1',
+                                        background: '#000',
+                                        position: 'relative',
+                                        overflow: 'hidden',
+                                        cursor: 'pointer'
+                                    }}
+                                    onClick={() => handleOpenPhoto(idx)}
+                                >
+                                    {media.type === 'video' ? (
+                                        <div style={{
+                                            width: '100%',
+                                            height: '100%',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            fontSize: '32px'
+                                        }}>
+                                            🎥
+                                        </div>
+                                    ) : (
+                                        <img
+                                            src={media.url}
+                                            alt={`media-${idx}`}
+                                            style={{
+                                                width: '100%',
+                                                height: '100%',
+                                                objectFit: 'cover'
+                                            }}
+                                        />
+                                    )}
+                                    {idx === 3 && data.media.length > 4 && (
+                                        <div style={{
+                                            position: 'absolute',
+                                            top: 0,
+                                            left: 0,
+                                            right: 0,
+                                            bottom: 0,
+                                            background: 'rgba(0,0,0,0.6)',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            fontSize: '24px',
+                                            fontWeight: 'bold',
+                                            color: 'white'
+                                        }}>
+                                            +{data.media.length - 4}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
             )}
 
             {/* Like / Comment / Share Actions */}

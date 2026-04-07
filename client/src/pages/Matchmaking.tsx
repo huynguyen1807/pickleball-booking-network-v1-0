@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useDialog } from '../context/DialogContext'
 import api from '../api/axios'
@@ -15,6 +15,7 @@ import {
     isWithinAdvanceDays,
     getMaxBookingDateYMD
 } from '../utils/dateTime'
+import { sortMatchesNewestFirst } from '../utils/matchSort'
 
 const FORMATS = [
     { key: '1v1', label: '1 vs 1', players: 2, icon: '⚔️' },
@@ -27,6 +28,7 @@ const SKILL_OPTIONS = [
     { value: 'intermediate', label: '🟡 Trung bình' },
     { value: 'advanced', label: '🔴 Nâng cao' }
 ]
+const MATCHES_PER_PAGE = 10
 
 export default function Matchmaking() {
     const { user } = useAuth()
@@ -48,6 +50,7 @@ export default function Matchmaking() {
     const [courtPage, setCourtPage] = useState(1)
     const [cardsPerPage, setCardsPerPage] = useState(4)
     const [pendingPayment, setPendingPayment] = useState<any>(null)
+    const [matchPage, setMatchPage] = useState(1)
     const courtSliderRef = useRef<HTMLDivElement | null>(null)
     const allTimeOptions = generateHalfHourOptions()
     const isMatchStartValid = isAtLeastAdvanceHours(createForm.date, createForm.start_time)
@@ -165,6 +168,16 @@ export default function Matchmaking() {
         return true
     })
 
+    const sortedMatches = useMemo(() => {
+        return sortMatchesNewestFirst(filtered)
+    }, [filtered])
+
+    const totalMatchPages = Math.max(1, Math.ceil(sortedMatches.length / MATCHES_PER_PAGE))
+    const pagedMatches = sortedMatches.slice(
+        (matchPage - 1) * MATCHES_PER_PAGE,
+        matchPage * MATCHES_PER_PAGE
+    )
+
     const totalCourtPages = Math.max(1, Math.ceil(availableCourts.length / cardsPerPage))
 
     const handleCourtSliderScroll = () => {
@@ -211,6 +224,16 @@ export default function Matchmaking() {
         if (el) el.scrollTo({ left: 0, behavior: 'auto' })
     }, [cardsPerPage])
 
+    useEffect(() => {
+        setMatchPage(1)
+    }, [tab, filterSkill])
+
+    useEffect(() => {
+        if (matchPage > totalMatchPages) {
+            setMatchPage(totalMatchPages)
+        }
+    }, [matchPage, totalMatchPages])
+
     const formatPrice = (p: number) => new Intl.NumberFormat('vi-VN').format(p) + 'đ'
 
     if (loading) return <div className={styles.matchPage} style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-secondary)' }}>⏳ Đang tải...</div>
@@ -250,7 +273,7 @@ export default function Matchmaking() {
             </div>
 
             <div className={styles.matchGrid}>
-                {filtered.length > 0 ? filtered.map((match: any) => (
+                {pagedMatches.length > 0 ? pagedMatches.map((match: any) => (
                     <MatchCard key={match.id} match={{
                         ...match,
                         date: match.match_date,
@@ -263,6 +286,28 @@ export default function Matchmaking() {
                     </div>
                 )}
             </div>
+
+            {sortedMatches.length > MATCHES_PER_PAGE && (
+                <div className={styles.matchPager}>
+                    <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => setMatchPage(p => Math.max(1, p - 1))}
+                        disabled={matchPage <= 1}
+                    >
+                        ← Trang trước
+                    </button>
+                    <span className={styles.matchPagerText}>Trang {matchPage}/{totalMatchPages}</span>
+                    <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => setMatchPage(p => Math.min(totalMatchPages, p + 1))}
+                        disabled={matchPage >= totalMatchPages}
+                    >
+                        Trang sau →
+                    </button>
+                </div>
+            )}
 
             {/* Create Match Modal */}
             {showCreate && (

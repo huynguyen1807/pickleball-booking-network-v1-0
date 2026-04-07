@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useDialog } from '../context/DialogContext'
 import api from '../api/axios'
+import BackButton from '../components/BackButton'
 import styles from '../styles/UserProfile.module.css'
 
 type AvatarMode = null | 'choose' | 'camera' | 'preview'
@@ -176,8 +177,7 @@ export default function UserProfile() {
 
     return (
         <div className={styles.profilePage}>
-            <button className="btn btn-secondary btn-sm" onClick={() => navigate(-1)}
-                style={{ marginBottom: '20px' }}>← Quay lại</button>
+            <BackButton size="sm" style={{ marginBottom: '20px' }} />
 
             <div className={styles.profileCard}>
                 <div className={styles.coverBg} />

@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
 import UserProfileCard from '../components/UserProfileCard'
+import BackButton from '../components/BackButton'
 import { useDialog } from '../context/DialogContext'
 import styles from '../styles/Booking.module.css'
 import { getAdvanceValidationMessage, getTodayYMD, isAtLeastAdvanceHours, getMaxBookingDateYMD } from '../utils/dateTime'
@@ -246,7 +247,7 @@ export default function CourtDetail() {
                 <div className={styles.courtHero}>
                     <div className={styles.courtHeroPlaceholder}>🏟️</div>
                     <div className={styles.courtHeroOverlay}>
-                        <button className={styles.backBtn} onClick={() => navigate(-1)}>← Quay lại</button>
+                        <BackButton className={styles.backBtn} />
                         <div className={styles.courtHeroInfo}>
                             <h1 className={styles.courtName}>{court.name}</h1>
                             <p className={styles.courtAddress}>📍 {court.address}</p>

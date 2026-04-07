@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api/axios'
+import BackButton from '../components/BackButton'
 import styles from '../styles/Dashboard.module.css'
 import { useAuth } from '../context/AuthContext'
 import { useDialog } from '../context/DialogContext'
@@ -729,7 +730,7 @@ export default function UserDashboard() {
                         <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Bạn có chắc chắn muốn hủy đặt sân <strong>{cancelModal.booking?.court_name}</strong> lúc {fmtMatchTime(cancelModal.booking?.start_time)} ngày {fmtDate(cancelModal.booking?.booking_date)} không?</p>
 
                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 24 }}>
-                            <button className="btn btn-secondary" onClick={() => setCancelModal({ open: false, booking: null, hoursLeft: 0 })}>Quay lại</button>
+                            <BackButton onClick={() => setCancelModal({ open: false, booking: null, hoursLeft: 0 })} />
                             <button className="btn btn-primary" style={{ background: '#ef4444' }} onClick={confirmCancel}>Xác nhận hủy</button>
                         </div>
                     </div>
@@ -781,7 +782,7 @@ export default function UserDashboard() {
                                 <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Bạn sẽ gửi lời mời nhượng sân <strong>{transferModal.booking?.court_name}</strong> cho người này?</p>
                                 
                                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 24 }}>
-                                    <button className="btn btn-secondary" onClick={() => setTransferModal(p => ({ ...p, step: 1, targetUser: null }))}>⬅ Quay lại</button>
+                                    <BackButton onClick={() => setTransferModal(p => ({ ...p, step: 1, targetUser: null }))} />
                                     <button className="btn btn-primary" onClick={confirmTransfer}>Gửi lời mời</button>
                                 </div>
                             </>
