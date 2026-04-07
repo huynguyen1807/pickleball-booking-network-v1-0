@@ -4,6 +4,32 @@ import { createNotification } from './notification.controller';
 import fs from 'fs';
 import path from 'path';
 
+const SERVER_URL = process.env.SERVER_URL || 'http://localhost:5000';
+const UPLOADS_DIR = path.resolve(__dirname, '..', 'uploads');
+
+const normalizeStoredMediaPath = (filePath: string | null | undefined): string => {
+    if (!filePath) return '';
+    const normalized = String(filePath).replace(/\\/g, '/');
+    const uploadsMarker = '/uploads/';
+    const markerIndex = normalized.toLowerCase().lastIndexOf(uploadsMarker);
+
+    if (markerIndex >= 0) {
+        return normalized.slice(markerIndex + uploadsMarker.length).replace(/^\/+/, '');
+    }
+
+    return normalized.replace(/^uploads\//i, '').replace(/^\/+/, '');
+};
+
+const toMediaUrl = (filePath: string | null | undefined): string => {
+    const relativePath = normalizeStoredMediaPath(filePath);
+    return `${SERVER_URL}/uploads/${relativePath}`;
+};
+
+const toMediaDiskPath = (filePath: string | null | undefined): string => {
+    const relativePath = normalizeStoredMediaPath(filePath);
+    return path.join(UPLOADS_DIR, relativePath);
+};
+
 // Get single post by ID
 export const getPostById = async (req, res) => {
     try {
@@ -30,7 +56,7 @@ export const getPostById = async (req, res) => {
         post.media = mediaResult.recordset.map(m => ({
             id: m.id,
             type: m.media_type,
-            url: `${process.env.SERVER_URL || 'http://localhost:5000'}/uploads/${m.file_path.replace(/\\/g, '/')}`,
+            url: toMediaUrl(m.file_path),
             filename: m.file_name,
             mimeType: m.mime_type
         }));
@@ -67,8 +93,8 @@ export const createPost = async (req, res) => {
                 const file = req.files[i];
                 const mediaType = file.mimetype.startsWith('video') ? 'video' : 'image';
                 console.log(`📁 File ${i+1}: ${file.filename} | Type: ${mediaType} | MIME: ${file.mimetype}`);
-                // Store relative path without 'uploads/' prefix for correct URL construction
-                const relativePath = file.path.replace(/\\/g, '/').replace(/^uploads\//, '');
+                // Keep only path relative to uploads directory for stable URL generation
+                const relativePath = normalizeStoredMediaPath(file.path);
                 
                 insertRequest
                     .input(`post_id_${i}`, sql.Int, postId)
@@ -114,7 +140,7 @@ export const createPost = async (req, res) => {
         createdPost.media = mediaRes.recordset.map(m => ({
             id: m.id,
             type: m.media_type,
-            url: `${process.env.SERVER_URL || 'http://localhost:5000'}/uploads/${m.file_path.replace(/\\/g, '/')}`,
+            url: toMediaUrl(m.file_path),
             filename: m.file_name,
             mimeType: m.mime_type
         }));
@@ -161,7 +187,7 @@ export const getAllPosts = async (req, res) => {
             mediaMap[m.post_id].push({
                 id: m.id,
                 type: m.media_type,
-                url: `${process.env.SERVER_URL || 'http://localhost:5000'}/uploads/${m.file_path.replace(/\\/g, '/')}`,
+                url: toMediaUrl(m.file_path),
                 filename: m.file_name,
                 mimeType: m.mime_type
             });
@@ -200,7 +226,7 @@ export const deletePost = async (req, res) => {
         
         // Delete files from disk
         for (const media of mediaRes.recordset) {
-            const filePath = path.join('uploads', media.file_path);
+            const filePath = toMediaDiskPath(media.file_path);
             if (fs.existsSync(filePath)) {
                 try {
                     fs.unlinkSync(filePath);
