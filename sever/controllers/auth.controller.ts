@@ -5,12 +5,9 @@ import { sql, poolPromise } from '../config/db';
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
-import { setDefaultResultOrder } from 'dns';
+import { resolve4 } from 'dns/promises';
 import type { StringValue } from 'ms';
 dotenv.config();
-
-// Render can fail to reach SMTP over IPv6, so prefer IPv4 when resolving SMTP hosts.
-setDefaultResultOrder('ipv4first');
 
 // In-memory OTP store
 const otpStore = new Map();
@@ -25,20 +22,45 @@ if (!hasSmtpConfig) {
     console.warn('[SMTP] Missing SMTP_USER/SMTP_PASS/SMTP_FROM. OTP email sending will fail until these env vars are set.');
 }
 
-// Email transporter
-const transporter = nodemailer.createTransport({
-    host: smtpHost,
-    port: smtpPort,
-    secure: smtpSecure,
-    requireTLS: !smtpSecure,
-    connectionTimeout: Number(process.env.SMTP_CONNECTION_TIMEOUT || 15000),
-    greetingTimeout: Number(process.env.SMTP_GREETING_TIMEOUT || 15000),
-    socketTimeout: Number(process.env.SMTP_SOCKET_TIMEOUT || 20000),
-    auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS
+const resolveSmtpHost = async (): Promise<string> => {
+    if (process.env.SMTP_HOST_IPV4) {
+        return process.env.SMTP_HOST_IPV4;
     }
-});
+
+    try {
+        const ipv4Addresses = await resolve4(smtpHost);
+        if (ipv4Addresses.length > 0) {
+            return ipv4Addresses[0];
+        }
+    } catch (err) {
+        console.warn('[SMTP] Failed to resolve IPv4 for SMTP host, falling back to hostname:', err);
+    }
+
+    return smtpHost;
+};
+
+const sendSmtpMail = async (mailOptions) => {
+    const smtpConnectHost = await resolveSmtpHost();
+
+    const transporter = nodemailer.createTransport({
+        host: smtpConnectHost,
+        port: smtpPort,
+        secure: smtpSecure,
+        requireTLS: !smtpSecure,
+        connectionTimeout: Number(process.env.SMTP_CONNECTION_TIMEOUT || 15000),
+        greetingTimeout: Number(process.env.SMTP_GREETING_TIMEOUT || 15000),
+        socketTimeout: Number(process.env.SMTP_SOCKET_TIMEOUT || 20000),
+        auth: {
+            user: process.env.SMTP_USER,
+            pass: process.env.SMTP_PASS
+        },
+        tls: {
+            servername: smtpHost
+        }
+    });
+
+    return transporter.sendMail(mailOptions);
+};
 
 // Generate 6-digit code
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
@@ -86,7 +108,7 @@ export const sendRegisterOTP = async (req, res) => {
             type: 'register'
         })
 
-        await transporter.sendMail({
+        await sendSmtpMail({
             from: process.env.SMTP_FROM,
             to: trimmedEmail,
             subject: '🏓 Mã xác nhận đăng ký — PickleBall- Đà Nẵng',
@@ -371,6 +393,10 @@ export const changePassword = async (req, res) => {
 // Forgot Password — send 6-digit OTP to email
 export const forgotPassword = async (req, res) => {
     try {
+        if (!hasSmtpConfig) {
+            return res.status(500).json({ message: 'Server chưa cấu hình SMTP để gửi OTP' });
+        }
+
         const { email } = req.body;
         if (!email) return res.status(400).json({ message: 'Vui lòng nhập email' });
 
@@ -388,7 +414,7 @@ export const forgotPassword = async (req, res) => {
         otpStore.set(email, { otp, expiresAt, verified: false });
 
         // Send OTP email
-        await transporter.sendMail({
+        await sendSmtpMail({
             from: process.env.SMTP_FROM,
             to: email,
             subject: '🏓 Mã xác nhận đặt lại mật khẩu — PickleBall- Đà Nẵng',
