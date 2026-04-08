@@ -11,9 +11,25 @@ dotenv.config();
 // In-memory OTP store
 const otpStore = new Map();
 
-// Email transporter — Gmail with App Password
+const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
+const smtpPort = Number(process.env.SMTP_PORT || 587);
+const smtpSecure = process.env.SMTP_SECURE === 'true' || smtpPort === 465;
+
+const hasSmtpConfig = Boolean(process.env.SMTP_USER && process.env.SMTP_PASS && process.env.SMTP_FROM);
+
+if (!hasSmtpConfig) {
+    console.warn('[SMTP] Missing SMTP_USER/SMTP_PASS/SMTP_FROM. OTP email sending will fail until these env vars are set.');
+}
+
+// Email transporter
 const transporter = nodemailer.createTransport({
-    service: 'gmail',
+    host: smtpHost,
+    port: smtpPort,
+    secure: smtpSecure,
+    requireTLS: !smtpSecure,
+    connectionTimeout: Number(process.env.SMTP_CONNECTION_TIMEOUT || 15000),
+    greetingTimeout: Number(process.env.SMTP_GREETING_TIMEOUT || 15000),
+    socketTimeout: Number(process.env.SMTP_SOCKET_TIMEOUT || 20000),
     auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS
@@ -36,6 +52,10 @@ const validatePassword = (pwd: string): string | null => {
 // Register
 export const sendRegisterOTP = async (req, res) => {
     try {
+        if (!hasSmtpConfig) {
+            return res.status(500).json({ message: 'Server chưa cấu hình SMTP để gửi OTP' });
+        }
+
         const { email } = req.body
         if (!email)
             return res.status(400).json({ message: 'Vui lòng nhập email' })
@@ -93,7 +113,7 @@ export const sendRegisterOTP = async (req, res) => {
         res.json({ message: 'OTP đã gửi về email' })
 
     } catch (err) {
-        console.error(err)
+        console.error('[SEND_OTP] Failed to send OTP email:', err)
         res.status(500).json({ message: 'Không thể gửi OTP' })
     }
 }
