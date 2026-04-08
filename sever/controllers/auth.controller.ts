@@ -5,8 +5,12 @@ import { sql, poolPromise } from '../config/db';
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
+import { setDefaultResultOrder } from 'dns';
 import type { StringValue } from 'ms';
 dotenv.config();
+
+// Render can fail to reach SMTP over IPv6, so prefer IPv4 when resolving SMTP hosts.
+setDefaultResultOrder('ipv4first');
 
 // In-memory OTP store
 const otpStore = new Map();
