@@ -17,7 +17,7 @@ const otpStore = new Map();
 
 const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
 const smtpPort = Number(process.env.SMTP_PORT || 587);
-const smtpSecure = process.env.SMTP_SECURE === 'true' || smtpPort === 465;
+const smtpSecure = String(process.env.SMTP_SECURE).toLowerCase() === 'true';
 
 const hasSmtpConfig = Boolean(process.env.SMTP_USER && process.env.SMTP_PASS && process.env.SMTP_FROM);
 
