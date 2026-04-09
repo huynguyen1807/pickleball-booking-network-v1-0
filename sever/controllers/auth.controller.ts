@@ -1,6 +1,5 @@
 import bcrypt from 'bcryptjs';
 import dns from 'dns';
-import { promisify } from 'util';
 import jwt from 'jsonwebtoken';
 import nodemailer from 'nodemailer';
 import { sql, poolPromise } from '../config/db';
@@ -20,42 +19,45 @@ try {
 // In-memory OTP store
 const otpStore = new Map();
 
-// Resolve SMTP host to IPv4 address only (bypass IPv6 blocking on Render)
-let smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
-let smtpPort = Number(process.env.SMTP_PORT || 587);
+const smtpHost = process.env.SMTP_HOST || 'smtp-relay.brevo.com';
+const smtpPort = Number(process.env.SMTP_PORT || 587);
+const smtpUser = process.env.SMTP_USER || '';
+const smtpPass = process.env.SMTP_PASS || '';
+const smtpFrom = process.env.SMTP_FROM || smtpUser;
 
-const initSmtpConnection = async () => {
-    try {
-        const resolve4 = promisify(dns.resolve4);
-        console.log(`[EMAIL] Resolving ${smtpHost} to IPv4...`);
-        const ipv4Addresses = await resolve4(smtpHost);
-        if (ipv4Addresses && ipv4Addresses.length > 0) {
-            smtpHost = ipv4Addresses[0]; // Use first IPv4 address
-            console.log(`[EMAIL] Resolved SMTP host to IPv4: ${smtpHost}`);
-        }
-    } catch (err) {
-        console.warn(`[EMAIL] Failed to resolve ${smtpHost} to IPv4, falling back to hostname:`, (err as Error).message);
-        // Keep original hostname as fallback
-    }
-};
-
-// Initialize IPv4 resolution immediately
-initSmtpConnection().catch(err => console.error('[EMAIL] Init error:', err));
-
-// Email transporter — Gmail with App Password (using IPv4 address)
-const transporter = nodemailer.createTransport({
+const createTransporter = (port: number, secure: boolean) => nodemailer.createTransport({
     host: smtpHost,
-    port: smtpPort,
-    secure: String(process.env.SMTP_SECURE || 'false').toLowerCase() === 'true',
-    requireTLS: true,
-    connectionTimeout: 15000,
-    greetingTimeout: 10000,
-    socketTimeout: 20000,
+    port,
+    secure,
+    requireTLS: !secure,
+    connectionTimeout: 20000,
+    greetingTimeout: 15000,
+    socketTimeout: 30000,
     auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS
+        user: smtpUser,
+        pass: smtpPass
+    },
+    tls: {
+        servername: smtpHost
     }
 });
+
+const sendOtpMail = async (mailOptions: nodemailer.SendMailOptions) => {
+    try {
+        // Primary path: STARTTLS on 587 (Brevo default)
+        const primary = createTransporter(smtpPort, false);
+        return await primary.sendMail(mailOptions);
+    } catch (err) {
+        const error = err as Error & { code?: string };
+        // If 587 path times out, retry SMTPS 465 as fallback.
+        if (error.code === 'ETIMEDOUT' && smtpPort === 587) {
+            console.warn('[EMAIL] Port 587 timeout, retrying SMTP on 465...');
+            const fallback = createTransporter(465, true);
+            return await fallback.sendMail(mailOptions);
+        }
+        throw err;
+    }
+};
 
 // Generate 6-digit code
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
@@ -99,8 +101,8 @@ export const sendRegisterOTP = async (req, res) => {
             type: 'register'
         })
 
-        await transporter.sendMail({
-            from: process.env.SMTP_FROM,
+        await sendOtpMail({
+            from: smtpFrom,
             to: trimmedEmail,
             subject: '🏓 Mã xác nhận đăng ký — PickleBall- Đà Nẵng',
             html: `
@@ -401,8 +403,8 @@ export const forgotPassword = async (req, res) => {
         otpStore.set(email, { otp, expiresAt, verified: false });
 
         // Send OTP email
-        await transporter.sendMail({
-            from: process.env.SMTP_FROM,
+        await sendOtpMail({
+            from: smtpFrom,
             to: email,
             subject: '🏓 Mã xác nhận đặt lại mật khẩu — PickleBall- Đà Nẵng',
             html: `
