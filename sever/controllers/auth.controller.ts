@@ -23,7 +23,8 @@ const smtpHost = process.env.SMTP_HOST || 'smtp-relay.brevo.com';
 const smtpPort = Number(process.env.SMTP_PORT || 587);
 const smtpUser = process.env.SMTP_USER || '';
 const smtpPass = process.env.SMTP_PASS || '';
-const smtpFrom = process.env.SMTP_FROM || smtpUser;
+const smtpFromEmail = process.env.SMTP_FROM_EMAIL || smtpUser;
+const smtpFromName = process.env.SMTP_FROM_NAME || 'PickleBall- Đà Nẵng';
 const brevoApiKey = process.env.BREVO_API_KEY || '';
 
 const createTransporter = (port: number, secure: boolean) => nodemailer.createTransport({
@@ -60,7 +61,7 @@ const sendViaBrevoApi = async (mailOptions: nodemailer.SendMailOptions) => {
             'api-key': brevoApiKey
         },
         body: JSON.stringify({
-            sender: { email: smtpFrom },
+            sender: { email: smtpFromEmail, name: smtpFromName },
             to: [{ email: toEmail }],
             subject: String(mailOptions.subject || ''),
             htmlContent: String(mailOptions.html || ''),
@@ -149,7 +150,7 @@ export const sendRegisterOTP = async (req, res) => {
         })
 
         await sendOtpMail({
-            from: smtpFrom,
+            from: `"${smtpFromName}" <${smtpFromEmail}>`,
             to: trimmedEmail,
             subject: '🏓 Mã xác nhận đăng ký — PickleBall- Đà Nẵng',
             html: `
@@ -451,7 +452,7 @@ export const forgotPassword = async (req, res) => {
 
         // Send OTP email
         await sendOtpMail({
-            from: smtpFrom,
+            from: `"${smtpFromName}" <${smtpFromEmail}>`,
             to: email,
             subject: '🏓 Mã xác nhận đặt lại mật khẩu — PickleBall- Đà Nẵng',
             html: `
