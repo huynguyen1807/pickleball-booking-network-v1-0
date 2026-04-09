@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import dns from 'dns';
 import jwt from 'jsonwebtoken';
 import nodemailer from 'nodemailer';
 import { sql, poolPromise } from '../config/db';
@@ -8,17 +9,103 @@ import fs from 'fs';
 import type { StringValue } from 'ms';
 dotenv.config();
 
+// Render often does not provide outbound IPv6 routes; force IPv4 for SMTP DNS lookups.
+try {
+    dns.setDefaultResultOrder('ipv4first');
+} catch (err) {
+    console.warn('[EMAIL] Unable to set DNS result order:', (err as Error).message);
+}
+
 // In-memory OTP store
 const otpStore = new Map();
 
-// Email transporter — Gmail with App Password
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
+const smtpHost = process.env.SMTP_HOST || 'smtp-relay.brevo.com';
+const smtpPort = Number(process.env.SMTP_PORT || 587);
+const smtpUser = process.env.SMTP_USER || '';
+const smtpPass = process.env.SMTP_PASS || '';
+const smtpFromEmail = process.env.SMTP_FROM_EMAIL || smtpUser;
+const smtpFromName = process.env.SMTP_FROM_NAME || 'PickleBall- Đà Nẵng';
+const brevoApiKey = process.env.BREVO_API_KEY || '';
+
+const createTransporter = (port: number, secure: boolean) => nodemailer.createTransport({
+    host: smtpHost,
+    port,
+    secure,
+    requireTLS: !secure,
+    connectionTimeout: 20000,
+    greetingTimeout: 15000,
+    socketTimeout: 30000,
     auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS
+        user: smtpUser,
+        pass: smtpPass
+    },
+    tls: {
+        servername: smtpHost
     }
 });
+
+const sendViaBrevoApi = async (mailOptions: nodemailer.SendMailOptions) => {
+    if (!brevoApiKey) {
+        throw new Error('BREVO_API_KEY is missing for HTTP fallback');
+    }
+
+    const toEmail = String(mailOptions.to || '').trim();
+    if (!toEmail) {
+        throw new Error('Email recipient is missing');
+    }
+
+    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'api-key': brevoApiKey
+        },
+        body: JSON.stringify({
+            sender: { email: smtpFromEmail, name: smtpFromName },
+            to: [{ email: toEmail }],
+            subject: String(mailOptions.subject || ''),
+            htmlContent: String(mailOptions.html || ''),
+            textContent: String(mailOptions.text || '') || undefined
+        })
+    });
+
+    if (!response.ok) {
+        const body = await response.text();
+        throw new Error(`Brevo API failed: ${response.status} ${body}`);
+    }
+
+    return response.json();
+};
+
+const sendOtpMail = async (mailOptions: nodemailer.SendMailOptions) => {
+    const attempts = [
+        { port: smtpPort, secure: smtpPort === 465 },
+        { port: 2525, secure: false },
+        { port: 465, secure: true }
+    ];
+
+    let lastError: unknown = null;
+    for (const attempt of attempts) {
+        try {
+            const transporter = createTransporter(attempt.port, attempt.secure);
+            return await transporter.sendMail(mailOptions);
+        } catch (err) {
+            lastError = err;
+            const smtpErr = err as Error & { code?: string };
+            console.warn(`[EMAIL] SMTP failed on port ${attempt.port}: ${smtpErr.code || smtpErr.message}`);
+        }
+    }
+
+    console.warn('[EMAIL] SMTP unavailable, trying Brevo HTTP API fallback...');
+    try {
+        return await sendViaBrevoApi(mailOptions);
+    } catch (apiErr) {
+        if (lastError) {
+            console.error('[EMAIL] Last SMTP error before API fallback:', lastError);
+        }
+        throw apiErr;
+    }
+};
 
 // Generate 6-digit code
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
@@ -62,8 +149,8 @@ export const sendRegisterOTP = async (req, res) => {
             type: 'register'
         })
 
-        await transporter.sendMail({
-            from: process.env.SMTP_FROM,
+        await sendOtpMail({
+            from: `"${smtpFromName}" <${smtpFromEmail}>`,
             to: trimmedEmail,
             subject: '🏓 Mã xác nhận đăng ký — PickleBall- Đà Nẵng',
             html: `
@@ -93,7 +180,7 @@ export const sendRegisterOTP = async (req, res) => {
         res.json({ message: 'OTP đã gửi về email' })
 
     } catch (err) {
-        console.error(err)
+        console.error('[SEND_OTP] Failed to send OTP email:', err)
         res.status(500).json({ message: 'Không thể gửi OTP' })
     }
 }
@@ -364,8 +451,8 @@ export const forgotPassword = async (req, res) => {
         otpStore.set(email, { otp, expiresAt, verified: false });
 
         // Send OTP email
-        await transporter.sendMail({
-            from: process.env.SMTP_FROM,
+        await sendOtpMail({
+            from: `"${smtpFromName}" <${smtpFromEmail}>`,
             to: email,
             subject: '🏓 Mã xác nhận đặt lại mật khẩu — PickleBall- Đà Nẵng',
             html: `

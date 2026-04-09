@@ -5,6 +5,9 @@
 USE pickleball_danang;
 GO
 
+SET QUOTED_IDENTIFIER ON;
+GO
+
 -- Check if column exists, if not add it
 IF NOT EXISTS (
     SELECT * FROM sys.columns 

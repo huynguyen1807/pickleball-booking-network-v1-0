@@ -26,6 +26,14 @@ IF NOT EXISTS (
     ALTER TABLE matches ADD CONSTRAINT FK_matches_booking_id FOREIGN KEY (booking_id) REFERENCES bookings(id);
 GO
 
+IF EXISTS (SELECT 1 FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID('matches') AND name = 'CK_matches_status')
+    ALTER TABLE matches DROP CONSTRAINT CK_matches_status;
+GO
+
+IF EXISTS (SELECT 1 FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID('matches') AND name = 'CK_matches_status_v2')
+    ALTER TABLE matches DROP CONSTRAINT CK_matches_status_v2;
+GO
+
 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('payments') AND name = 'refunded_amount')
     ALTER TABLE payments ADD refunded_amount DECIMAL(12,2) NOT NULL CONSTRAINT DF_payments_refunded_amount_v2 DEFAULT(0);
 GO

@@ -6,7 +6,13 @@ import { io } from 'socket.io-client'
 import UserProfileCard from './UserProfileCard'
 import styles from '../styles/Chat.module.css'
 
-const socket = io('http://localhost:5000')
+const productionSocketUrl = 'https://pickleball-booking-network-v1-0.onrender.com'
+const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+const socketUrl = import.meta.env.VITE_SOCKET_URL || import.meta.env.VITE_API_URL || (isLocalhost ? 'http://localhost:5000' : productionSocketUrl)
+const socket = io(socketUrl, {
+    transports: ['websocket'],
+    withCredentials: true
+})
 
 interface ChatBoxProps {
     roomId: number

@@ -6,13 +6,15 @@ dotenv.config();
 const DB_NAME = process.env.DB_NAME || 'pickleball_danang';
 
 const config = {
-    server: process.env.DB_SERVER || 'localhost',
-    port: parseInt(process.env.DB_PORT) || 1433,
-    user: process.env.DB_USER || 'sa',
+    // server: process.env.DB_SERVER || 'localhost',
+    // port: parseInt(process.env.DB_PORT) || 1433,
+    server: process.env.DB_HOST || process.env.DB_SERVER ,
+    port: Number(process.env.DB_PORT || 1433),
+    user: process.env.DB_USER || 'sqlserver',
     password: process.env.DB_PASSWORD || '123456',
     database: DB_NAME,
     options: {
-        encrypt: false,
+        encrypt: true,
         trustServerCertificate: true,
         enableArithAbort: true
     },

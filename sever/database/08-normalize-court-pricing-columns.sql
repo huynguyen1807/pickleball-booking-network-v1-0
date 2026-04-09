@@ -5,6 +5,15 @@ BEGIN
 END
 GO
 
+UPDATE courts
+SET peak_price = COALESCE(peak_price, 0),
+    weekend_price = COALESCE(weekend_price, 0),
+    min_booking_minutes = COALESCE(min_booking_minutes, 30)
+WHERE peak_price IS NULL
+   OR weekend_price IS NULL
+   OR min_booking_minutes IS NULL;
+GO
+
 IF NOT EXISTS (
     SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
     WHERE TABLE_SCHEMA='dbo' AND TABLE_NAME='courts' AND COLUMN_NAME='peak_price'
@@ -68,38 +77,14 @@ BEGIN
 END
 GO
 
-IF EXISTS (
-    SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
-    WHERE TABLE_SCHEMA='dbo' AND TABLE_NAME='courts' AND COLUMN_NAME='peak_price_per_hour'
-)
-BEGIN
-    UPDATE courts
-    SET peak_price = COALESCE(peak_price, peak_price_per_hour, 0)
-    WHERE peak_price IS NULL;
-END
-ELSE
-BEGIN
-    UPDATE courts
-    SET peak_price = COALESCE(peak_price, 0)
-    WHERE peak_price IS NULL;
-END
+UPDATE courts
+SET peak_price = COALESCE(peak_price, 0)
+WHERE peak_price IS NULL;
 GO
 
-IF EXISTS (
-    SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
-    WHERE TABLE_SCHEMA='dbo' AND TABLE_NAME='courts' AND COLUMN_NAME='weekend_price_per_hour'
-)
-BEGIN
-    UPDATE courts
-    SET weekend_price = COALESCE(weekend_price, weekend_price_per_hour, 0)
-    WHERE weekend_price IS NULL;
-END
-ELSE
-BEGIN
-    UPDATE courts
-    SET weekend_price = COALESCE(weekend_price, 0)
-    WHERE weekend_price IS NULL;
-END
+UPDATE courts
+SET weekend_price = COALESCE(weekend_price, 0)
+WHERE weekend_price IS NULL;
 GO
 
 UPDATE courts
@@ -109,41 +94,17 @@ GO
 
 IF OBJECT_ID('dbo.sub_courts', 'U') IS NOT NULL
 BEGIN
-    IF EXISTS (
-        SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
-        WHERE TABLE_SCHEMA='dbo' AND TABLE_NAME='sub_courts' AND COLUMN_NAME='peak_price_per_hour'
-    )
-    BEGIN
-        UPDATE sub_courts
-        SET peak_price = COALESCE(peak_price, peak_price_per_hour, 0)
-        WHERE peak_price IS NULL;
-    END
-    ELSE
-    BEGIN
-        UPDATE sub_courts
-        SET peak_price = COALESCE(peak_price, 0)
-        WHERE peak_price IS NULL;
-    END
+    UPDATE sub_courts
+    SET peak_price = COALESCE(peak_price, 0)
+    WHERE peak_price IS NULL;
 END
 GO
 
 IF OBJECT_ID('dbo.sub_courts', 'U') IS NOT NULL
 BEGIN
-    IF EXISTS (
-        SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
-        WHERE TABLE_SCHEMA='dbo' AND TABLE_NAME='sub_courts' AND COLUMN_NAME='weekend_price_per_hour'
-    )
-    BEGIN
-        UPDATE sub_courts
-        SET weekend_price = COALESCE(weekend_price, weekend_price_per_hour, 0)
-        WHERE weekend_price IS NULL;
-    END
-    ELSE
-    BEGIN
-        UPDATE sub_courts
-        SET weekend_price = COALESCE(weekend_price, 0)
-        WHERE weekend_price IS NULL;
-    END
+    UPDATE sub_courts
+    SET weekend_price = COALESCE(weekend_price, 0)
+    WHERE weekend_price IS NULL;
 END
 GO
 
@@ -243,87 +204,6 @@ BEGIN
     )
     BEGIN
         ALTER TABLE sub_courts ADD CONSTRAINT DF_sub_courts_min_booking_minutes DEFAULT 30 FOR min_booking_minutes;
-    END
-END
-GO
-
-DECLARE @constraintName SYSNAME;
-
-WHILE 1 = 1
-BEGIN
-        SELECT TOP 1 @constraintName = dc.name
-        FROM sys.default_constraints dc
-        JOIN sys.columns c ON c.object_id = dc.parent_object_id AND c.column_id = dc.parent_column_id
-        WHERE dc.parent_object_id = OBJECT_ID('dbo.courts')
-            AND c.name IN ('peak_price_per_hour', 'weekend_price_per_hour');
-
-        IF @constraintName IS NULL
-                BREAK;
-
-        EXEC('ALTER TABLE courts DROP CONSTRAINT [' + @constraintName + ']');
-        SET @constraintName = NULL;
-END
-GO
-
-IF EXISTS (
-    SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
-    WHERE TABLE_SCHEMA='dbo' AND TABLE_NAME='courts' AND COLUMN_NAME='peak_price_per_hour'
-)
-BEGIN
-    ALTER TABLE courts DROP COLUMN peak_price_per_hour;
-END
-GO
-
-IF EXISTS (
-    SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
-    WHERE TABLE_SCHEMA='dbo' AND TABLE_NAME='courts' AND COLUMN_NAME='weekend_price_per_hour'
-)
-BEGIN
-    ALTER TABLE courts DROP COLUMN weekend_price_per_hour;
-END
-GO
-
-IF OBJECT_ID('dbo.sub_courts', 'U') IS NOT NULL
-BEGIN
-    DECLARE @subConstraintName SYSNAME;
-
-    WHILE 1 = 1
-    BEGIN
-        SELECT TOP 1 @subConstraintName = dc.name
-        FROM sys.default_constraints dc
-        JOIN sys.columns c ON c.object_id = dc.parent_object_id AND c.column_id = dc.parent_column_id
-        WHERE dc.parent_object_id = OBJECT_ID('dbo.sub_courts')
-          AND c.name IN ('peak_price_per_hour', 'weekend_price_per_hour');
-
-        IF @subConstraintName IS NULL
-            BREAK;
-
-        EXEC('ALTER TABLE sub_courts DROP CONSTRAINT [' + @subConstraintName + ']');
-        SET @subConstraintName = NULL;
-    END
-END
-GO
-
-IF OBJECT_ID('dbo.sub_courts', 'U') IS NOT NULL
-BEGIN
-    IF EXISTS (
-        SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
-        WHERE TABLE_SCHEMA='dbo' AND TABLE_NAME='sub_courts' AND COLUMN_NAME='peak_price_per_hour'
-    )
-    BEGIN
-        ALTER TABLE sub_courts DROP COLUMN peak_price_per_hour;
-    END
-END
-GO
-
-IF OBJECT_ID('dbo.sub_courts', 'U') IS NOT NULL
-BEGIN
-    IF EXISTS (
-        SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
-        WHERE TABLE_SCHEMA='dbo' AND TABLE_NAME='sub_courts' AND COLUMN_NAME='weekend_price_per_hour'
-    )
-    BEGIN
-        ALTER TABLE sub_courts DROP COLUMN weekend_price_per_hour;
     END
 END
 GO

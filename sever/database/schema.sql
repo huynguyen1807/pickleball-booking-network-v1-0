@@ -55,8 +55,8 @@ CREATE TABLE facilities (
   description NVARCHAR(MAX),
 
   phone NVARCHAR(20),
-  open_time VARCHAR(10),
-  close_time VARCHAR(10),
+  open_time TIME,
+  close_time TIME,
 
   avatar NVARCHAR(500),
   cover_image NVARCHAR(500),
@@ -80,7 +80,7 @@ CREATE TABLE courts (
   name NVARCHAR(200) NOT NULL,
   image NVARCHAR(500),
 
-  price_per_hour DECIMAL(12,2) NOT NULL,
+  price_per_hour DECIMAL(12,2) NOT NULL DEFAULT 0.00,
 
   latitude DECIMAL(10,7),
   longitude DECIMAL(10,7),
@@ -89,22 +89,13 @@ CREATE TABLE courts (
   surface_type NVARCHAR(50),    -- hard / grass / synthetic
   status NVARCHAR(20),          -- active / maintenance
 
-  peak_start_time VARCHAR(10),
-  peak_end_time VARCHAR(10),
-  peak_price DECIMAL(12,2),
-
-  weekend_price DECIMAL(12,2),
-
-  slot_step_minutes INT DEFAULT 60,
-
-  is_active BIT DEFAULT 1,
-  price_per_hour DECIMAL(12,2) DEFAULT 0.00,
-  peak_start_time DATETIME NULL,
-  peak_end_time DATETIME NULL,
+  peak_start_time TIME,
+  peak_end_time TIME,
   peak_price DECIMAL(12,2) DEFAULT 0.00,
   weekend_price DECIMAL(12,2) DEFAULT 0.00,
   min_booking_minutes INT DEFAULT 30,
   slot_step_minutes INT DEFAULT 15,
+  is_active BIT DEFAULT 1,
   created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
 );
 GO
@@ -119,8 +110,8 @@ CREATE TABLE sub_courts (
   surface_type NVARCHAR(50) NOT NULL,
   status NVARCHAR(20) DEFAULT 'active' CHECK (status IN ('active','maintenance')),
   price_per_hour DECIMAL(12,2) DEFAULT 0.00,
-  peak_start_time TIMESTAMP NULL,
-  peak_end_time TIMESTAMP NULL,
+  peak_start_time TIME NULL,
+  peak_end_time TIME NULL,
   peak_price DECIMAL(12,2) DEFAULT 0.00,
   weekend_price DECIMAL(12,2) DEFAULT 0.00,
   min_booking_minutes INT DEFAULT 30,
@@ -418,9 +409,15 @@ BEGIN
 END
 GO
 
-ALTER TABLE bookings
-ADD CONSTRAINT CK_bookings_status
-CHECK (status IN ('pending','payment_pending','confirmed','cancelled','completed','expired'));
+IF NOT EXISTS (
+  SELECT 1 FROM sys.check_constraints
+  WHERE parent_object_id = OBJECT_ID('bookings') AND name = 'CK_bookings_status'
+)
+BEGIN
+  ALTER TABLE bookings
+  ADD CONSTRAINT CK_bookings_status
+  CHECK (status IN ('pending','payment_pending','confirmed','cancelled','completed','expired'));
+END
 GO
 
 DECLARE @matchStatusConstraintCurrent NVARCHAR(200);
@@ -436,9 +433,15 @@ BEGIN
 END
 GO
 
-ALTER TABLE matches
-ADD CONSTRAINT CK_matches_status_v2
-CHECK (status IN ('waiting','pending_host_payment','open','full','confirmed','completed','finished','cancelled','expired'));
+IF NOT EXISTS (
+  SELECT 1 FROM sys.check_constraints
+  WHERE parent_object_id = OBJECT_ID('matches') AND name = 'CK_matches_status_v2'
+)
+BEGIN
+  ALTER TABLE matches
+  ADD CONSTRAINT CK_matches_status_v2
+  CHECK (status IN ('waiting','pending_host_payment','open','full','confirmed','completed','finished','cancelled','expired'));
+END
 GO
 
 DECLARE @matchPlayersStatusConstraint NVARCHAR(200);
@@ -455,9 +458,15 @@ BEGIN
 END
 GO
 
-ALTER TABLE match_players
-ADD CONSTRAINT CK_match_players_status_v2
-CHECK (status IN ('payment_pending','joined','waitlist','left','expired'));
+IF NOT EXISTS (
+  SELECT 1 FROM sys.check_constraints
+  WHERE parent_object_id = OBJECT_ID('match_players') AND name = 'CK_match_players_status_v2'
+)
+BEGIN
+  ALTER TABLE match_players
+  ADD CONSTRAINT CK_match_players_status_v2
+  CHECK (status IN ('payment_pending','joined','waitlist','left','expired'));
+END
 GO
 
 DECLARE @matchPlayersPaymentStatusConstraint NVARCHAR(200);
@@ -473,9 +482,15 @@ BEGIN
 END
 GO
 
-ALTER TABLE match_players
-ADD CONSTRAINT CK_match_players_payment_status_v2
-CHECK (payment_status IN ('pending','paid','failed','expired','cancelled','refunded','partial_refunded'));
+IF NOT EXISTS (
+  SELECT 1 FROM sys.check_constraints
+  WHERE parent_object_id = OBJECT_ID('match_players') AND name = 'CK_match_players_payment_status_v2'
+)
+BEGIN
+  ALTER TABLE match_players
+  ADD CONSTRAINT CK_match_players_payment_status_v2
+  CHECK (payment_status IN ('pending','paid','failed','expired','cancelled','refunded','partial_refunded'));
+END
 GO
 
 DECLARE @paymentsStatusConstraint NVARCHAR(200);
@@ -491,7 +506,13 @@ BEGIN
 END
 GO
 
-ALTER TABLE payments
-ADD CONSTRAINT CK_payments_status_v2
-CHECK (status IN ('pending','completed','failed','refunded','partial_refunded','cancelled','expired'));
+IF NOT EXISTS (
+  SELECT 1 FROM sys.check_constraints
+  WHERE parent_object_id = OBJECT_ID('payments') AND name = 'CK_payments_status_v2'
+)
+BEGIN
+  ALTER TABLE payments
+  ADD CONSTRAINT CK_payments_status_v2
+  CHECK (status IN ('pending','completed','failed','refunded','partial_refunded','cancelled','expired'));
+END
 GO
