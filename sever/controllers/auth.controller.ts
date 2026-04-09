@@ -1,66 +1,38 @@
 import bcrypt from 'bcryptjs';
+import dns from 'dns';
 import jwt from 'jsonwebtoken';
 import nodemailer from 'nodemailer';
 import { sql, poolPromise } from '../config/db';
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
-import { resolve4 } from 'dns/promises';
 import type { StringValue } from 'ms';
 dotenv.config();
+
+// Render often does not provide outbound IPv6 routes; prefer IPv4 for SMTP DNS lookups.
+try {
+    dns.setDefaultResultOrder('ipv4first');
+} catch (err) {
+    console.warn('[EMAIL] Unable to set DNS result order:', (err as Error).message);
+}
 
 // In-memory OTP store
 const otpStore = new Map();
 
-const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
-const smtpPort = Number(process.env.SMTP_PORT || 587);
-const smtpSecure = String(process.env.SMTP_SECURE).toLowerCase() === 'true';
-
-const hasSmtpConfig = Boolean(process.env.SMTP_USER && process.env.SMTP_PASS && process.env.SMTP_FROM);
-
-if (!hasSmtpConfig) {
-    console.warn('[SMTP] Missing SMTP_USER/SMTP_PASS/SMTP_FROM. OTP email sending will fail until these env vars are set.');
-}
-
-const resolveSmtpHost = async (): Promise<string> => {
-    if (process.env.SMTP_HOST_IPV4) {
-        return process.env.SMTP_HOST_IPV4;
+// Email transporter — Gmail with App Password
+const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: Number(process.env.SMTP_PORT || 587),
+    secure: String(process.env.SMTP_SECURE || 'false').toLowerCase() === 'true',
+    requireTLS: true,
+    connectionTimeout: 15000,
+    greetingTimeout: 10000,
+    socketTimeout: 20000,
+    auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
     }
-
-    try {
-        const ipv4Addresses = await resolve4(smtpHost);
-        if (ipv4Addresses.length > 0) {
-            return ipv4Addresses[0];
-        }
-    } catch (err) {
-        console.warn('[SMTP] Failed to resolve IPv4 for SMTP host, falling back to hostname:', err);
-    }
-
-    return smtpHost;
-};
-
-const sendSmtpMail = async (mailOptions) => {
-    const smtpConnectHost = await resolveSmtpHost();
-
-    const transporter = nodemailer.createTransport({
-        host: smtpConnectHost,
-        port: smtpPort,
-        secure: smtpSecure,
-        requireTLS: !smtpSecure,
-        connectionTimeout: Number(process.env.SMTP_CONNECTION_TIMEOUT || 15000),
-        greetingTimeout: Number(process.env.SMTP_GREETING_TIMEOUT || 15000),
-        socketTimeout: Number(process.env.SMTP_SOCKET_TIMEOUT || 20000),
-        auth: {
-            user: process.env.SMTP_USER,
-            pass: process.env.SMTP_PASS
-        },
-        tls: {
-            servername: smtpHost
-        }
-    });
-
-    return transporter.sendMail(mailOptions);
-};
+});
 
 // Generate 6-digit code
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
@@ -78,10 +50,6 @@ const validatePassword = (pwd: string): string | null => {
 // Register
 export const sendRegisterOTP = async (req, res) => {
     try {
-        if (!hasSmtpConfig) {
-            return res.status(500).json({ message: 'Server chưa cấu hình SMTP để gửi OTP' });
-        }
-
         const { email } = req.body
         if (!email)
             return res.status(400).json({ message: 'Vui lòng nhập email' })
@@ -108,7 +76,7 @@ export const sendRegisterOTP = async (req, res) => {
             type: 'register'
         })
 
-        await sendSmtpMail({
+        await transporter.sendMail({
             from: process.env.SMTP_FROM,
             to: trimmedEmail,
             subject: '🏓 Mã xác nhận đăng ký — PickleBall- Đà Nẵng',
@@ -393,10 +361,6 @@ export const changePassword = async (req, res) => {
 // Forgot Password — send 6-digit OTP to email
 export const forgotPassword = async (req, res) => {
     try {
-        if (!hasSmtpConfig) {
-            return res.status(500).json({ message: 'Server chưa cấu hình SMTP để gửi OTP' });
-        }
-
         const { email } = req.body;
         if (!email) return res.status(400).json({ message: 'Vui lòng nhập email' });
 
@@ -414,7 +378,7 @@ export const forgotPassword = async (req, res) => {
         otpStore.set(email, { otp, expiresAt, verified: false });
 
         // Send OTP email
-        await sendSmtpMail({
+        await transporter.sendMail({
             from: process.env.SMTP_FROM,
             to: email,
             subject: '🏓 Mã xác nhận đặt lại mật khẩu — PickleBall- Đà Nẵng',
