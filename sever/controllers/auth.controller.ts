@@ -24,6 +24,7 @@ const smtpPort = Number(process.env.SMTP_PORT || 587);
 const smtpUser = process.env.SMTP_USER || '';
 const smtpPass = process.env.SMTP_PASS || '';
 const smtpFrom = process.env.SMTP_FROM || smtpUser;
+const brevoApiKey = process.env.BREVO_API_KEY || '';
 
 const createTransporter = (port: number, secure: boolean) => nodemailer.createTransport({
     host: smtpHost,
@@ -42,20 +43,66 @@ const createTransporter = (port: number, secure: boolean) => nodemailer.createTr
     }
 });
 
+const sendViaBrevoApi = async (mailOptions: nodemailer.SendMailOptions) => {
+    if (!brevoApiKey) {
+        throw new Error('BREVO_API_KEY is missing for HTTP fallback');
+    }
+
+    const toEmail = String(mailOptions.to || '').trim();
+    if (!toEmail) {
+        throw new Error('Email recipient is missing');
+    }
+
+    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'api-key': brevoApiKey
+        },
+        body: JSON.stringify({
+            sender: { email: smtpFrom },
+            to: [{ email: toEmail }],
+            subject: String(mailOptions.subject || ''),
+            htmlContent: String(mailOptions.html || ''),
+            textContent: String(mailOptions.text || '') || undefined
+        })
+    });
+
+    if (!response.ok) {
+        const body = await response.text();
+        throw new Error(`Brevo API failed: ${response.status} ${body}`);
+    }
+
+    return response.json();
+};
+
 const sendOtpMail = async (mailOptions: nodemailer.SendMailOptions) => {
-    try {
-        // Primary path: STARTTLS on 587 (Brevo default)
-        const primary = createTransporter(smtpPort, false);
-        return await primary.sendMail(mailOptions);
-    } catch (err) {
-        const error = err as Error & { code?: string };
-        // If 587 path times out, retry SMTPS 465 as fallback.
-        if (error.code === 'ETIMEDOUT' && smtpPort === 587) {
-            console.warn('[EMAIL] Port 587 timeout, retrying SMTP on 465...');
-            const fallback = createTransporter(465, true);
-            return await fallback.sendMail(mailOptions);
+    const attempts = [
+        { port: smtpPort, secure: smtpPort === 465 },
+        { port: 2525, secure: false },
+        { port: 465, secure: true }
+    ];
+
+    let lastError: unknown = null;
+    for (const attempt of attempts) {
+        try {
+            const transporter = createTransporter(attempt.port, attempt.secure);
+            return await transporter.sendMail(mailOptions);
+        } catch (err) {
+            lastError = err;
+            const smtpErr = err as Error & { code?: string };
+            console.warn(`[EMAIL] SMTP failed on port ${attempt.port}: ${smtpErr.code || smtpErr.message}`);
         }
-        throw err;
+    }
+
+    console.warn('[EMAIL] SMTP unavailable, trying Brevo HTTP API fallback...');
+    try {
+        return await sendViaBrevoApi(mailOptions);
+    } catch (apiErr) {
+        if (lastError) {
+            console.error('[EMAIL] Last SMTP error before API fallback:', lastError);
+        }
+        throw apiErr;
     }
 };
 
