@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import dns from 'dns';
+import { promisify } from 'util';
 import jwt from 'jsonwebtoken';
 import nodemailer from 'nodemailer';
 import { sql, poolPromise } from '../config/db';
@@ -9,7 +10,7 @@ import fs from 'fs';
 import type { StringValue } from 'ms';
 dotenv.config();
 
-// Render often does not provide outbound IPv6 routes; prefer IPv4 for SMTP DNS lookups.
+// Render often does not provide outbound IPv6 routes; force IPv4 for SMTP DNS lookups.
 try {
     dns.setDefaultResultOrder('ipv4first');
 } catch (err) {
@@ -19,10 +20,32 @@ try {
 // In-memory OTP store
 const otpStore = new Map();
 
-// Email transporter — Gmail with App Password
+// Resolve SMTP host to IPv4 address only (bypass IPv6 blocking on Render)
+let smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
+let smtpPort = Number(process.env.SMTP_PORT || 587);
+
+const initSmtpConnection = async () => {
+    try {
+        const resolve4 = promisify(dns.resolve4);
+        console.log(`[EMAIL] Resolving ${smtpHost} to IPv4...`);
+        const ipv4Addresses = await resolve4(smtpHost);
+        if (ipv4Addresses && ipv4Addresses.length > 0) {
+            smtpHost = ipv4Addresses[0]; // Use first IPv4 address
+            console.log(`[EMAIL] Resolved SMTP host to IPv4: ${smtpHost}`);
+        }
+    } catch (err) {
+        console.warn(`[EMAIL] Failed to resolve ${smtpHost} to IPv4, falling back to hostname:`, (err as Error).message);
+        // Keep original hostname as fallback
+    }
+};
+
+// Initialize IPv4 resolution immediately
+initSmtpConnection().catch(err => console.error('[EMAIL] Init error:', err));
+
+// Email transporter — Gmail with App Password (using IPv4 address)
 const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: Number(process.env.SMTP_PORT || 587),
+    host: smtpHost,
+    port: smtpPort,
     secure: String(process.env.SMTP_SECURE || 'false').toLowerCase() === 'true',
     requireTLS: true,
     connectionTimeout: 15000,
