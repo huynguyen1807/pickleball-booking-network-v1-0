@@ -12,7 +12,6 @@ import {
     getMinimumPlayers,
     getScheduleConflictMessage,
     getUserScheduleConflict,
-    isMatchFinished,
     isMatchStarted,
     normalizeTime,
     syncMatchState,
@@ -932,13 +931,37 @@ export const autoCheckMatches = async () => {
         const pool = await poolPromise;
 
         const toComplete = await pool.request().query(`
-            SELECT id, match_date, end_time
-            FROM matches
-            WHERE status NOT IN ('cancelled', 'completed', 'finished', 'expired', 'pending_host_payment')
+            DECLARE @now DATETIME = CAST(SWITCHOFFSET(SYSDATETIMEOFFSET(), '+07:00') AS DATETIME);
+
+            SELECT
+                m.id,
+                DATEDIFF(
+                    MINUTE,
+                    DATEADD(
+                        SECOND,
+                        DATEDIFF(SECOND, CAST('00:00:00' AS TIME), CAST(m.start_time AS TIME)),
+                        CAST(m.match_date AS DATETIME)
+                    ),
+                    @now
+                ) AS minutes_since_start,
+                DATEDIFF(
+                    MINUTE,
+                    DATEADD(
+                        SECOND,
+                        DATEDIFF(SECOND, CAST('00:00:00' AS TIME), CAST(m.end_time AS TIME)),
+                        CAST(m.match_date AS DATETIME)
+                    ),
+                    @now
+                ) AS minutes_since_end
+            FROM matches m
+            WHERE m.status IN ('open', 'waiting', 'full', 'confirmed')
         `);
 
         for (const row of toComplete.recordset) {
-            if (isMatchFinished(row.match_date, row.end_time)) {
+            const minutesSinceStart = Number(row.minutes_since_start);
+            const minutesSinceEnd = Number(row.minutes_since_end);
+
+            if (minutesSinceStart >= 0 && minutesSinceEnd >= 0) {
                 await pool.request()
                     .input('id', sql.Int, row.id)
                     .query("UPDATE matches SET status = 'completed' WHERE id = @id AND status NOT IN ('cancelled','completed','finished','expired')");
@@ -946,6 +969,8 @@ export const autoCheckMatches = async () => {
         }
 
         const underfilled = await pool.request().query(`
+            DECLARE @now DATETIME = CAST(SWITCHOFFSET(SYSDATETIMEOFFSET(), '+07:00') AS DATETIME);
+
             SELECT
                 m.id,
                 m.booking_id,
@@ -956,7 +981,7 @@ export const autoCheckMatches = async () => {
                 m.start_time,
                 DATEDIFF(
                     MINUTE,
-                    GETDATE(),
+                    @now,
                     DATEADD(
                         SECOND,
                         DATEDIFF(SECOND, CAST('00:00:00' AS TIME), CAST(m.start_time AS TIME)),
@@ -972,6 +997,10 @@ export const autoCheckMatches = async () => {
 
         for (const row of underfilled.recordset) {
             const minutesUntilStart = Number(row.minutes_until_start);
+            if (minutesUntilStart < 0) {
+                continue;
+            }
+
             if (minutesUntilStart > getUnderfilledCancelWindowMinutes()) {
                 continue;
             }
