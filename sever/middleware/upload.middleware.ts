@@ -64,21 +64,7 @@ export const uploadAvatar = multer({
 });
 
 // Post media upload config (images + videos)
-const postMediaDir = path.join(uploadDir, 'post_media');
-if (!fs.existsSync(postMediaDir)) {
-    fs.mkdirSync(postMediaDir, { recursive: true });
-}
-
-const postMediaStorage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, postMediaDir);
-    },
-    filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, uniqueSuffix + path.extname(file.originalname));
-    }
-});
-
+// Uses MEMORY storage — files are uploaded to Cloudinary from buffer, not saved to disk
 const postMediaFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
     const allowedMimeTypes = [
         'image/jpeg', 'image/png', 'image/webp', // Images
@@ -92,7 +78,7 @@ const postMediaFilter = (req: any, file: Express.Multer.File, cb: multer.FileFil
 };
 
 export const uploadPostMedia = multer({
-    storage: postMediaStorage,
+    storage: multer.memoryStorage(),
     fileFilter: postMediaFilter,
     limits: { fileSize: 100 * 1024 * 1024 } // Giới hạn 100MB cho video
 });

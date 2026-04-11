@@ -297,9 +297,26 @@ export default function Home() {
                                 return (
                                     <div key={idx} style={{ position: 'relative', width: '80px', height: '80px', borderRadius: '8px', overflow: 'hidden' }}>
                                         {isVideo ? (
-                                            <div style={{ width: '100%', height: '100%', background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>
-                                                🎥
-                                            </div>
+                                            <>
+                                                <video
+                                                    src={url}
+                                                    muted
+                                                    preload="metadata"
+                                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                />
+                                                <div style={{
+                                                    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                    background: 'rgba(0,0,0,0.3)'
+                                                }}>
+                                                    <div style={{
+                                                        width: '28px', height: '28px', borderRadius: '50%',
+                                                        background: 'rgba(255,255,255,0.85)',
+                                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                        fontSize: '12px'
+                                                    }}>▶</div>
+                                                </div>
+                                            </>
                                         ) : (
                                             <img src={url} alt={`preview-${idx}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                         )}
