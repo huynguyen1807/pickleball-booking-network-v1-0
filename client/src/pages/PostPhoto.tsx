@@ -190,13 +190,15 @@ export default function PostPhoto() {
 
             {/* Left: Image */}
             <div className={styles.imageArea} onClick={e => { if (e.target === e.currentTarget) setZoomed(false) }}>
-                {post?.media?.[currentMediaIndex]?.media_type === 'video' ? (
+                {(post?.media?.[currentMediaIndex]?.media_type === 'video' || post?.media?.[currentMediaIndex]?.type === 'video') ? (
                     <video
+                        key={currentMediaIndex}
                         src={post.media[currentMediaIndex]?.url}
                         className={`${styles.image} ${zoomed ? styles.zoomed : ''}`}
                         controls
                         autoPlay
-                        title={zoomed ? 'Click để thu nhỏ' : 'Click để phóng to'}
+                        preload="metadata"
+                        title="Video"
                     />
                 ) : (
                     <img

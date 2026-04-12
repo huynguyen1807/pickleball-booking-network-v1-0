@@ -1,33 +1,15 @@
 import { sql, poolPromise } from '../config/db';
 import { getIO } from '../socket/index';
 import { createNotification } from './notification.controller';
-import fs from 'fs';
-import path from 'path';
+import { uploadToCloudinary, deleteFromCloudinary } from '../config/cloudinary';
 
-const SERVER_URL = process.env.SERVER_URL || 'http://localhost:5000';
-const UPLOADS_DIR = path.resolve(__dirname, '..', 'uploads');
-
-const normalizeStoredMediaPath = (filePath: string | null | undefined): string => {
-    if (!filePath) return '';
-    const normalized = String(filePath).replace(/\\/g, '/');
-    const uploadsMarker = '/uploads/';
-    const markerIndex = normalized.toLowerCase().lastIndexOf(uploadsMarker);
-
-    if (markerIndex >= 0) {
-        return normalized.slice(markerIndex + uploadsMarker.length).replace(/^\/+/, '');
-    }
-
-    return normalized.replace(/^uploads\//i, '').replace(/^\/+/, '');
-};
-
+/**
+ * Convert stored file_path to a displayable URL.
+ * Cloudinary URLs are returned as-is (starts with http).
+ */
 const toMediaUrl = (filePath: string | null | undefined): string => {
-    const relativePath = normalizeStoredMediaPath(filePath);
-    return `${SERVER_URL}/uploads/${relativePath}`;
-};
-
-const toMediaDiskPath = (filePath: string | null | undefined): string => {
-    const relativePath = normalizeStoredMediaPath(filePath);
-    return path.join(UPLOADS_DIR, relativePath);
+    if (!filePath) return '';
+    return String(filePath).replace(/\\/g, '/');
 };
 
 // Get single post by ID
@@ -74,7 +56,7 @@ export const createPost = async (req, res) => {
         const { content, post_type } = req.body;
         const pool = await poolPromise;
         
-        console.log('📤 createPost - Files received:', req.files?.length || 0, req.files?.map(f => ({ name: f.filename, type: f.mimetype, size: f.size })));
+        console.log('📤 createPost - Files received:', req.files?.length || 0);
         
         // Create post record
         const result = await pool.request()
@@ -86,37 +68,56 @@ export const createPost = async (req, res) => {
         const postId = result.recordset[0].id;
         console.log('✅ Post created with ID:', postId);
 
-        // Handle file uploads
+        // Upload files to Cloudinary
         if (req.files && req.files.length > 0) {
-            const insertRequest = pool.request();
+            const uploadedFiles: { mediaType: string; secureUrl: string; originalName: string; mimeType: string; fileSize: number; publicId: string }[] = [];
+            
             for (let i = 0; i < req.files.length; i++) {
                 const file = req.files[i];
                 const mediaType = file.mimetype.startsWith('video') ? 'video' : 'image';
-                console.log(`📁 File ${i+1}: ${file.filename} | Type: ${mediaType} | MIME: ${file.mimetype}`);
-                // Keep only path relative to uploads directory for stable URL generation
-                const relativePath = normalizeStoredMediaPath(file.path);
+                console.log(`☁️ Uploading file ${i+1}/${req.files.length} to Cloudinary: ${file.originalname} (${mediaType})`);
                 
-                insertRequest
-                    .input(`post_id_${i}`, sql.Int, postId)
-                    .input(`media_type_${i}`, sql.NVarChar, mediaType)
-                    .input(`file_path_${i}`, sql.NVarChar(sql.MAX), relativePath)
-                    .input(`file_name_${i}`, sql.NVarChar, file.filename)
-                    .input(`mime_type_${i}`, sql.NVarChar, file.mimetype)
-                    .input(`file_size_${i}`, sql.Int, file.size);
+                try {
+                    const cloudResult = await uploadToCloudinary(file.buffer, {
+                        folder: 'pickleball/posts',
+                        resource_type: mediaType === 'video' ? 'video' : 'image',
+                    });
+                    
+                    console.log(`✅ Cloudinary done: ${cloudResult.secure_url}`);
+                    
+                    uploadedFiles.push({
+                        mediaType,
+                        secureUrl: cloudResult.secure_url,
+                        originalName: file.originalname,
+                        mimeType: file.mimetype,
+                        fileSize: file.size,
+                        publicId: cloudResult.public_id,
+                    });
+                } catch (uploadErr: any) {
+                    console.error(`❌ Cloudinary upload failed for file ${i+1}:`, uploadErr.message);
+                }
             }
             
-            // Build dynamic insert query
-            let insertQuery = 'INSERT INTO post_media (post_id, media_type, file_path, file_name, mime_type, file_size) VALUES ';
-            const values = req.files.map((_, i) => 
-                `(@post_id_${i}, @media_type_${i}, @file_path_${i}, @file_name_${i}, @mime_type_${i}, @file_size_${i})`
-            ).join(', ');
-            insertQuery += values;
-            
-            try {
-                await insertRequest.query(insertQuery);
-            } catch (err) {
-                console.error('Error inserting post_media:', err);
+            // Insert uploaded files into DB
+            for (const uploaded of uploadedFiles) {
+                try {
+                    await pool.request()
+                        .input('post_id', sql.Int, postId)
+                        .input('media_type', sql.NVarChar, uploaded.mediaType)
+                        .input('file_path', sql.NVarChar(sql.MAX), uploaded.secureUrl)
+                        .input('file_name', sql.NVarChar, uploaded.originalName)
+                        .input('mime_type', sql.NVarChar, uploaded.mimeType)
+                        .input('file_size', sql.Int, uploaded.fileSize)
+                        .input('cloud_public_id', sql.NVarChar, uploaded.publicId)
+                        .query(`INSERT INTO post_media (post_id, media_type, file_path, file_name, mime_type, file_size, cloud_public_id) 
+                            VALUES (@post_id, @media_type, @file_path, @file_name, @mime_type, @file_size, @cloud_public_id)`);
+                    console.log(`📝 Inserted media: ${uploaded.originalName}`);
+                } catch (dbErr: any) {
+                    console.error(`❌ DB insert failed for ${uploaded.originalName}:`, dbErr.message);
+                }
             }
+            
+            console.log(`✅ Total uploaded: ${uploadedFiles.length}/${req.files.length} files`);
         }
 
         // Get complete post with media
@@ -164,7 +165,6 @@ export const getAllPosts = async (req, res) => {
         const { type, sort } = req.query;
         const pool = await poolPromise;
         const request = pool.request();
-        // alias full_name to user_name so frontend can display author correctly
         let sql_query = `SELECT TOP 50 p.*, u.full_name AS user_name, u.avatar, u.role AS user_role,
             (SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = p.id) AS likes,
             (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id) AS comments,
@@ -193,7 +193,6 @@ export const getAllPosts = async (req, res) => {
             });
         });
         
-        // normalize created_at to ISO UTC strings to avoid client timezone mismatch
         const rows = result.recordset.map(r => ({
             ...r,
             created_at: r.created_at ? new Date(r.created_at).toISOString() : null,
@@ -219,27 +218,22 @@ export const deletePost = async (req, res) => {
             return res.status(403).json({ message: 'Không có quyền' });
         }
         
-        // Get all media files for this post
+        // Get all media for this post
         const mediaRes = await pool.request()
             .input('post_id', sql.Int, postId)
-            .query('SELECT file_path FROM post_media WHERE post_id = @post_id');
+            .query('SELECT cloud_public_id, media_type FROM post_media WHERE post_id = @post_id');
         
-        // Delete files from disk
+        // Delete files from Cloudinary
         for (const media of mediaRes.recordset) {
-            const filePath = toMediaDiskPath(media.file_path);
-            if (fs.existsSync(filePath)) {
-                try {
-                    fs.unlinkSync(filePath);
-                    console.log(`🗑️ Deleted file: ${filePath}`);
-                } catch (err) {
-                    console.error(`⚠️ Failed to delete file: ${filePath}`, err);
-                }
+            if (media.cloud_public_id) {
+                const resourceType = media.media_type === 'video' ? 'video' : 'image';
+                await deleteFromCloudinary(media.cloud_public_id, resourceType as any);
             }
         }
         
         // Delete from DB (CASCADE will also delete post_media)
         await pool.request().input('id', sql.Int, postId).query('DELETE FROM posts WHERE id = @id');
-        console.log(`✅ Deleted post ${postId} and all its files`);
+        console.log(`✅ Deleted post ${postId} and all its cloud files`);
         
         try {
             getIO()?.emit('post_deleted', { postId });
@@ -271,9 +265,7 @@ export const likePost = async (req, res) => {
 
         const likesRes = await pool.request().input('post_id', sql.Int, postId).query('SELECT COUNT(*) AS cnt FROM post_likes WHERE post_id = @post_id');
         const likes = likesRes.recordset[0].cnt;
-        // Broadcast real-time like count
         try { getIO()?.to(`post_${postId}`).emit('post_liked', { postId, likes }); } catch { }
-        // Notify post owner (not self)
         if (postOwnerId !== req.user.id) {
             await createNotification(postOwnerId, '❤️ Thích mới', `${req.user.full_name} đã thích bài viết của bạn`, 'like', postId);
             try { getIO()?.to(`user_${postOwnerId}`).emit('new_notification'); } catch { }
@@ -343,9 +335,7 @@ export const addComment = async (req, res) => {
         const comment = commentRes.recordset[0];
         if (comment) comment.created_at = comment.created_at ? new Date(comment.created_at).toISOString() : null;
         const comments = countRes.recordset[0].cnt;
-        // Broadcast real-time
         try { getIO()?.to(`post_${postId}`).emit('post_commented', { postId, comment, comments }); } catch { }
-        // Notify post owner (not self)
         if (postOwnerId !== req.user.id) {
             const preview = content.length > 50 ? content.substring(0, 50) + '...' : content;
             await createNotification(postOwnerId, '💬 Bình luận mới', `${req.user.full_name}: "${preview}"`, 'comment', postId);
@@ -372,7 +362,6 @@ export const sharePost = async (req, res) => {
             .query('INSERT INTO post_shares (post_id, user_id) VALUES (@post_id, @user_id)');
 
         const sharesRes = await pool.request().input('post_id', sql.Int, postId).query('SELECT COUNT(*) AS cnt FROM post_shares WHERE post_id = @post_id');
-        // Notify post owner (not self)
         if (req.user?.id && postOwnerId !== req.user.id) {
             await createNotification(postOwnerId, '🔗 Chia sẻ mới', `${req.user.full_name} đã chia sẻ bài viết của bạn`, 'share', postId);
             try { getIO()?.to(`user_${postOwnerId}`).emit('new_notification'); } catch { }
@@ -382,4 +371,3 @@ export const sharePost = async (req, res) => {
         res.status(500).json({ message: 'Lỗi server' });
     }
 };
-
