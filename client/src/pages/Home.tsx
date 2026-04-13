@@ -8,6 +8,8 @@ import PostCard from '../components/PostCard'
 import CameraModal from '../components/CameraModal'
 import styles from '../styles/Home.module.css'
 import { formatDateVN, formatTimeHHmm } from '../utils/dateTime'
+import { getAvatarUrl } from '../utils/imageUrl'
+
 
 const HOME_SCROLL_KEY = 'home_feed_scroll_y'
 
@@ -272,7 +274,17 @@ export default function Home() {
             <div className={styles.createPost}>
                 <div className="avatar" style={{ overflow: 'hidden' }}>
                     {user?.avatar ? (
-                        <img src={user.avatar} alt={user.full_name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                        <img 
+                            src={getAvatarUrl(user.avatar) || ''} 
+                            alt={user.full_name} 
+                            style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} 
+                            onError={(e) => {
+                                const target = e.target as HTMLImageElement
+                                target.style.display = 'none'
+                                const parent = target.parentElement
+                                if (parent) parent.textContent = user?.full_name?.charAt(0) || '?'
+                            }}
+                        />
                     ) : (user?.full_name?.charAt(0) || '?')}
                 </div>
                 <div style={{ flex: 1 }}>

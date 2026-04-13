@@ -5,6 +5,8 @@ import { useDialog } from '../context/DialogContext'
 import api from '../api/axios'
 import BackButton from '../components/BackButton'
 import styles from '../styles/UserProfile.module.css'
+import { getAvatarUrl } from '../utils/imageUrl'
+
 
 type AvatarMode = null | 'choose' | 'camera' | 'preview'
 
@@ -184,7 +186,16 @@ export default function UserProfile() {
                 <div className={styles.profileHeader}>
                     <div className={styles.avatarLarge} style={{ position: 'relative' }}>
                         {profile.avatar ? (
-                            <img src={profile.avatar} alt={profile.full_name} />
+                            <img
+                                src={getAvatarUrl(profile.avatar) || ''}
+                                alt={profile.full_name}
+                                onError={(e) => {
+                                    const target = e.target as HTMLImageElement
+                                    target.style.display = 'none'
+                                    const parent = target.parentElement
+                                    if (parent) parent.textContent = getInitials(profile.full_name)
+                                }}
+                            />
                         ) : (
                             getInitials(profile.full_name)
                         )}
@@ -249,7 +260,7 @@ export default function UserProfile() {
                                 <div key={fac.id} className={styles.facilityCard} onClick={() => navigate(`/facilities/${fac.id}`)}>
                                     <div className={styles.facilityAvatar}>
                                         {fac.avatar ? (
-                                            <img src={fac.avatar} alt={fac.name} />
+                                            <img src={getAvatarUrl(fac.avatar) || ''} alt={fac.name} />
                                         ) : (
                                             <div className={styles.facilityAvatarFallback}>🏟️</div>
                                         )}

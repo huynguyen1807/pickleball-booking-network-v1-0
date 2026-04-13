@@ -6,6 +6,8 @@ import { useDialog } from '../context/DialogContext'
 import api from '../api/axios'
 import ReportModal from './ReportModal'
 import styles from '../styles/UserProfileCard.module.css'
+import { getAvatarUrl } from '../utils/imageUrl'
+
 
 interface UserProfileCardProps {
     userId: number
@@ -146,7 +148,20 @@ export default function UserProfileCard({ userId, children, onStartChat }: UserP
                             <div className={styles.header}>
                                 <div className={styles.avatar}>
                                     {userInfo.avatar ? (
-                                        <img src={userInfo.avatar} alt={userInfo.full_name} />
+                                        <img 
+                                            src={getAvatarUrl(userInfo.avatar) || ''} 
+                                            alt={userInfo.full_name} 
+                                            onError={(e) => {
+                                                const target = e.target as HTMLImageElement
+                                                target.style.display = 'none'
+                                                const parent = target.parentElement
+                                                if (parent) {
+                                                    const initials = document.createElement('span');
+                                                    initials.textContent = getInitials(userInfo.full_name);
+                                                    parent.appendChild(initials);
+                                                }
+                                            }}
+                                        />
                                     ) : (
                                         getInitials(userInfo.full_name)
                                     )}

@@ -5,6 +5,8 @@ import api from '../api/axios'
 import ChatBox from '../components/ChatBox'
 import UserProfileCard from '../components/UserProfileCard'
 import styles from '../styles/Chat.module.css'
+import { getAvatarUrl } from '../utils/imageUrl'
+
 
 export default function Chat() {
     const { user } = useAuth()
@@ -116,8 +118,17 @@ export default function Chat() {
                             >
                                 <div className={styles.chatRoomAvatar}>
                                     {info.avatar ? (
-                                        <img src={info.avatar} alt={info.name}
-                                            style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                                        <img 
+                                            src={getAvatarUrl(info.avatar) || ''} 
+                                            alt={info.name}
+                                            style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
+                                            onError={(e) => {
+                                                const target = e.target as HTMLImageElement
+                                                target.style.display = 'none'
+                                                const parent = target.parentElement
+                                                if (parent) parent.innerHTML = `<span style="font-size:0.8rem;font-weight:700">${getInitials(info.name)}</span>`
+                                            }}
+                                        />
                                     ) : info.icon ? info.icon : (
                                         <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>{getInitials(info.name)}</span>
                                     )}

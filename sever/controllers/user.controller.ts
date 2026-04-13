@@ -1,4 +1,5 @@
 import { sql, poolPromise } from '../config/db';
+import { uploadToCloudinary } from '../config/cloudinary';
 
 // Get public profile by user ID
 export const getUserProfile = async (req, res) => {
@@ -175,14 +176,21 @@ export const getAllUsers = async (req, res) => {
     }
 };
 
-// Update avatar
+// Update avatar — uploads to Cloudinary
 export const updateAvatar = async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ message: 'Vui lòng chọn ảnh' });
         }
 
-        const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+        // Upload to Cloudinary
+        const result = await uploadToCloudinary(req.file.buffer, {
+            folder: 'pickleball/avatars',
+            resource_type: 'image',
+            public_id: `avatar_user_${req.user.id}_${Date.now()}`
+        });
+
+        const avatarUrl = result.secure_url;
 
         const pool = await poolPromise;
         await pool.request()
