@@ -64,7 +64,7 @@ export default function OwnerCreateFacility() {
     }
 
     return (
-        <div className={styles.dashboardPage}>
+        <div className={styles.dashboardContainer}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
                 <div>
                     <h1 className="page-title">🏭 Thêm cơ sở mới</h1>

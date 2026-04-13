@@ -65,7 +65,7 @@ export default function OwnerCreateCourt() {
     }
 
     return (
-        <div className={styles.dashboardPage}>
+        <div className={styles.dashboardContainer}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
                 <div>
                     <h1 className="page-title">🏟️ Thêm sân con mới</h1>

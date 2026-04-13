@@ -256,7 +256,7 @@
 
 /* ---- Booking Confirm Page ---- */
 .bookingPage {
-    padding: 90px 20px 40px;
+    padding: var(--page-top-gap) 20px 40px;
     min-height: 100vh;
     max-width: 600px;
     margin: 0 auto;

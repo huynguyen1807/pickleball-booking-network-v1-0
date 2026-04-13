@@ -178,12 +178,11 @@ export default function Navbar() {
                             )}
                         </div> 
                         <div className={styles.profileMeta}>    
-                        <div className={styles.profileName}>{user.full_name}</div>       
-                        <div className={styles.profileRole}>{user.role}</div>       
+                            <div className={styles.profileName}>{user.full_name}</div>       
+                            <div className={styles.profileRole}>{user.role}</div>       
                         </div>                   
-                        </button>
+                    </button>
 
-                    
 
                     {dropdownOpen && (
                         <div className={styles.dropdown}>

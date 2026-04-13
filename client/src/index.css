@@ -58,6 +58,8 @@
     /* Font */
     --font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     --navbar-height: 70px;
+    --page-top-gap: 20px;
+    --page-top-gap-mobile: 16px;
 }
 
 * {

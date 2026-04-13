@@ -3,7 +3,7 @@
    ============================================ */
 
 .courtsPage {
-    padding: 20px 20px 40px;
+    padding: var(--page-top-gap) 20px 40px;
     min-height: 100vh;
     max-width: 1200px;
     margin: 0 auto;
@@ -96,7 +96,7 @@
 
 @media (max-width: 768px) {
     .courtsPage {
-        padding: 80px 16px 32px;
+        padding: var(--page-top-gap-mobile) 16px 32px;
     }
 
     .header {

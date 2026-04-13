@@ -259,10 +259,6 @@ export default function Home() {
                     </p>
                     <div className={styles.heroStats}>
                         <div className={styles.heroStat}>
-                            <div className={styles.heroStatValue}>{stats.total_users}</div>
-                            <div className={styles.heroStatLabel}>Người chơi</div>
-                        </div>
-                        <div className={styles.heroStat}>
                             <div className={styles.heroStatValue}>{stats.total_facilities || stats.total_courts}</div>
                             <div className={styles.heroStatLabel}>Cơ sở</div>
                         </div>
