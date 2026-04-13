@@ -32,22 +32,7 @@ export const uploadLicense = multer({
     limits: { fileSize: 5 * 1024 * 1024 } // Giới hạn 5MB
 });
 
-// Avatar upload config
-const avatarDir = path.join(uploadDir, 'avatars');
-if (!fs.existsSync(avatarDir)) {
-    fs.mkdirSync(avatarDir, { recursive: true });
-}
-
-const avatarStorage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, avatarDir);
-    },
-    filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, 'avatar-' + uniqueSuffix + path.extname(file.originalname));
-    }
-});
-
+// Avatar upload config — uses MEMORY storage for Cloudinary upload
 const imageOnlyFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
     const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
     if (allowedMimeTypes.includes(file.mimetype)) {
@@ -58,7 +43,7 @@ const imageOnlyFilter = (req: any, file: Express.Multer.File, cb: multer.FileFil
 };
 
 export const uploadAvatar = multer({
-    storage: avatarStorage,
+    storage: multer.memoryStorage(),
     fileFilter: imageOnlyFilter,
     limits: { fileSize: 3 * 1024 * 1024 } // Giới hạn 3MB
 });

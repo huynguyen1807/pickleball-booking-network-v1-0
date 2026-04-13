@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import api from '../api/axios'
 import styles from '../styles/Dashboard.module.css'
+import { getAvatarUrl } from '../utils/imageUrl'
+
 
 export default function AdminUsers() {
     const [users, setUsers] = useState<any[]>([])
@@ -138,7 +140,17 @@ export default function AdminUsers() {
                                     <Link to={`/admin/profile/${user.id}`} style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', color: 'inherit' }}>
                                         <div className="avatar avatar-sm" style={{ overflow: 'hidden' }}>
                                             {user.avatar ? (
-                                                <img src={user.avatar} alt={user.full_name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                                                <img 
+                                                    src={getAvatarUrl(user.avatar) || ''} 
+                                                    alt={user.full_name} 
+                                                    style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} 
+                                                    onError={(e) => {
+                                                        const target = e.target as HTMLImageElement
+                                                        target.style.display = 'none'
+                                                        const parent = target.parentElement
+                                                        if (parent) parent.textContent = user.full_name?.charAt(0)?.toUpperCase() || '?'
+                                                    }}
+                                                />
                                             ) : (user.full_name?.charAt(0)?.toUpperCase() || '?')}
                                         </div>
                                         <span style={{ fontWeight: 600, color: 'var(--accent-green)' }}>{user.full_name}</span>

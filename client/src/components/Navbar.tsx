@@ -5,6 +5,8 @@ import api from '../api/axios'
 import { io } from 'socket.io-client'
 import NotificationDropdown from './NotificationDropdown'
 import styles from '../styles/Navbar.module.css'
+import { getAvatarUrl } from '../utils/imageUrl'
+
 
 const socket = io('http://localhost:5000')
 
@@ -158,7 +160,23 @@ export default function Navbar() {
 
                 <div style={{ position: 'relative' }} ref={dropdownRef}>
                     <button className={styles.profileBtn} onClick={() => setDropdownOpen(!dropdownOpen)}>
-                        <div className="avatar avatar-sm">{getInitials(user.full_name)}</div> 
+                        <div className="avatar avatar-sm">
+                            {user.avatar ? (
+                                <img
+                                    src={getAvatarUrl(user.avatar) || ''}
+                                    alt={user.full_name}
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }}
+                                    onError={(e) => {
+                                        const target = e.target as HTMLImageElement
+                                        target.style.display = 'none'
+                                        const parent = target.parentElement
+                                        if (parent) parent.textContent = getInitials(user.full_name)
+                                    }}
+                                />
+                            ) : (
+                                getInitials(user.full_name)
+                            )}
+                        </div> 
                         <div className={styles.profileMeta}>    
                         <div className={styles.profileName}>{user.full_name}</div>       
                         <div className={styles.profileRole}>{user.role}</div>       

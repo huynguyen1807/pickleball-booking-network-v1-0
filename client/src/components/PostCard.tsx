@@ -7,6 +7,8 @@ import UserProfileCard from './UserProfileCard'
 import ReportModal from './ReportModal'
 import { useDialog } from '../context/DialogContext'
 import styles from '../styles/Cards.module.css'
+import { getAvatarUrl } from '../utils/imageUrl'
+
 
 type PostType = any
 type CommentType = any
@@ -296,14 +298,34 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
                     <UserProfileCard userId={data.user_id}>
                         <div className="avatar" style={{ cursor: 'pointer', overflow: 'hidden' }}>
                             {data.avatar ? (
-                                <img src={data.avatar} alt={data.user_name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                                <img 
+                                    src={getAvatarUrl(data.avatar) || ''} 
+                                    alt={data.user_name} 
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} 
+                                    onError={(e) => {
+                                        const target = e.target as HTMLImageElement
+                                        target.style.display = 'none'
+                                        const parent = target.parentElement
+                                        if (parent) parent.textContent = getInitials(data.user_name)
+                                    }}
+                                />
                             ) : getInitials(data.user_name)}
                         </div>
                     </UserProfileCard>
                 ) : (
                     <div className="avatar" style={{ overflow: 'hidden' }}>
                         {data.avatar ? (
-                            <img src={data.avatar} alt={data.user_name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                            <img 
+                                src={getAvatarUrl(data.avatar) || ''} 
+                                alt={data.user_name} 
+                                style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} 
+                                onError={(e) => {
+                                    const target = e.target as HTMLImageElement
+                                    target.style.display = 'none'
+                                    const parent = target.parentElement
+                                    if (parent) parent.textContent = getInitials(data.user_name)
+                                }}
+                            />
                         ) : getInitials(data.user_name)}
                     </div>
                 )}
@@ -574,14 +596,34 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
                                             <UserProfileCard userId={c.user_id}>
                                                 <div className={`avatar avatar-sm ${styles.commentAvatar}`} style={{ cursor: 'pointer', overflow: 'hidden' }}>
                                                     {c.avatar ? (
-                                                        <img src={c.avatar} alt={commenterName} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                                                        <img 
+                                                            src={getAvatarUrl(c.avatar) || ''} 
+                                                            alt={commenterName} 
+                                                            style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} 
+                                                            onError={(e) => {
+                                                                const target = e.target as HTMLImageElement
+                                                                target.style.display = 'none'
+                                                                const parent = target.parentElement
+                                                                if (parent) parent.textContent = getInitials(commenterName)
+                                                            }}
+                                                        />
                                                     ) : getInitials(commenterName)}
                                                 </div>
                                             </UserProfileCard>
                                         ) : (
                                             <div className={`avatar avatar-sm ${styles.commentAvatar}`} style={{ overflow: 'hidden' }}>
                                                 {c.avatar ? (
-                                                    <img src={c.avatar} alt={commenterName} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                                                    <img 
+                                                        src={getAvatarUrl(c.avatar) || ''} 
+                                                        alt={commenterName} 
+                                                        style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} 
+                                                        onError={(e) => {
+                                                            const target = e.target as HTMLImageElement
+                                                            target.style.display = 'none'
+                                                            const parent = target.parentElement
+                                                            if (parent) parent.textContent = getInitials(commenterName)
+                                                        }}
+                                                    />
                                                 ) : getInitials(commenterName)}
                                             </div>
                                         )}
@@ -600,7 +642,17 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
                     <form className={styles.commentForm} onSubmit={handleAddComment}>
                         <div className={`avatar avatar-sm`} style={{ overflow: 'hidden' }}>
                             {user?.avatar ? (
-                                <img src={user.avatar} alt={user.full_name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                                <img 
+                                    src={getAvatarUrl(user.avatar) || ''} 
+                                    alt={user.full_name} 
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} 
+                                    onError={(e) => {
+                                        const target = e.target as HTMLImageElement
+                                        target.style.display = 'none'
+                                        const parent = target.parentElement
+                                        if (parent) parent.textContent = getInitials(user?.full_name)
+                                    }}
+                                />
                             ) : getInitials(user?.full_name)}
                         </div>
                         <input

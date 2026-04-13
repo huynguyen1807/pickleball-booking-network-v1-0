@@ -201,6 +201,18 @@ export const toggleUserStatus = async (req, res) => {
         const pool = await poolPromise;
         await pool.request().input('status', sql.NVarChar, status).input('id', sql.Int, req.params.id)
             .query('UPDATE users SET status = @status WHERE id = @id');
+
+        // If the user is being banned, emit a real-time socket event
+        if (status === 'banned') {
+            const { getIO } = require('../socket/index');
+            const io = getIO();
+            if (io) {
+                io.to(`user_${req.params.id}`).emit('account_banned', {
+                    message: 'Tài khoản của bạn đã bị khóa. Liên hệ thangkhaiyt24@gmail.com để được hỗ trợ.'
+                });
+            }
+        }
+
         res.json({ message: 'Đã cập nhật trạng thái user' });
     } catch (err) { res.status(500).json({ message: 'Lỗi server' }); }
 };

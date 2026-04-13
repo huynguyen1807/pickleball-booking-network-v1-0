@@ -4,6 +4,8 @@ import { useDialog } from '../context/DialogContext'
 import api from '../api/axios'
 import styles from '../styles/Dashboard.module.css'
 import settingStyles from '../styles/Settings.module.css'
+import { getAvatarUrl } from '../utils/imageUrl'
+
 
 export default function Settings() {
     const { user, updateUser } = useAuth()
@@ -217,8 +219,17 @@ export default function Settings() {
                             border: '3px solid var(--border-glass)'
                         }}>
                             {user?.avatar ? (
-                                <img src={user.avatar} alt={user.full_name}
-                                    style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                                <img 
+                                    src={getAvatarUrl(user.avatar) || ''} 
+                                    alt={user.full_name}
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} 
+                                    onError={(e) => {
+                                        const target = e.target as HTMLImageElement
+                                        target.style.display = 'none'
+                                        const parent = target.parentElement
+                                        if (parent) parent.textContent = getInitials(user?.full_name || '')
+                                    }}
+                                />
                             ) : getInitials(user?.full_name || '')}
                         </div>
                         <div style={{ flex: 1 }}>

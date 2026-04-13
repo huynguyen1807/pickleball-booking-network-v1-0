@@ -4,6 +4,8 @@ import Navbar from './components/Navbar'
 import ProtectedRoute from './components/ProtectedRoute'
 import AdminLayout from './components/AdminLayout'
 import AIChatWidget from './components/AIChatWidget'
+import BanListener from './components/BanListener'
+
 
 // Pages
 import Login from './pages/Login'
@@ -45,6 +47,7 @@ export default function App() {
         <>
             {user && !isAdminPage && <Navbar />}
             {user && !isAdminPage && <AIChatWidget />}
+            {user && <BanListener />}
             <main className={user && !isAdminPage ? 'appContentWithNavbar' : ''}>
                 <Routes>
                 {/* Public */}

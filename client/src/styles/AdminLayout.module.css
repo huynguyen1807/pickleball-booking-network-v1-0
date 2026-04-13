@@ -1,5 +1,6 @@
 /* ============================================
    ADMIN LAYOUT - Sidebar + Content
+   Responsive for Desktop, Tablet & Mobile
    ============================================ */
 
 .adminWrapper {
@@ -10,7 +11,7 @@
 
 /* ===== SIDEBAR ===== */
 .sidebar {
-    width: 270px;
+    width: 260px;
     min-height: 100vh;
     background: var(--gradient-card);
     border-right: 1px solid var(--border-glass);
@@ -22,12 +23,12 @@
     bottom: 0;
     z-index: 100;
     backdrop-filter: blur(20px);
-    transition: width 0.3s ease, transform 0.3s ease;
+    transition: width 0.3s cubic-bezier(.4,0,.2,1), transform 0.3s cubic-bezier(.4,0,.2,1);
     overflow: hidden;
 }
 
 .sidebarCollapsed {
-    width: 80px;
+    width: 72px;
 }
 
 .sidebarCollapsed .navSectionLabel {
@@ -44,12 +45,14 @@
 
 .sidebarCollapsed .sidebarHeader {
     flex-direction: column;
-    padding: 16px 8px;
-    gap: 12px;
+    padding: 12px 0;
+    gap: 16px;
+    align-items: center;
 }
 
 .sidebarCollapsed .sidebarBrand {
     justify-content: center;
+    width: 100%;
 }
 
 .sidebarCollapsed .userCard {
@@ -64,6 +67,7 @@
     align-items: center;
     justify-content: space-between;
     gap: 12px;
+    flex-shrink: 0;
 }
 
 .collapseBtn {
@@ -94,24 +98,27 @@
     gap: 12px;
     text-decoration: none;
     color: var(--text-primary);
+    min-width: 0;
 }
 
 .brandIcon {
-    width: 44px;
-    height: 44px;
+    width: 42px;
+    height: 42px;
     background: var(--gradient-primary);
     border-radius: var(--radius-md);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.4rem;
+    font-size: 1.3rem;
     box-shadow: var(--shadow-glow);
+    flex-shrink: 0;
 }
 
 .brandText {
-    font-size: 1.15rem;
+    font-size: 1.1rem;
     font-weight: 800;
     letter-spacing: -0.3px;
+    white-space: nowrap;
 }
 
 .brandText span {
@@ -119,7 +126,7 @@
 }
 
 .brandSub {
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     color: var(--text-muted);
     font-weight: 500;
     text-transform: uppercase;
@@ -130,11 +137,13 @@
 /* Navigation */
 .sidebarNav {
     flex: 1;
-    padding: 16px 12px;
+    padding: 12px 10px;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
     overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-glass) transparent;
 }
 
 .navSection {
@@ -142,23 +151,23 @@
 }
 
 .navSectionLabel {
-    font-size: 0.65rem;
+    font-size: 0.6rem;
     font-weight: 700;
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 1.5px;
-    padding: 12px 16px 6px;
+    padding: 10px 14px 6px;
 }
 
 .navItem {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 12px 16px;
+    padding: 11px 14px;
     border-radius: var(--radius-md);
     color: var(--text-secondary);
     text-decoration: none;
-    font-size: 0.9rem;
+    font-size: 0.875rem;
     font-weight: 500;
     transition: all var(--transition-fast);
     position: relative;
@@ -173,7 +182,7 @@
 
 .sidebarCollapsed .navItem {
     justify-content: center;
-    padding: 12px;
+    padding: 11px;
 }
 
 .navItem:hover {
@@ -200,7 +209,7 @@
 }
 
 .navIcon {
-    font-size: 1.15rem;
+    font-size: 1.1rem;
     width: 24px;
     text-align: center;
     flex-shrink: 0;
@@ -220,15 +229,16 @@
 
 /* Sidebar Footer (User Info) */
 .sidebarFooter {
-    padding: 16px 16px 20px;
+    padding: 12px 12px 16px;
     border-top: 1px solid var(--border-glass);
+    flex-shrink: 0;
 }
 
 .userCard {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 12px;
+    gap: 10px;
+    padding: 10px;
     border-radius: var(--radius-md);
     background: var(--bg-glass);
     transition: background var(--transition-fast);
@@ -244,7 +254,7 @@
 }
 
 .userName {
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     font-weight: 600;
     white-space: nowrap;
     overflow: hidden;
@@ -252,7 +262,7 @@
 }
 
 .userRole {
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     color: var(--accent-green);
     font-weight: 600;
     text-transform: uppercase;
@@ -263,7 +273,7 @@
     background: none;
     border: none;
     color: var(--text-muted);
-    font-size: 1.1rem;
+    font-size: 1rem;
     cursor: pointer;
     padding: 6px;
     border-radius: var(--radius-sm);
@@ -279,64 +289,80 @@
 /* ===== MAIN CONTENT ===== */
 .mainContent {
     flex: 1;
-    margin-left: 270px;
+    margin-left: 260px;
     min-height: 100vh;
     display: flex;
     flex-direction: column;
-    transition: margin-left 0.3s ease;
+    transition: margin-left 0.3s cubic-bezier(.4,0,.2,1);
+    width: calc(100% - 260px);
 }
 
 .mainContentCollapsed {
-    margin-left: 80px;
+    margin-left: 72px;
+    width: calc(100% - 72px);
 }
 
 .topBar {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 16px 32px;
+    padding: 14px 28px;
     background: var(--bg-card);
     border-bottom: 1px solid var(--border-glass);
     backdrop-filter: blur(20px);
     position: sticky;
     top: 0;
     z-index: 50;
+    flex-shrink: 0;
+    min-height: 56px;
 }
 
 .topBarTitle {
-    font-size: 1.2rem;
+    font-size: 1.15rem;
     font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .topBarActions {
     display: flex;
     align-items: center;
     gap: 12px;
+    flex-shrink: 0;
 }
 
 .contentArea {
     flex: 1;
-    padding: 28px 32px;
+    padding: 24px 28px;
+    overflow-x: hidden;
 }
 
-/* ===== MOBILE ===== */
+/* ===== MOBILE MENU BUTTON ===== */
 .mobileMenuBtn {
     display: none;
     position: fixed;
-    top: 16px;
-    left: 16px;
+    top: 7px; /* Centered in 56px topBar */
+    left: 12px;
     z-index: 200;
-    width: 44px;
-    height: 44px;
+    width: 42px;
+    height: 42px;
     background: var(--bg-card);
     border: 1px solid var(--border-glass);
     border-radius: var(--radius-md);
     color: var(--text-primary);
-    font-size: 1.3rem;
+    font-size: 1.2rem;
     cursor: pointer;
     align-items: center;
     justify-content: center;
     backdrop-filter: blur(20px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    transition: all var(--transition-fast);
+}
+
+.mobileMenuBtn:hover {
+    background: var(--bg-glass-hover);
+    border-color: var(--accent-green);
 }
 
 .overlay {
@@ -348,33 +374,180 @@
     backdrop-filter: blur(4px);
 }
 
+/* ===== TABLET (768px - 1024px) ===== */
+@media (max-width: 1024px) {
+    .sidebar {
+        width: 72px;
+    }
+
+    .sidebar .navSectionLabel {
+        display: none;
+    }
+
+    .sidebar .userInfo {
+        display: none;
+    }
+
+    .sidebar .logoutBtn {
+        display: none;
+    }
+
+    .sidebar .sidebarHeader {
+        flex-direction: column;
+        padding: 16px 8px;
+        gap: 12px;
+    }
+
+    .sidebar .sidebarBrand {
+        justify-content: center;
+    }
+
+    .sidebar .userCard {
+        justify-content: center;
+        padding: 8px;
+    }
+
+    .sidebar .navItem {
+        justify-content: center;
+        padding: 11px;
+    }
+
+    .mainContent {
+        margin-left: 72px;
+        width: calc(100% - 72px);
+    }
+
+    .mainContentCollapsed {
+        margin-left: 72px;
+        width: calc(100% - 72px);
+    }
+
+    .contentArea {
+        padding: 20px;
+    }
+
+    .topBar {
+        padding: 14px 20px;
+    }
+
+    .collapseBtn {
+        display: none;
+    }
+}
+
+/* ===== MOBILE (< 768px) ===== */
 @media (max-width: 768px) {
     .mobileMenuBtn {
         display: flex;
     }
 
     .sidebar {
+        width: 280px;
         transform: translateX(-100%);
+        box-shadow: 4px 0 24px rgba(0,0,0,0.3);
+    }
+
+    .sidebar .navSectionLabel {
+        display: block;
+    }
+
+    .sidebar .userInfo {
+        display: block;
+    }
+
+    .sidebar .logoutBtn {
+        display: block;
+    }
+
+    .sidebar .sidebarHeader {
+        flex-direction: row;
+        padding: 7px 16px; /* Match mobileMenuBtn top */
+        height: 56px;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .sidebar .sidebarBrand {
+        justify-content: flex-start;
+        padding-left: 54px; /* Room for fixed mobileMenuBtn (✕) */
+    }
+
+    .sidebar .userCard {
+        justify-content: flex-start;
+        padding: 10px;
+    }
+
+    .sidebar .navItem {
+        justify-content: flex-start;
+        padding: 11px 14px;
     }
 
     .sidebarOpen {
         transform: translateX(0);
     }
 
+    .sidebarCollapsed {
+        width: 280px;
+    }
+
     .overlay {
         display: block;
     }
 
-    .mainContent {
+    .mainContent,
+    .mainContentCollapsed {
         margin-left: 0;
+        width: 100%;
     }
 
     .contentArea {
-        padding: 20px 16px;
+        padding: 16px 12px;
     }
 
     .topBar {
-        padding: 16px;
-        padding-left: 64px;
+        padding: 0 16px;
+        padding-left: 60px;
+        min-height: 56px;
+        height: 56px;
+    }
+
+    .topBarTitle {
+        font-size: 1rem;
+    }
+
+    .collapseBtn {
+        display: none;
+    }
+}
+
+/* ===== VERY SMALL MOBILE (< 400px) ===== */
+@media (max-width: 400px) {
+    .sidebar {
+        width: 260px;
+    }
+
+    .sidebarCollapsed {
+        width: 260px;
+    }
+
+    .contentArea {
+        padding: 12px 8px;
+    }
+
+    .topBar {
+        padding: 10px 12px;
+        padding-left: 56px;
+    }
+
+    .topBarTitle {
+        font-size: 0.9rem;
+    }
+
+    .mobileMenuBtn {
+        width: 38px;
+        height: 38px;
+        top: 10px;
+        left: 10px;
+        font-size: 1.1rem;
     }
 }
