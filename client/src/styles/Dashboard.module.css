@@ -2,16 +2,11 @@
    DASHBOARD & SETTINGS STYLES
    ============================================ */
 
-.dashboardPage {
-    padding: var(--page-top-gap) 0 40px;
-    min-height: 100vh;
-}
-
 .dashboardContainer {
     width: 100%;
-    max-width: 1140px;
+    max-width: 1200px;
     margin: 0 auto;
-    padding: 0 20px;
+    padding: var(--page-top-gap) 20px 40px;
 }
 
 .dashboardHeader {

@@ -158,23 +158,12 @@ export default function Navbar() {
 
                 <div style={{ position: 'relative' }} ref={dropdownRef}>
                     <button className={styles.profileBtn} onClick={() => setDropdownOpen(!dropdownOpen)}>
-<<<<<<< Updated upstream
-                        <div className="avatar avatar-sm">{getInitials(user.full_name)}</div> 
-                        <div className={styles.profileMeta}>    
-                        <div className={styles.profileName}>{user.full_name}</div>       
-                        <div className={styles.profileRole}>{user.role}</div>       
-                        </div>                   
-                        </button>
-
-                    
-=======
                         <div className="avatar avatar-sm">{getInitials(user.full_name)}</div>
                         <div className={styles.profileMeta}>
                             <div className={styles.profileName}>{user.full_name}</div>
                             <div className={styles.profileRole}>{user.role}</div>
                         </div>
                     </button>
->>>>>>> Stashed changes
 
 
                     {dropdownOpen && (

@@ -21,6 +21,8 @@ const PAYOS_API_URL = process.env.PAYOS_API_URL;
 const PAYOS_RETURN_URL = process.env.PAYOS_RETURN_URL;
 const PAYOS_CANCEL_URL = process.env.PAYOS_CANCEL_URL;
 
+const roundMoney = (value: any): number => Math.round(Number(value) || 0);
+
 // ===== Helper Functions =====
 
 /**
@@ -108,13 +110,14 @@ export const insertPayment = async (
     executor?: any
 ) => {
     const dbExecutor = executor || await poolPromise;
-    const commission = amount * 0.05;
+    const normalizedAmount = roundMoney(amount);
+    const commission = roundMoney(normalizedAmount * 0.05);
 
     const result = await dbExecutor.request()
         .input('user_id', sql.Int, userId)
         .input('booking_id', sql.Int, bookingId || null)
         .input('match_id', sql.Int, matchId || null)
-        .input('amount', sql.Decimal(12, 2), amount)
+        .input('amount', sql.Decimal(12, 2), normalizedAmount)
         .input('commission', sql.Decimal(12, 2), commission)
         .input('payment_context', sql.NVarChar, paymentContext)
         .input('payment_method', sql.NVarChar, paymentMethod)
@@ -147,9 +150,10 @@ const getUserBalance = async (userId: number): Promise<number> => {
 };
 
 const debitUserBalance = async (executor: any, userId: number, amount: number): Promise<boolean> => {
+    const normalizedAmount = roundMoney(amount);
     const result = await executor.request()
         .input('user_id', sql.Int, userId)
-        .input('amount', sql.Decimal(12, 2), amount)
+        .input('amount', sql.Decimal(12, 2), normalizedAmount)
         .query(`
             UPDATE users
             SET balance = ISNULL(balance, 0) - @amount
@@ -374,11 +378,13 @@ export const createPayOSPaymentSession = async (params: {
         description
     } = params;
 
+    const normalizedAmount = roundMoney(amount);
+
     const orderCode = generateOrderCode();
     const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000);
     const payosData = {
         orderCode,
-        amount: Math.round(amount),
+        amount: normalizedAmount,
         description,
         returnUrl: PAYOS_RETURN_URL,
         cancelUrl: PAYOS_CANCEL_URL
@@ -409,7 +415,7 @@ export const createPayOSPaymentSession = async (params: {
         userId,
         bookingId,
         matchId,
-        Math.round(amount),
+        normalizedAmount,
         'payos',
         orderCode,
         paymentData.paymentLinkId,
@@ -676,6 +682,8 @@ export const payByBalance = async (req: any, res: any) => {
             return res.status(400).json({ message: 'Số tiền thanh toán không hợp lệ' });
         }
 
+        amount = roundMoney(amount);
+
         const debited = await debitUserBalance(tx, userId, amount);
         if (!debited) {
             await tx.rollback();
@@ -770,7 +778,7 @@ export const payByBalance = async (req: any, res: any) => {
         return successResponse(res, {
             paymentId,
             method: 'balance',
-            amount: Math.round(amount),
+            amount,
             paymentContext,
             bookingId: resolvedBookingId,
             matchId: resolvedMatchId,

@@ -41,6 +41,7 @@ const MATCH_STATUS: Record<string, BadgeConfig> = {
 const METHOD_ICON: Record<string, string> = { payos: '💳', mock: '🧪', cash: '💵' }
 const PAGE_SIZE = 8
 const VISIBLE_PAYMENT_STATUSES = ['completed', 'cancelled', 'expired', 'pending']
+const roundMoney = (value: any) => Math.round(Number(value) || 0)
 
 function StatusBadge({ status, map }: { status: string; map: Record<string, BadgeConfig> }) {
     const cfg = map[status] || { label: status, className: pageStyles.statusNeutral }
@@ -228,15 +229,15 @@ export default function OwnerDashboard() {
         }
     }
 
-    const formatPrice = (p) => new Intl.NumberFormat('vi-VN').format(Number(p) || 0) + 'đ'
+    const formatPrice = (p) => new Intl.NumberFormat('vi-VN').format(roundMoney(p)) + 'đ'
     const formatDate = (d) => formatDateVN(d)
     const formatDateTime = (d) => formatDateTimeVN(d)
     const formatTime = (t) => formatTimeHHmm(t)
     const isReceivedStatus = (status) => status === 'confirmed' || status === 'completed'
     const getNetReceived = (booking) => {
-        const total = Number(booking?.total_price || 0)
-        const commission = Number(booking?.commission_amount || 0)
-        return Math.max(total - commission, 0)
+        const total = roundMoney(booking?.total_price)
+        const commission = roundMoney(booking?.commission_amount)
+        return Math.max(roundMoney(total - commission), 0)
     }
 
     if (loading) return <div className={`${styles.dashboardPage} ${pageStyles.loadingState}`}>⏳ Đang tải...</div>

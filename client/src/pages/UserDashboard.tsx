@@ -49,6 +49,7 @@ const METHOD_ICON: Record<string, string> = { payos: '💳', mock: '🧪', cash:
 
 const PAGE_SIZE = 8
 const VISIBLE_PAYMENT_STATUSES = ['completed', 'cancelled', 'expired', 'pending']
+const roundMoney = (value: any) => Math.round(Number(value) || 0)
 
 function StatusBadge({ status, map }: { status: string; map: Record<string, { label: string; bg: string; color: string }> }) {
     const cfg = map[status] || { label: status, bg: 'rgba(156,163,175,0.15)', color: '#9ca3af' }
@@ -233,7 +234,7 @@ export default function UserDashboard() {
         loadData()
     }, [])
 
-    const fmt = (p: number) => new Intl.NumberFormat('vi-VN').format(p || 0) + 'đ'
+    const fmt = (p: number) => new Intl.NumberFormat('vi-VN').format(roundMoney(p)) + 'đ'
     const fmtDate = (d: string) => formatDateVN(d)
     const fmtDateTime = (d: string) => formatDateTimeVN(d)
     const fmtMatchDate = (value: any) => formatDateVN(value)
@@ -287,7 +288,7 @@ export default function UserDashboard() {
             subDescription: '',
             orderCode: '—',
             method: 'wallet',
-            amount: Number(tx.amount || 0),
+            amount: roundMoney(tx.amount),
             status: tx.status === 'completed' ? 'completed' : 'pending',
             rawPayment: null,
         })),
@@ -307,7 +308,7 @@ export default function UserDashboard() {
                 subDescription: p.booking_date ? `Ngày đặt: ${fmtDate(p.booking_date)}` : '',
                 orderCode: p.transaction_id?.split('_')[1] || '—',
                 method: p.payment_method || 'mock',
-                amount: Number(p.amount || 0),
+                amount: roundMoney(p.amount),
                 status: p.status,
                 rawPayment: p,
             }

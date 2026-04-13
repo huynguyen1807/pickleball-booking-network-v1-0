@@ -2,10 +2,18 @@ import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import styles from '../styles/Payment.module.css';
+import { useAuth } from '../context/AuthContext';
 
 export default function PaymentResult() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const dashboardPath = user?.role === 'owner'
+    ? '/owner/dashboard'
+    : user?.role === 'admin'
+      ? '/admin'
+      : '/dashboard';
   
   const [status, setStatus] = useState<'loading' | 'success' | 'failed' | 'pending'>('loading');
   const [paymentData, setPaymentData] = useState<any>(null);
@@ -90,7 +98,7 @@ export default function PaymentResult() {
 
     if (countdown === 0) {
       if (status === 'success') {
-        navigate('/dashboard');
+        navigate(dashboardPath);
       } else {
         navigate('/booking');
       }
@@ -158,7 +166,7 @@ export default function PaymentResult() {
 
           <div className={styles.resultActions}>
             <button 
-              onClick={() => navigate('/dashboard')}
+              onClick={() => navigate(dashboardPath)}
               className={styles.btnPrimary}
             >
               📊 Về Dashboard
@@ -211,7 +219,7 @@ export default function PaymentResult() {
               🔄 Thử lại thanh toán
             </button>
             <button 
-              onClick={() => navigate('/dashboard')}
+              onClick={() => navigate(dashboardPath)}
               className={styles.btnSecondary}
             >
               📊 Về Dashboard
@@ -252,7 +260,7 @@ export default function PaymentResult() {
               🔄 Kiểm tra lại
             </button>
             <button 
-              onClick={() => navigate('/dashboard')}
+              onClick={() => navigate(dashboardPath)}
               className={styles.btnSecondary}
             >
               📊 Về Dashboard

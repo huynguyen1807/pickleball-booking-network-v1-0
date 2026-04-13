@@ -22,6 +22,7 @@ export default function PaymentModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [balance, setBalance] = useState<number>(0);
+  const roundedAmount = Math.round(Number(amount) || 0);
 
   React.useEffect(() => {
     if (!isOpen) return;
@@ -65,7 +66,7 @@ export default function PaymentModal({
           qrCode,
           orderCode,
           paymentLinkId,
-          amount
+          amount: roundedAmount
         });
         onClose();
       } else {
@@ -100,14 +101,14 @@ export default function PaymentModal({
       onSuccess({
         bookingId: newBookingId,
         method: 'balance',
-        amount,
+        amount: roundedAmount,
         currentBalance: Number(payload?.currentBalance || 0)
       });
       onClose();
     } catch (err: any) {
       const msg = err.response?.data?.message || err.response?.data?.error || 'Không thể thanh toán bằng ví';
       const currentBalance = Number(err.response?.data?.currentBalance || 0);
-      const requiredAmount = Number(err.response?.data?.requiredAmount || amount);
+      const requiredAmount = Math.round(Number(err.response?.data?.requiredAmount || roundedAmount) || 0);
 
       if (msg.includes('Số dư ví không đủ')) {
         setError(`${msg}. Số dư hiện tại: ${currentBalance.toLocaleString('vi-VN')}đ, cần: ${requiredAmount.toLocaleString('vi-VN')}đ`);
@@ -136,7 +137,7 @@ export default function PaymentModal({
 
         <div className={styles.modalBody}>
           <p className={styles.paymentAmount}>
-            Số tiền: <strong>{amount.toLocaleString('vi-VN')} VND</strong>
+            Số tiền: <strong>{roundedAmount.toLocaleString('vi-VN')} VND</strong>
           </p>
 
           <p style={{ textAlign: 'center', margin: '0 0 12px', color: '#14532d', fontWeight: 600 }}>
@@ -153,7 +154,7 @@ export default function PaymentModal({
             <button
               className={`${styles.paymentOption} ${styles.balance}`}
               onClick={handlePayWithBalance}
-              disabled={loading || balance < amount}
+              disabled={loading || balance < roundedAmount}
             >
               <div className={styles.icon}>
                 <span>₫</span>
@@ -162,7 +163,7 @@ export default function PaymentModal({
                 <span className={styles.title}>Ví người dùng</span>
                 <span className={styles.subtitle}>Trừ trực tiếp từ số dư ví</span>
                 <span className={styles.description}>
-                  {balance >= amount ? 'Thanh toán tức thì, không cần quét QR' : 'Số dư ví không đủ'}
+                  {balance >= roundedAmount ? 'Thanh toán tức thì, không cần quét QR' : 'Số dư ví không đủ'}
                 </span>
               </div>
               {loading && <div className={styles.spinner}></div>}
