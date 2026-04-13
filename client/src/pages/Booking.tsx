@@ -5,6 +5,7 @@ import BackButton from '../components/BackButton'
 import PaymentModal from '../components/PaymentModal'
 import { PayOSPayment } from '../components/PayOSPayment'
 import { useDialog } from '../context/DialogContext'
+import { useAuth } from '../context/AuthContext'
 import styles from '../styles/Booking.module.css'
 import { formatDateVN, getAdvanceValidationMessage, getTodayYMD, isAtLeastAdvanceHours } from '../utils/dateTime'
 
@@ -12,6 +13,7 @@ export default function Booking() {
     const { id } = useParams()
     const [searchParams] = useSearchParams()
     const navigate = useNavigate()
+    const { user } = useAuth()
     const { showAlert } = useDialog()
     const [step, setStep] = useState(1)
     const [payment, setPayment] = useState('')
@@ -29,6 +31,7 @@ export default function Booking() {
     const endTime = searchParams.get('end') || '20:00'
     const subCourtId = searchParams.get('subCourt')
     const isStartTimeValid = isAtLeastAdvanceHours(bookingDate, startTime)
+    const dashboardPath = user?.role === 'owner' ? '/owner/dashboard' : user?.role === 'admin' ? '/admin' : '/dashboard'
 
     useEffect(() => {
         const loadCourt = async () => {
@@ -214,7 +217,7 @@ export default function Booking() {
                     </p>
                     <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
                         <button className="btn btn-primary" onClick={() => navigate('/')}>Về trang chủ</button>
-                        <button className="btn btn-secondary" onClick={() => navigate('/dashboard')}>Xem lịch sử</button>
+                        <button className="btn btn-secondary" onClick={() => navigate(dashboardPath)}>Xem lịch sử</button>
                     </div>
                 </div>
             )}

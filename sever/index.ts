@@ -77,8 +77,8 @@ setInterval(cancelExpiredPayments, 60 * 1000);
 // Also run once on startup to clear any payments that expired during downtime
 setTimeout(cancelExpiredPayments, 5000);
 
-// Auto-cancel matches with insufficient players 30 min before start (every 10 min)
-setInterval(autoCheckMatches, 10 * 60 * 1000);
+// Auto-cancel matches with insufficient players near the threshold (every 60s)
+setInterval(autoCheckMatches, 60 * 1000);
 setTimeout(autoCheckMatches, 15 * 1000);
 
 // Khởi tạo scheduler sinh court_slots hàng ngày (cho 30 ngày tới)
@@ -91,4 +91,5 @@ server.listen(PORT, () => {
     console.log(`📡 Socket.IO ready`);
     console.log(`🔗 http://localhost:${PORT}/api/health\n`);
     console.log(`⏰ Auto-cancel expired payments job started (every 60s)`);
+    console.log(`⏰ Auto-check underfilled matches job started (every 60s)`);
 });

@@ -157,7 +157,7 @@ export default function OwnerCourts() {
     if (loading) return <div className={styles.dashboardPage} style={{ textAlign: 'center', padding: '60px 20px' }}>⏳ Đang tải...</div>
 
     return (
-        <div className={styles.dashboardPage}>
+        <div className={styles.dashboardContainer}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
                 <div>
                     <h1 className="page-title">⚙️ Quản lý Cơ Sở & Sân</h1>

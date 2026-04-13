@@ -1,11 +1,19 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../api/axios'
+import { useAuth } from '../context/AuthContext'
 
 export default function PaymentCancel() {
     const [searchParams] = useSearchParams()
     const navigate = useNavigate()
+    const { user } = useAuth()
     const [countdown, setCountdown] = useState(5)
+
+    const dashboardPath = user?.role === 'owner'
+        ? '/owner/dashboard'
+        : user?.role === 'admin'
+            ? '/admin'
+            : '/dashboard'
 
     const orderCode = searchParams.get('orderCode')
 
@@ -21,14 +29,14 @@ export default function PaymentCancel() {
             setCountdown(prev => {
                 if (prev <= 1) {
                     clearInterval(timer)
-                    navigate('/dashboard')
+                    navigate(dashboardPath)
                     return 0
                 }
                 return prev - 1
             })
         }, 1000)
         return () => clearInterval(timer)
-    }, [navigate])
+    }, [navigate, dashboardPath])
 
     return (
         <div style={{
@@ -55,7 +63,7 @@ export default function PaymentCancel() {
             </p>
             <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
                 <button
-                    onClick={() => navigate('/dashboard')}
+                    onClick={() => navigate(dashboardPath)}
                     style={{
                         padding: '10px 24px',
                         borderRadius: '8px',
