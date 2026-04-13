@@ -80,6 +80,15 @@ const poolPromise = new sql.ConnectionPool(config).connect()
                     PRINT 'Updated users.status constraint to include banned';
                 END
             `);
+
+            // Auto-migration: Add cloud_public_id column to post_media for Cloudinary
+            await pool.request().query(`
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('post_media') AND name = 'cloud_public_id')
+                BEGIN
+                    ALTER TABLE post_media ADD cloud_public_id NVARCHAR(255) NULL;
+                    PRINT 'Added cloud_public_id to post_media';
+                END
+            `);
         } catch (e) {
             console.error('Migration failed:', e);
         }

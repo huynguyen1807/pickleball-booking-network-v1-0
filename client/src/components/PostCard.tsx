@@ -384,11 +384,12 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
                             <video
                                 src={data.media[0].url}
                                 controls
+                                preload="metadata"
                                 style={{
                                     width: '100%',
                                     borderRadius: 'var(--radius-md)',
                                     background: '#000',
-                                    maxHeight: '400px'
+                                    maxHeight: '500px'
                                 }}
                             />
                         ) : (
@@ -414,9 +415,9 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
                             borderRadius: 'var(--radius-md)',
                             overflow: 'hidden'
                         }}>
-                            {data.media.map((media, idx) => (
+                            {data.media.slice(0, 4).map((media, idx) => (
                                 <div
-                                    key={media.id}
+                                    key={media.id || idx}
                                     style={{
                                         aspectRatio: '1',
                                         background: '#000',
@@ -427,16 +428,37 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
                                     onClick={() => handleOpenPhoto(idx)}
                                 >
                                     {media.type === 'video' ? (
-                                        <div style={{
-                                            width: '100%',
-                                            height: '100%',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            fontSize: '32px'
-                                        }}>
-                                            🎥
-                                        </div>
+                                        <>
+                                            <video
+                                                src={media.url}
+                                                preload="metadata"
+                                                muted
+                                                style={{
+                                                    width: '100%',
+                                                    height: '100%',
+                                                    objectFit: 'cover'
+                                                }}
+                                            />
+                                            {/* Play button overlay */}
+                                            <div style={{
+                                                position: 'absolute',
+                                                top: 0, left: 0, right: 0, bottom: 0,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                background: 'rgba(0,0,0,0.25)'
+                                            }}>
+                                                <div style={{
+                                                    width: '44px', height: '44px',
+                                                    borderRadius: '50%',
+                                                    background: 'rgba(255,255,255,0.9)',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    fontSize: '18px'
+                                                }}>▶</div>
+                                            </div>
+                                        </>
                                     ) : (
                                         <img
                                             src={media.url}
@@ -451,10 +473,7 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
                                     {idx === 3 && data.media.length > 4 && (
                                         <div style={{
                                             position: 'absolute',
-                                            top: 0,
-                                            left: 0,
-                                            right: 0,
-                                            bottom: 0,
+                                            top: 0, left: 0, right: 0, bottom: 0,
                                             background: 'rgba(0,0,0,0.6)',
                                             display: 'flex',
                                             alignItems: 'center',
