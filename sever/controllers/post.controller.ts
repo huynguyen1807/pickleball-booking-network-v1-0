@@ -17,13 +17,23 @@ export const getPostById = async (req, res) => {
     try {
         const postId = parseInt(req.params.id);
         const pool = await poolPromise;
-        const result = await pool.request()
-            .input('id', sql.Int, postId)
-            .query(`SELECT p.*, u.full_name AS user_name, u.avatar, u.role AS user_role,
-                (SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = p.id) AS likes,
-                (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id) AS comments,
-                (SELECT COUNT(*) FROM post_shares ps WHERE ps.post_id = p.id) AS shares
-                FROM posts p JOIN users u ON p.user_id = u.id WHERE p.id = @id`);
+        let sql_query = `SELECT p.*, u.full_name AS user_name, u.avatar, u.role AS user_role,
+            (SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = p.id) AS likes,
+            (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id) AS comments,
+            (SELECT COUNT(*) FROM post_shares ps WHERE ps.post_id = p.id) AS shares`;
+            
+        if (req.user?.id) {
+            sql_query += `, CAST(CASE WHEN EXISTS (SELECT 1 FROM post_likes pl2 WHERE pl2.post_id = p.id AND pl2.user_id = @user_id) THEN 1 ELSE 0 END AS BIT) AS is_liked`;
+        } else {
+            sql_query += `, CAST(0 AS BIT) AS is_liked`;
+        }
+            
+        sql_query += ` FROM posts p JOIN users u ON p.user_id = u.id WHERE p.id = @id`;
+
+        const request = pool.request().input('id', sql.Int, postId);
+        if (req.user?.id) request.input('user_id', sql.Int, req.user.id);
+        
+        const result = await request.query(sql_query);
         if (result.recordset.length === 0) return res.status(404).json({ message: 'Không tìm thấy bài viết' });
         
         const post = result.recordset[0];
@@ -168,8 +178,16 @@ export const getAllPosts = async (req, res) => {
         let sql_query = `SELECT TOP 50 p.*, u.full_name AS user_name, u.avatar, u.role AS user_role,
             (SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = p.id) AS likes,
             (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id) AS comments,
-            (SELECT COUNT(*) FROM post_shares ps WHERE ps.post_id = p.id) AS shares
-            FROM posts p JOIN users u ON p.user_id = u.id`;
+            (SELECT COUNT(*) FROM post_shares ps WHERE ps.post_id = p.id) AS shares`;
+            
+        if (req.user?.id) {
+            sql_query += `, CAST(CASE WHEN EXISTS (SELECT 1 FROM post_likes pl2 WHERE pl2.post_id = p.id AND pl2.user_id = @user_id) THEN 1 ELSE 0 END AS BIT) AS is_liked`;
+            request.input('user_id', sql.Int, req.user.id);
+        } else {
+            sql_query += `, CAST(0 AS BIT) AS is_liked`;
+        }
+            
+        sql_query += ` FROM posts p JOIN users u ON p.user_id = u.id`;
         if (type) {
             request.input('type', sql.NVarChar, type);
             sql_query += ' WHERE p.post_type = @type';

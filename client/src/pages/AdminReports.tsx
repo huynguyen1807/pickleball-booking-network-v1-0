@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useDialog } from '../context/DialogContext'
 import api from '../api/axios'
 import styles from '../styles/Dashboard.module.css'
 
@@ -20,6 +21,7 @@ interface Report {
 }
 
 export default function AdminReports() {
+    const { showConfirm } = useDialog()
     const [reports, setReports] = useState<Report[]>([])
     const [loading, setLoading] = useState(true)
     const [selectedStatus, setSelectedStatus] = useState<string>('all')
@@ -80,7 +82,8 @@ export default function AdminReports() {
     }
 
     const handleDeleteReport = async (reportId: number) => {
-        if (!confirm('Bạn có chắc muốn xóa báo cáo này?')) return
+        const isConfirm = await showConfirm('Xác nhận xóa', 'Bạn có chắc muốn xóa báo cáo này không? Hành động này không thể hoàn tác.');
+        if (!isConfirm) return;
         try {
             await api.delete(`/reports/${reportId}`)
             await loadReports()
@@ -354,10 +357,51 @@ export default function AdminReports() {
                             </div>
                             {selectedReport.evidence_urls && (
                                 <div style={{ marginBottom: '12px' }}>
-                                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Chứng cứ:</div>
-                                    <a href={selectedReport.evidence_urls} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-blue)' }}>
-                                        View Evidence
-                                    </a>
+                                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '8px' }}>Chứng cứ đính kèm:</div>
+                                    <div style={{
+                                        position: 'relative',
+                                        maxHeight: '200px',
+                                        maxWidth: '100%',
+                                        borderRadius: 'var(--radius-md)',
+                                        overflow: 'hidden',
+                                        background: 'var(--bg-secondary)',
+                                        display: 'inline-block'
+                                    }}>
+                                        {selectedReport.evidence_urls.match(/\.(jpeg|jpg|gif|png|webp)/i) || selectedReport.evidence_urls.includes('image/upload') ? (
+                                            <a href={selectedReport.evidence_urls} target="_blank" rel="noreferrer" title="Click để mở kích thước đầy đủ">
+                                                <img 
+                                                    src={selectedReport.evidence_urls} 
+                                                    alt="Bằng chứng" 
+                                                    style={{ maxHeight: '200px', objectFit: 'contain', display: 'block' }} 
+                                                />
+                                            </a>
+                                        ) : selectedReport.evidence_urls.match(/\.(mp4|webm|avi)/i) || selectedReport.evidence_urls.includes('video/upload') ? (
+                                            <video 
+                                                src={selectedReport.evidence_urls} 
+                                                controls 
+                                                preload="metadata"
+                                                style={{ maxHeight: '200px', maxWidth: '100%', display: 'block' }} 
+                                            />
+                                        ) : (
+                                            <a 
+                                                href={selectedReport.evidence_urls} 
+                                                target="_blank" 
+                                                rel="noreferrer" 
+                                                style={{ 
+                                                    color: 'white', 
+                                                    background: 'var(--accent-blue)', 
+                                                    padding: '8px 16px', 
+                                                    borderRadius: 'var(--radius-md)', 
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    textDecoration: 'none',
+                                                    fontWeight: 600
+                                                }}
+                                            >
+                                                📥 Tải xuống Bằng Chứng
+                                            </a>
+                                        )}
+                                    </div>
                                 </div>
                             )}
                         </div>

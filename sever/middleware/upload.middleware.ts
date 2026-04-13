@@ -68,21 +68,7 @@ export const uploadPostMedia = multer({
     limits: { fileSize: 100 * 1024 * 1024 } // Giới hạn 100MB cho video
 });
 
-// Report evidence upload config
-const reportEvidenceDir = path.join(uploadDir, 'report_evidence');
-if (!fs.existsSync(reportEvidenceDir)) {
-    fs.mkdirSync(reportEvidenceDir, { recursive: true });
-}
-
-const reportEvidenceStorage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, reportEvidenceDir);
-    },
-    filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, uniqueSuffix + path.extname(file.originalname));
-    }
-});
+const reportEvidenceStorage = multer.memoryStorage();
 
 const reportEvidenceFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
     const allowedMimeTypes = [

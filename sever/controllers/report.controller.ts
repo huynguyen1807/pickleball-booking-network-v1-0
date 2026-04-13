@@ -3,6 +3,7 @@ import { sql, poolPromise } from '../config/db';
 import fs from 'fs';
 import path from 'path';
 import { getIO } from '../socket';
+import { uploadToCloudinary } from '../config/cloudinary';
 
 interface AuthRequest extends Request {
     user?: {
@@ -73,22 +74,19 @@ export const createReport = async (req: AuthRequest, res: Response) => {
             `);
 
         if (duplicateCheck.recordset.length > 0) {
-            // Delete uploaded file if exists
-            if (req.file) {
-                try {
-                    fs.unlinkSync(req.file.path);
-                } catch (err) {
-                    console.error('Failed to delete file:', err);
-                }
-            }
             return res.status(400).json({ message: 'Bạn đã báo cáo đối tượng này trong 24 giờ qua' });
         }
 
         // Get file path if exists
-        let evidencePath = null;
+        let evidenceUrl = null;
         if (req.file) {
-            evidencePath = req.file.path.replace(/\\/g, '/').replace(/^uploads\//, '');
-            console.log(`📎 Evidence file saved: ${evidencePath}`);
+            const mediaType = req.file.mimetype.startsWith('video') ? 'video' : 'image'; // or 'auto' for PDFs
+            const cloudResult = await uploadToCloudinary(req.file.buffer, {
+                folder: 'pickleball/reports',
+                resource_type: mediaType === 'video' ? 'video' : 'auto',
+            });
+            evidenceUrl = cloudResult.secure_url;
+            console.log(`☁️ Evidence file uploaded to Cloudinary: ${evidenceUrl}`);
         }
 
         // Create report
@@ -98,7 +96,7 @@ export const createReport = async (req: AuthRequest, res: Response) => {
             .input('report_target_id', sql.Int, report_target_id || null)
             .input('report_target_type', sql.NVarChar, report_target_type || null)
             .input('description', sql.NVarChar, description)
-            .input('evidence_urls', sql.NVarChar(sql.MAX), evidencePath || null)
+            .input('evidence_urls', sql.NVarChar(sql.MAX), evidenceUrl || null)
             .query(`
                 INSERT INTO reports (reporter_id, report_type, report_target_id, report_target_type, description, evidence_urls, status)
                 OUTPUT INSERTED.id
@@ -125,14 +123,6 @@ export const createReport = async (req: AuthRequest, res: Response) => {
 
         res.status(201).json({ message: 'Báo cáo đã được gửi', reportId });
     } catch (err) {
-        // Delete uploaded file if error
-        if (req.file) {
-            try {
-                fs.unlinkSync(req.file.path);
-            } catch (delErr) {
-                console.error('Failed to delete file:', delErr);
-            }
-        }
         console.error("Error in createReport:", err);
         res.status(500).json({ message: 'Lỗi server' });
     }

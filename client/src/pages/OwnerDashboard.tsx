@@ -127,7 +127,7 @@ export default function OwnerDashboard() {
         const paymentLinkId = parts.length >= 3 ? parts.slice(2).join('_') : ''
 
         if (!paymentLinkId) {
-            alert('Không tìm thấy thông tin link thanh toán cho giao dịch này')
+            await showAlert('Không tìm thấy thông tin', 'Không tìm thấy thông tin link thanh toán cho giao dịch này')
             return
         }
 
@@ -144,7 +144,7 @@ export default function OwnerDashboard() {
             window.location.href = checkoutUrl
         } catch (err: any) {
             console.error('Failed to redirect payment:', err)
-            alert(err?.response?.data?.message || 'Không thể chuyển đến trang thanh toán')
+            await showAlert('Lỗi thanh toán', err?.response?.data?.message || 'Không thể chuyển đến trang thanh toán')
             setRedirectingPaymentId(null)
         }
     }
@@ -161,7 +161,7 @@ export default function OwnerDashboard() {
         if (!cancelModal.booking) return;
         try {
             const res = await api.put(`/bookings/${cancelModal.booking.id}/cancel`);
-            alert(res.data.message || 'Hủy thành công');
+            await showAlert('Thành công', res.data.message || 'Hủy thành công');
             setCancelModal({ open: false, booking: null, hoursLeft: 0 });
             window.location.reload();
         } catch (err: any) {

@@ -2,17 +2,9 @@ import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useDialog } from '../context/DialogContext'
 import api from '../api/axios'
-import { io } from 'socket.io-client'
+import socket from '../api/socket'
 import UserProfileCard from './UserProfileCard'
 import styles from '../styles/Chat.module.css'
-
-const productionSocketUrl = 'https://pickleball-booking-network-v1-0.onrender.com'
-const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-const socketUrl = import.meta.env.VITE_SOCKET_URL || import.meta.env.VITE_API_URL || (isLocalhost ? 'http://localhost:5000' : productionSocketUrl)
-const socket = io(socketUrl, {
-    transports: ['websocket'],
-    withCredentials: true
-})
 
 interface ChatBoxProps {
     roomId: number

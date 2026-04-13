@@ -2,13 +2,10 @@ import { useState, useEffect, useRef } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
-import { io } from 'socket.io-client'
+import socket from '../api/socket'
 import NotificationDropdown from './NotificationDropdown'
 import styles from '../styles/Navbar.module.css'
 import { getAvatarUrl } from '../utils/imageUrl'
-
-
-const socket = io('http://localhost:5000')
 
 export default function Navbar() {
     const { user, logout } = useAuth()

@@ -60,11 +60,11 @@ export default function Settings() {
         const file = e.target.files?.[0]
         if (!file) return
         if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-            alert('Chỉ chấp nhận file ảnh JPG, PNG hoặc WEBP')
+            void showAlert('Lỗi ảnh', 'Chỉ chấp nhận file ảnh JPG, PNG hoặc WEBP')
             return
         }
         if (file.size > 3 * 1024 * 1024) {
-            alert('File ảnh không được vượt quá 3MB')
+            void showAlert('Lỗi ảnh', 'File ảnh không được vượt quá 3MB')
             return
         }
         setPreviewFile(file)
@@ -83,7 +83,7 @@ export default function Settings() {
                 videoRef.current.srcObject = stream
             }
         } catch {
-            alert('Không thể truy cập camera. Vui lòng cho phép truy cập camera.')
+            await showAlert('Lỗi camera', 'Không thể truy cập camera. Vui lòng cho phép truy cập camera.')
             setAvatarMode('choose')
         }
     }
@@ -117,9 +117,9 @@ export default function Settings() {
             })
             updateUser({ avatar: res.data.avatar })
             closeAvatarModal()
-            alert('✅ Cập nhật ảnh đại diện thành công!')
+            await showAlert('Thành công', '✅ Cập nhật ảnh đại diện thành công!')
         } catch (err: any) {
-            alert(err.response?.data?.message || 'Lỗi khi cập nhật ảnh')
+            await showAlert('Lỗi tải lên', err.response?.data?.message || 'Lỗi khi cập nhật ảnh')
         } finally {
             setUploadingAvatar(false)
         }

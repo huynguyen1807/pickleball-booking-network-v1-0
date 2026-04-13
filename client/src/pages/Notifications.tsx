@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { useDialog } from '../context/DialogContext'
 import api from '../api/axios'
 import styles from '../styles/Notifications.module.css'
 
@@ -18,6 +19,7 @@ interface Notification {
 export default function NotificationsPage() {
     const navigate = useNavigate()
     const { user } = useAuth()
+    const { showConfirm } = useDialog()
     const [notifications, setNotifications] = useState<Notification[]>([])
     const [loading, setLoading] = useState(true)
     const [filter, setFilter] = useState<'all' | 'unread'>('all')
@@ -58,8 +60,14 @@ export default function NotificationsPage() {
         }
     }
 
-    const deleteNotification = (id: number) => {
-        setNotifications(prev => prev.filter(n => n.id !== id))
+    const deleteNotification = async (id: number) => {
+        const confirmDelete = await showConfirm('Xóa thông báo', 'Bạn có chắc chắn muốn xóa thông báo này?');
+        if (confirmDelete) {
+            setNotifications(prev => prev.filter(n => n.id !== id))
+            try {
+                await api.delete(`/notifications/${id}`)
+            } catch {}
+        }
     }
 
     const handleNotificationClick = async (notification: Notification) => {

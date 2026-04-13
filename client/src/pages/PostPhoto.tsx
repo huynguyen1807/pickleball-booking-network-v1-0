@@ -3,7 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useDialog } from '../context/DialogContext'
 import api from '../api/axios'
-import { io as socketIO } from 'socket.io-client'
+import { createSocket } from '../api/socket'
 import BackButton from '../components/BackButton'
 import UserProfileCard from '../components/UserProfileCard'
 import styles from '../styles/PostPhoto.module.css'
@@ -43,6 +43,7 @@ export default function PostPhoto() {
                 setLikeCount(r.data.likes || 0)
                 setCommentCount(r.data.comments || 0)
                 setShareCount(r.data.shares || 0)
+                setLiked(!!r.data.is_liked)
                 setLoading(false)
                 // Update page title & meta
                 document.title = `Ảnh của ${r.data.user_name} | PickleBall`
@@ -61,7 +62,7 @@ export default function PostPhoto() {
     // Socket real-time
     useEffect(() => {
         if (!id) return
-        const socket = socketIO('http://localhost:5000', { transports: ['websocket'] })
+        const socket = createSocket()
         socket.emit('join_post', parseInt(id))
         socket.on('post_liked', (ev: { postId: number; likes: number }) => {
             if (ev.postId === parseInt(id!)) setLikeCount(ev.likes)

@@ -88,11 +88,11 @@ export default function UserProfile() {
         const file = e.target.files?.[0]
         if (!file) return
         if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-            alert('Chỉ chấp nhận file ảnh JPG, PNG hoặc WEBP')
+            void showAlert('Lỗi', 'Chỉ chấp nhận file ảnh JPG, PNG hoặc WEBP')
             return
         }
         if (file.size > 3 * 1024 * 1024) {
-            alert('File ảnh không được vượt quá 3MB')
+            void showAlert('Lỗi', 'File ảnh không được vượt quá 3MB')
             return
         }
         setPreviewFile(file)
@@ -111,7 +111,7 @@ export default function UserProfile() {
                 videoRef.current.srcObject = stream
             }
         } catch (err) {
-            alert('Không thể truy cập camera. Vui lòng cho phép truy cập camera.')
+            await showAlert('Lỗi', 'Không thể truy cập camera. Vui lòng cho phép truy cập camera.')
             setAvatarMode('choose')
         }
     }
@@ -150,7 +150,7 @@ export default function UserProfile() {
             updateUser({ avatar: res.data.avatar })
             closeModal()
         } catch (err: any) {
-            alert(err.response?.data?.message || 'Lỗi khi cập nhật ảnh')
+            await showAlert('Lỗi', err.response?.data?.message || 'Lỗi khi cập nhật ảnh')
         } finally {
             setUploading(false)
         }

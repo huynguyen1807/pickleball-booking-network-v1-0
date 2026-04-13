@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useDialog } from '../context/DialogContext'
-import { io } from 'socket.io-client'
+import { createSocket } from '../api/socket'
 import api from '../api/axios'
 
 interface Report {
@@ -35,13 +35,7 @@ export default function MyReports() {
     fetchReports()
 
     // Setup socket for real-time reports
-    const socketURL = 'http://localhost:5000'
-    const socket = io(socketURL, {
-      reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      reconnectionAttempts: 5
-    })
+    const socket = createSocket()
     
     // Kết nối và join room khi socket sẵn sàng
     if (socket.connected) {
@@ -261,6 +255,57 @@ export default function MyReports() {
               }}>
                 {report.description}
               </div>
+
+              {/* Evidence */}
+              {report.evidence_url && (
+                <div style={{ marginBottom: '12px' }}>
+                  <div style={{
+                    position: 'relative',
+                    maxHeight: '150px',
+                    maxWidth: '100%',
+                    borderRadius: 'var(--radius-md)',
+                    overflow: 'hidden',
+                    background: 'var(--bg-primary)',
+                    display: 'inline-block'
+                  }}>
+                    {report.evidence_url.match(/\.(jpeg|jpg|gif|png|webp)/i) || report.evidence_url.includes('image/upload') ? (
+                        <a href={report.evidence_url} target="_blank" rel="noreferrer" title="Click để xem đầy đủ">
+                            <img 
+                                src={report.evidence_url} 
+                                alt="Bằng chứng" 
+                                style={{ maxHeight: '150px', objectFit: 'contain', display: 'block' }} 
+                            />
+                        </a>
+                    ) : report.evidence_url.match(/\.(mp4|webm|avi)/i) || report.evidence_url.includes('video/upload') ? (
+                        <video 
+                            src={report.evidence_url} 
+                            controls 
+                            preload="metadata"
+                            style={{ maxHeight: '150px', maxWidth: '100%', display: 'block' }} 
+                        />
+                    ) : (
+                        <a 
+                            href={report.evidence_url} 
+                            target="_blank" 
+                            rel="noreferrer" 
+                            style={{ 
+                                color: 'white', 
+                                background: 'var(--accent-blue)', 
+                                padding: '6px 12px', 
+                                borderRadius: 'var(--radius-md)', 
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                textDecoration: 'none',
+                                fontWeight: 600,
+                                fontSize: '0.85rem'
+                            }}
+                        >
+                            🔗 Xem Bằng Chứng
+                        </a>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Admin Note */}
               {report.admin_note && (
