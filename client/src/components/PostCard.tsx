@@ -2,7 +2,7 @@ import React, { useState, useEffect, FormEvent } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import api from '../api/axios'
-import { io as socketIO } from 'socket.io-client'
+import { createSocket } from '../api/socket'
 import UserProfileCard from './UserProfileCard'
 import ReportModal from './ReportModal'
 import { useDialog } from '../context/DialogContext'
@@ -77,7 +77,7 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
         comments: 5
     }
 
-    const [liked, setLiked] = useState(false)
+    const [liked, setLiked] = useState(!!data.is_liked)
     const [, setTick] = useState(0)
     const [likeCount, setLikeCount] = useState(data.likes || 0)
     const [showShare, setShowShare] = useState(false)
@@ -92,7 +92,8 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
         setLikeCount(data.likes || 0)
         setCommentCount(data.comments || 0)
         setShareCount(data.shares || 0)
-    }, [post?.id])
+        setLiked(!!data.is_liked)
+    }, [post?.id, data.is_liked])
 
     // Auto-refresh time display every 30 seconds
     useEffect(() => {
@@ -103,7 +104,7 @@ export default function PostCard({ post, isHidden = false, onDeleted, onHide }: 
     // Real-time socket updates for this post
     useEffect(() => {
         if (!data.id) return
-        const socket = socketIO('http://localhost:5000', { transports: ['websocket'] })
+        const socket = createSocket()
         socket.emit('join_post', data.id)
         socket.on('post_liked', (ev: { postId: number; likes: number }) => {
             if (ev.postId === data.id) setLikeCount(ev.likes)

@@ -18,5 +18,17 @@ const auth = (req: AuthRequest, res: Response, next: NextFunction) => {
         return res.status(401).json({ message: 'Token không hợp lệ' });
     }
 };
+export const optionalAuth = (req: AuthRequest, res: Response, next: NextFunction) => {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return next();
+
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET!) as TokenPayload;
+        req.user = decoded;
+    } catch (err) {
+        // Ignore invalid token
+    }
+    next();
+};
 
 export default auth;

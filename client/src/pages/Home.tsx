@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useDialog } from '../context/DialogContext'
 import api from '../api/axios'
-import { io as socketIO } from 'socket.io-client'
+import { createSocket } from '../api/socket'
 import PostCard from '../components/PostCard'
 import CameraModal from '../components/CameraModal'
 import styles from '../styles/Home.module.css'
@@ -39,7 +39,7 @@ export default function Home() {
     }, [])
 
     useEffect(() => {
-        const socket = socketIO('http://localhost:5000', { transports: ['websocket'] })
+        const socket = createSocket()
 
         socket.on('post_created', (newPost: any) => {
             if (!newPost?.id) return

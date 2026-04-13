@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { io } from 'socket.io-client'
+import { createSocket } from '../api/socket'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
 
@@ -11,7 +11,7 @@ export default function BanListener() {
     useEffect(() => {
         if (!user) return
 
-        const socket = io('http://localhost:5000', { transports: ['websocket'] })
+        const socket = createSocket()
 
         socket.on('connect', () => {
             // Join user-specific notification room

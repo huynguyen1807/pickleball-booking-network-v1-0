@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
 import styles from '../styles/NotificationDropdown.module.css'
 import { Bell, X } from 'lucide-react'
-import io from 'socket.io-client'
+import { createSocket } from '../api/socket'
 
 interface Notification {
     id: number
@@ -63,10 +63,7 @@ export default function NotificationDropdown() {
     }
 
     const subscribeToSocketEvents = () => {
-        const socketUrl = window.location.hostname === 'localhost' 
-            ? 'http://localhost:5000' 
-            : window.location.origin
-        const socket = io(socketUrl)
+        const socket = createSocket()
         
         socket.on('connect', () => {
             if (user?.id) {

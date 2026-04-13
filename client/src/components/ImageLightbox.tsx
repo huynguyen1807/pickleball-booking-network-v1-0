@@ -2,7 +2,7 @@ import { useEffect, useCallback, useState, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useDialog } from '../context/DialogContext'
 import api from '../api/axios'
-import { io as socketIO } from 'socket.io-client'
+import { createSocket } from '../api/socket'
 import UserProfileCard from './UserProfileCard'
 import styles from '../styles/ImageLightbox.module.css'
 
@@ -37,7 +37,7 @@ export default function ImageLightbox({ imageUrl, post, onClose }: LightboxProps
     // Socket real-time
     useEffect(() => {
         if (!post?.id) return
-        const socket = socketIO('http://localhost:5000', { transports: ['websocket'] })
+        const socket = createSocket()
         socket.emit('join_post', post.id)
 
         socket.on('post_liked', (data: { postId: number; likes: number }) => {
